@@ -69,3 +69,5 @@ GoogleService-Info.plist
 
 # OS 관련
 Thumbs.db
+
+lib/firebase_options.dart
