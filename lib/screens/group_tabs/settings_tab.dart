@@ -8,6 +8,7 @@ import '../../services/group_service.dart';
 import '../../services/notification_service.dart';
 import 'group_info_edit_screen.dart';
 import 'join_requests_screen.dart';
+import 'plan_screen.dart';
 
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
@@ -101,7 +102,7 @@ class _SettingsTabState extends State<SettingsTab> {
     final memberLimit = gp.memberLimit;
     final memberCount = gp.memberCount;
     final plan = gp.plan;
-    final maxLimit = plan == 'free' ? 50 : 1000;
+    final maxLimit = gp.absoluteMaxLimit;
     final requireApproval = gp.requireApproval;
     final currentType = gp.type;
     final currentCategory = gp.category;
@@ -153,35 +154,14 @@ class _SettingsTabState extends State<SettingsTab> {
 
         // ── 유형 & 카테고리 ──────────────────────────────────────────────────
         ListTile(
-          leading:
-              Icon(Icons.business_outlined, color: colorScheme.primary),
-          title: Text(l.type),
-          subtitle: Text(_typeLabel(currentType, l)),
+          leading: Icon(Icons.info_outline, color: colorScheme.primary), // 아이콘을 통합된 느낌으로 변경
+          title: Text(l.groupType), // '그룹 정보' 혹은 '유형 및 카테고리'
+          subtitle: Text(
+            '${_typeLabel(currentType, l)}  •  ${currentCategory.isEmpty ? '-' : currentCategory}',
+            style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7)),
+          ),
           trailing: canEdit
-              ? Icon(Icons.chevron_right,
-                  color: colorScheme.onSurface.withOpacity(0.4))
-              : null,
-          onTap: canEdit
-              ? () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => GroupInfoEditScreen(
-                      groupId: groupId,
-                      currentType: currentType,
-                      currentCategory: currentCategory,
-                      currentName: currentName,
-                      canEditInfo: canEdit,
-                    ),
-                  ))
-              : null,
-        ),
-        ListTile(
-          leading:
-              Icon(Icons.category_outlined, color: colorScheme.primary),
-          title: Text(l.category),
-          subtitle:
-              Text(currentCategory.isEmpty ? '-' : currentCategory),
-          trailing: canEdit
-              ? Icon(Icons.chevron_right,
-                  color: colorScheme.onSurface.withOpacity(0.4))
+              ? Icon(Icons.chevron_right, color: colorScheme.onSurface.withOpacity(0.4))
               : null,
           onTap: canEdit
               ? () => Navigator.of(context).push(MaterialPageRoute(
@@ -221,7 +201,7 @@ class _SettingsTabState extends State<SettingsTab> {
           leading:
               Icon(Icons.people_outline, color: colorScheme.primary),
           title: Text(l.memberLimit),
-          subtitle: Text('$memberCount / $memberLimit ${l.people}'),
+          subtitle: Text('$memberCount / $maxLimit ${l.people}'),
           trailing: canEdit
               ? TextButton(
                   onPressed: () => _showMemberLimitDialog(context, l,
@@ -373,10 +353,43 @@ class _SettingsTabState extends State<SettingsTab> {
             title: Text(l.manageBoardsSection),
             trailing: Icon(Icons.chevron_right,
                 color: colorScheme.onSurface.withOpacity(0.4)),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => _BoardManagementScreen(groupId: groupId),
-            )),
+            onTap: () {
+              // 1. 현재 context에서 이미 활성화된 groupProvider를 가져옵니다.
+              final groupProvider = context.read<GroupProvider>();
+
+              Navigator.of(context).push(MaterialPageRoute(
+                // 2. 새로운 화면으로 기존 groupProvider 인스턴스를 주입하며 이동합니다.
+                builder: (_) => ChangeNotifierProvider.value(
+                  value: groupProvider,
+                  child: _BoardManagementScreen(groupId: groupId),
+                ),
+              ));
+            },
           ),
+          const Divider(),
+
+          // ── 유료플랜 관리 ──────────────────────────────────────────────────────
+          _SectionHeader(title: l.sectionPremium),
+          ListTile(
+            leading:
+                Icon(Icons.article_outlined, color: colorScheme.primary),
+            title: Text(l.manageGroupPlan),
+            trailing: Icon(Icons.chevron_right,
+                color: colorScheme.onSurface.withOpacity(0.4)),
+            onTap: () {
+              // 1. 현재 context에서 이미 활성화된 groupProvider를 가져옵니다.
+              final groupProvider = context.read<GroupProvider>();
+
+              Navigator.of(context).push(MaterialPageRoute(
+                // 2. 새로운 화면으로 기존 groupProvider 인스턴스를 주입하며 이동합니다.
+                builder: (_) => ChangeNotifierProvider.value(
+                  value: groupProvider,
+                  child: PlanScreen(groupId: groupId),
+                ),
+              ));
+            },
+          ),
+
           const Divider(),
         ],
 
@@ -925,10 +938,77 @@ class _BoardManagementScreen extends StatelessWidget {
   void _showBoardForm(BuildContext context, AppLocalizations l,
       ColorScheme colorScheme, GroupService service,
       {Map<String, dynamic>? board}) {
+    final groupProvider = context.read<GroupProvider>();
+    if (!groupProvider.loaded) return;
+    // 새 게시판 생성 시에 한도 체크
+    if (board == null) {
+      if (groupProvider.boardCount >= groupProvider.getMaxBoards()){
+        _showUpgradeDialog(context, groupProvider.plan, l);
+        return;
+      }
+    }
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => _BoardFormScreen(groupId: groupId, board: board),
     ));
   }
+
+  // 다이얼로그 함수를 메서드로 분리
+  void _showUpgradeDialog(BuildContext context, String currentPlan, AppLocalizations l) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.unfold_more_double_outlined, color: colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(l.limitReached), 
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l.boardLimitReachedMsg(currentPlan.toUpperCase(), currentPlan == 'free' ? 3 : 5),              
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Text(l.upgradePlanPrompt),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l.cancel, style: TextStyle(color: colorScheme.onSurfaceVariant)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+              elevation: 0,
+            ),
+            onPressed: () {
+              final groupProvider = context.read<GroupProvider>();
+              // 다이얼로그 닫기
+              Navigator.pop(ctx);
+              // 결제 페이지 이동 로직 추가 가능
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => ChangeNotifierProvider.value(
+                  value: groupProvider,
+                  child: PlanScreen(groupId: groupId),
+                ),
+              ));
+            },
+            child: Text(l.viewPlans),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   void _confirmDelete(
       BuildContext context,

@@ -79,6 +79,7 @@ class GroupTypeCategoryData {
       'cat_business_startup',
       'cat_social_networking',
       'cat_travel',
+      'cat_food_gourmet',
       'cat_reading_study',
       'cat_cooking',
       'cat_gaming',
@@ -104,6 +105,7 @@ class GroupTypeCategoryData {
       'cat_social_networking',
       'cat_travel',
       'cat_reading',
+      'cat_food_gourmet',
       'cat_cooking',
       'cat_gaming',
       'cat_music',
@@ -182,6 +184,7 @@ class GroupTypeCategoryData {
       case 'cat_music':               return l.catMusic2;
       case 'cat_photo_video':         return l.catPhotoVideo;
       case 'cat_dance':               return l.catDance;
+      case 'cat_food_gourmet':        return l.catFoodGourmet;
       // ── 학원 ──────────────────────────────────────────────────
       case 'cat_english_academy':     return l.catEnglishAcademy;
       case 'cat_language_academy':    return l.catLanguageAcademy;

@@ -40,6 +40,7 @@ class AppLocalizations {
   String get sectionGroupInfo => _s.sectionGroupInfo;
   String get sectionNotifications => _s.sectionNotifications;
   String get sectionMemberManagement => _s.sectionMemberManagement;
+  String get sectionPremium => _s.sectionPremium;
   String get sectionDangerZone => _s.sectionDangerZone;
   String get groupName => _s.groupName;
   String get category => _s.category;
@@ -168,7 +169,7 @@ class AppLocalizations {
   String get selectGroupType => _s.selectGroupType;
   String get selectGroupTypeDesc => _s.selectGroupTypeDesc;
   String get selectCategory => _s.selectCategory;
-  String get selectCategoryDesc => _s.selectCategoryDesc;
+  String get selectChooseOne => _s.selectChooseOne;
   String get groupSettings => _s.groupSettings;
   String get joinSettings => _s.joinSettings;
   String get requireApprovalDesc => _s.requireApprovalDesc;
@@ -176,6 +177,14 @@ class AppLocalizations {
   String get people => _s.people;
   String get selectPlan => _s.selectPlan;
   String get selectPlanDesc => _s.selectPlanDesc;
+  String get active => _s.active;
+  String get unlimited => _s.unlimited;
+  String get prioritySupport => _s.prioritySupport;
+  String get advancedAdminTool => _s.advancedAdminTool;
+  String get freePlanDesc => _s.freePlanDesc;
+  String get plusPlanDesc => _s.plusPlanDesc;
+  String get proPlanDesc => _s.proPlanDesc;
+
 
   // ── 플랜: Free ──────────────────────────────────────────────────────────────
   String get planFree => _s.planFree;
@@ -204,6 +213,7 @@ class AppLocalizations {
   String get planProFeature5 => _s.planProFeature5;
 
   // ── 플랜 공통 ────────────────────────────────────────────────────────────────
+  String get manageGroupPlan => _s.manageGroupPlan;
   String get allowPlanUpgrade => _s.allowPlanUpgrade;
   String get allowPlanUpgradeDesc => _s.allowPlanUpgradeDesc;
   String get comingSoon => _s.comingSoon;
@@ -211,8 +221,16 @@ class AppLocalizations {
   String get currentPlan => _s.currentPlan;
   String get upgradePlan => _s.upgradePlan;
   String get planUpgradeComingSoon => _s.planUpgradeComingSoon;
+  String get limitReached => _s.limitReached;
+  String get upgradePlanPrompt => _s.upgradePlanPrompt;
+  String get viewPlans => _s.viewPlans;
+  String boardLimitReachedMsg(String plan, int limit) => _s.boardLimitReachedMsg(plan, limit);
+  String boardLimitText(dynamic limit) => _s.boardLimitText(limit);
+  String chatLimitText(dynamic limit) => _s.chatLimitText(limit);
+  String memberLimitText(int limit) => _s.memberLimitText(limit);
 
   String get next => _s.next;
+  String get groupType => _s.groupType;
   String get groupTypeCompany => _s.groupTypeCompany;
   String get groupTypeClub => _s.groupTypeClub;
   String get groupTypeSmall => _s.groupTypeSmall;
@@ -437,6 +455,7 @@ class AppLocalizations {
   String get catMusic2 => _s.catMusic2;
   String get catPhotoVideo => _s.catPhotoVideo;
   String get catDance => _s.catDance;
+  String get catFoodGourmet => _s.catFoodGourmet;
   // 학원
   String get catEnglishAcademy => _s.catEnglishAcademy;
   String get catLanguageAcademy => _s.catLanguageAcademy;
@@ -460,6 +479,10 @@ class AppLocalizations {
   String get catAlumni => _s.catAlumni;
   // 공통
   String get catOther2 => _s.catOther2;
+  // 차단
+  String bannedUserNotice(String name) => 
+      _s.bannedUserNotice.replaceAll('__name__', name);
+
   // 그룹 생성 인원수 안내
   String get memberLimitPlanHint => _s.memberLimitPlanHint;
 
@@ -492,6 +515,7 @@ abstract class _AppStrings {
   String get joinRequestSent;
   String get joinedSuccess;
   String get joinFailed;
+  String get bannedUserNotice;
   String get alreadyJoined;
   String get searchPlaceholder;
   String get tabMembers;
@@ -512,11 +536,13 @@ abstract class _AppStrings {
   String get sectionGroupInfo;
   String get sectionNotifications;
   String get sectionMemberManagement;
+  String get sectionPremium;
   String get sectionDangerZone;
   String get groupName;
   String get category;
   String get type;
   String get requireApproval;
+  String get groupType;
   String get groupNotifications;
   String get manageJoinRequests;
   String get leaveGroup;
@@ -640,7 +666,7 @@ abstract class _AppStrings {
   String get selectGroupType;
   String get selectGroupTypeDesc;
   String get selectCategory;
-  String get selectCategoryDesc;
+  String get selectChooseOne;
   String get groupSettings;
   String get joinSettings;
   String get requireApprovalDesc;
@@ -648,6 +674,14 @@ abstract class _AppStrings {
   String get people;
   String get selectPlan;
   String get selectPlanDesc;
+  String get active;
+  String get unlimited;
+  String get prioritySupport;
+  String get advancedAdminTool;
+  String get freePlanDesc;
+  String get plusPlanDesc;
+  String get proPlanDesc;  
+  
   // Free
   String get planFree;
   String get planFreePrice;
@@ -672,6 +706,7 @@ abstract class _AppStrings {
   String get planProFeature4;
   String get planProFeature5;
   // 플랜 공통
+  String get manageGroupPlan;
   String get allowPlanUpgrade;
   String get allowPlanUpgradeDesc;
   String get comingSoon;
@@ -679,6 +714,13 @@ abstract class _AppStrings {
   String get currentPlan;
   String get upgradePlan;
   String get planUpgradeComingSoon;
+  String get limitReached;
+  String get viewPlans;
+  String get upgradePlanPrompt;
+  String boardLimitReachedMsg(String plan, int limit);
+  String boardLimitText(dynamic limit);
+  String chatLimitText(dynamic limit);
+  String memberLimitText(int limit);
 
   String get next;
   String get groupTypeCompany;
@@ -931,6 +973,7 @@ abstract class _AppStrings {
   String get catSameYear;
   String get catAlumni;
   String get catOther2;
+  String get catFoodGourmet;
   String get memberLimitPlanHint;
 }
 
@@ -996,7 +1039,9 @@ class _EnStrings extends _AppStrings {
   @override String get sectionNotifications => 'NOTIFICATIONS';
   @override String get sectionMemberManagement => 'MEMBER MANAGEMENT';
   @override String get sectionDangerZone => 'DANGER ZONE';
+  @override String get sectionPremium => 'PREMIUM';
   @override String get groupName => 'Group Name';
+  @override String get groupType => 'Group Type';
   @override String get category => 'Category';
   @override String get type => 'Type';
   @override String get requireApproval => 'Require Approval to Join';
@@ -1123,7 +1168,7 @@ class _EnStrings extends _AppStrings {
   @override String get selectGroupType => 'Group Type';
   @override String get selectGroupTypeDesc => 'What kind of group is this?';
   @override String get selectCategory => 'Category';
-  @override String get selectCategoryDesc => 'Select up to 3 categories.';
+  @override String get selectChooseOne => 'Choose one.';
   @override String get groupSettings => 'Settings';
   @override String get joinSettings => 'Join Settings';
   @override String get requireApprovalDesc => 'New members must be approved before joining.';
@@ -1131,6 +1176,13 @@ class _EnStrings extends _AppStrings {
   @override String get people => 'people';
   @override String get selectPlan => 'Plan';
   @override String get selectPlanDesc => 'Choose a plan for your group.';
+  @override String get active => 'Active';
+  @override String get unlimited => 'Unlimited';
+  @override String get prioritySupport => 'Priority Support';
+  @override String get advancedAdminTool => 'Advanced Admin Tool';
+  @override String get freePlanDesc => 'Free plan description';
+  @override String get plusPlanDesc => 'Plus plan description';
+  @override String get proPlanDesc => 'Pro plan description';  
 
   // Free
   @override String get planFree => 'Free';
@@ -1159,6 +1211,7 @@ class _EnStrings extends _AppStrings {
   @override String get planProFeature5 => 'All Plus features included';
 
   // 플랜 공통
+  @override String get manageGroupPlan => 'Manage Plan';
   @override String get allowPlanUpgrade => 'Allow Plan Upgrade Later';
   @override String get allowPlanUpgradeDesc => 'Allow upgrading to a paid plan in the future.';
   @override String get comingSoon => 'Coming Soon';
@@ -1166,6 +1219,13 @@ class _EnStrings extends _AppStrings {
   @override String get currentPlan => 'Current Plan';
   @override String get upgradePlan => 'Upgrade Plan';
   @override String get planUpgradeComingSoon => 'Paid plans are coming soon. Stay tuned!';
+  @override String get limitReached => 'Limit Reached';
+  @override String get viewPlans => 'View Plans';
+  @override String get upgradePlanPrompt => 'Upgrade your plan to enjoy more boards & features!';
+  @override String boardLimitReachedMsg(String plan, int limit) => 'You have reached the board limit for the $plan plan ($limit boards).';
+  @override String boardLimitText(dynamic limit) => 'Up to $limit boards';
+  @override String chatLimitText(dynamic limit) => 'Up to $limit sub-chats';
+  @override String memberLimitText(int limit) => 'Up to $limit members';
 
   @override String get next => 'Next';
   @override String get groupTypeCompany => 'Company';
@@ -1190,6 +1250,7 @@ class _EnStrings extends _AppStrings {
   @override String get selectedCount => ' selected';
   @override String get noGroupsJoined => 'No groups joined yet.';
   @override String get groupFull => 'This group is full.';
+  @override String get bannedUserNotice => '__name__ has been banned. Join request deleted.';
   @override String get memberLimitBelowCurrent => 'Cannot set below current member count.';
   @override String get edit => 'Edit';
   @override String get permissions => 'Permissions';
@@ -1418,6 +1479,7 @@ class _EnStrings extends _AppStrings {
   @override String get catSameYear => 'Same Year / Cohort';
   @override String get catAlumni => 'Alumni';
   @override String get catOther2 => 'Other';
+  @override String get catFoodGourmet => 'Food / Gourmet';
   @override String get memberLimitPlanHint => 'Member limit can be adjusted in Settings based on your plan.';
 }
 
@@ -1456,9 +1518,11 @@ class _KoStrings extends _AppStrings {
   @override String get directMessages => '개인 메시지';
   @override String get underConstruction => '준비 중입니다!';
   @override String get sectionGroupInfo => '그룹 정보';
+  @override String get groupType => '그룹 유형';
   @override String get sectionNotifications => '알림';
   @override String get sectionMemberManagement => '멤버 관리';
   @override String get sectionDangerZone => '위험 구역';
+  @override String get sectionPremium => '프리미엄';
   @override String get groupName => '그룹 이름';
   @override String get category => '카테고리';
   @override String get type => '타입';
@@ -1586,7 +1650,7 @@ class _KoStrings extends _AppStrings {
   @override String get selectGroupType => '그룹 유형';
   @override String get selectGroupTypeDesc => '어떤 종류의 그룹인가요?';
   @override String get selectCategory => '카테고리';
-  @override String get selectCategoryDesc => '최대 3개까지 선택할 수 있습니다.';
+  @override String get selectChooseOne => '하나를 선택해주세요.';
   @override String get groupSettings => '설정';
   @override String get joinSettings => '가입 설정';
   @override String get requireApprovalDesc => '새 멤버는 관리자 승인 후 가입됩니다.';
@@ -1594,6 +1658,13 @@ class _KoStrings extends _AppStrings {
   @override String get people => '명';
   @override String get selectPlan => '플랜';
   @override String get selectPlanDesc => '그룹에 맞는 플랜을 선택하세요.';
+  @override String get active => '활성화';
+  @override String get unlimited => '무제한';
+  @override String get prioritySupport => '우선급수 지원';
+  @override String get advancedAdminTool => '고급 관리 도구';
+  @override String get freePlanDesc => '무료 플랜 혜택';
+  @override String get plusPlanDesc => 'Plus 플랜 혜택';
+  @override String get proPlanDesc => 'Pro 플랜 혜택';  
 
   // Free
   @override String get planFree => '무료';
@@ -1622,6 +1693,7 @@ class _KoStrings extends _AppStrings {
   @override String get planProFeature5 => 'Plus 플랜 기능 전체 포함';
 
   // 플랜 공통
+  @override String get manageGroupPlan => '플랜 관리';
   @override String get allowPlanUpgrade => '나중에 유료 플랜 전환 허용';
   @override String get allowPlanUpgradeDesc => '향후 유료 플랜으로 업그레이드할 수 있도록 허용합니다.';
   @override String get comingSoon => '출시 예정';
@@ -1629,6 +1701,13 @@ class _KoStrings extends _AppStrings {
   @override String get currentPlan => '현재 플랜';
   @override String get upgradePlan => '플랜 변경';
   @override String get planUpgradeComingSoon => '유료 플랜은 곧 출시될 예정입니다. 조금만 기다려주세요!';
+  @override String get limitReached => '한도 도달';
+  @override String get viewPlans => '플랜 보기';
+  @override String get upgradePlanPrompt => '플랜을 업그레이드하여 더 많은 게시판과 기능을 이용해보세요!';
+  @override String boardLimitReachedMsg(String plan, int limit) => '현재 $plan 플랜의 게시판 생성 한도 ($limit개)에 도달했습니다.';
+  @override String boardLimitText(dynamic limit) => '최대 $limit 게시판';
+  @override String chatLimitText(dynamic limit) => '최대 $limit 서브 채팅';
+  @override String memberLimitText(int limit) => '최대 $limit 명';
 
   @override String get next => '다음';
   @override String get groupTypeCompany => '회사';
@@ -1653,6 +1732,7 @@ class _KoStrings extends _AppStrings {
   @override String get selectedCount => '명 선택됨';
   @override String get noGroupsJoined => '아직 가입한 그룹이 없습니다.';
   @override String get groupFull => '그룹 인원이 가득 찼습니다.';
+  @override String get bannedUserNotice => '__name__님은 차단된 사용자입니다. 가입 요청이 삭제되었습니다.';
   @override String get memberLimitBelowCurrent => '현재 가입 인원보다 낮게 설정할 수 없습니다.';
   @override String get edit => '수정';
   @override String get permissions => '권한 설정';
@@ -1881,6 +1961,7 @@ class _KoStrings extends _AppStrings {
   @override String get catSameYear => '동기 모임';
   @override String get catAlumni => '졸업생 모임';
   @override String get catOther2 => '기타';
+  @override String get catFoodGourmet => '맛집/미식';
   @override String get memberLimitPlanHint => '플랜에 따라 설정 탭에서 최대 인원수를 조정할 수 있습니다.';
 }
 
@@ -1919,8 +2000,10 @@ class _JaStrings extends _AppStrings {
   @override String get directMessages => 'ダイレクトメッセージ';
   @override String get underConstruction => '準備中です！';
   @override String get sectionGroupInfo => 'グループ情報';
+  @override String get groupType => 'グループタイプ';
   @override String get sectionNotifications => '通知';
   @override String get sectionMemberManagement => 'メンバー管理';
+  @override String get sectionPremium => 'プレミアム';
   @override String get sectionDangerZone => '危険ゾーン';
   @override String get groupName => 'グループ名';
   @override String get category => 'カテゴリ';
@@ -2049,7 +2132,7 @@ class _JaStrings extends _AppStrings {
   @override String get selectGroupType => 'グループタイプ';
   @override String get selectGroupTypeDesc => 'グループの種類を選んでください。';
   @override String get selectCategory => 'カテゴリ';
-  @override String get selectCategoryDesc => '最大3つまで選択できます。';
+  @override String get selectChooseOne => '一つ選んでください。';
   @override String get groupSettings => '設定';
   @override String get joinSettings => '参加設定';
   @override String get requireApprovalDesc => '新しいメンバーは管理者の承認が必要です。';
@@ -2057,6 +2140,13 @@ class _JaStrings extends _AppStrings {
   @override String get people => '人';
   @override String get selectPlan => 'プラン';
   @override String get selectPlanDesc => 'グループに合ったプランを選んでください。';
+  @override String get active => '有効';
+  @override String get unlimited => '無制限';
+  @override String get prioritySupport => '優先サポート';
+  @override String get advancedAdminTool => '高度な管理ツール';
+  @override String get freePlanDesc => '個人나 小規模グループに';
+  @override String get plusPlanDesc => '成長中のコミュニティに';
+  @override String get proPlanDesc => '大規模グループ向け';  
 
   // Free
   @override String get planFree => '無料';
@@ -2085,6 +2175,7 @@ class _JaStrings extends _AppStrings {
   @override String get planProFeature5 => 'Plusプランの全機能を含む';
 
   // 플랜 공통
+  @override String get manageGroupPlan => 'プラン管理';
   @override String get allowPlanUpgrade => '後で有料プランへの変更を許可';
   @override String get allowPlanUpgradeDesc => '将来、有料プランにアップグレードできるようにします。';
   @override String get comingSoon => '近日公開';
@@ -2092,6 +2183,13 @@ class _JaStrings extends _AppStrings {
   @override String get currentPlan => '現在のプラン';
   @override String get upgradePlan => 'プランを変更';
   @override String get planUpgradeComingSoon => '有料プランは近日公開予定です。お楽しみに！';
+  @override String get limitReached => '制限に達しました';
+  @override String get viewPlans => 'プランを見る';
+  @override String get upgradePlanPrompt => 'プランをアップグレードして、より多くの掲示板と機能を楽しむことができます！';
+  @override String boardLimitReachedMsg(String plan, int limit) => '現在の $plan プランの掲示板作成上限（最大 $limit個）に達しました。';
+  @override String boardLimitText(dynamic limit) => '掲示板：最大 $limit';
+  @override String chatLimitText(dynamic limit) => 'チャット：最大 $limit';
+  @override String memberLimitText(int limit) => 'メンバー：最大 $limit名';
 
   @override String get next => '次へ';
   @override String get groupTypeCompany => '会社';
@@ -2116,6 +2214,7 @@ class _JaStrings extends _AppStrings {
   @override String get selectedCount => '人を選択中';
   @override String get noGroupsJoined => 'まだグループに参加していません。';
   @override String get groupFull => 'グループが満員です。';
+  @override String get bannedUserNotice => '__name__さんはブロックされたユーザーです。参加リクエストが削除されました。';
   @override String get memberLimitBelowCurrent => '現在の参加人数より低く設定できません。';
   @override String get edit => '編集';
   @override String get permissions => '権限設定';
@@ -2344,5 +2443,6 @@ class _JaStrings extends _AppStrings {
   @override String get catSameYear => '同期の集まり';
   @override String get catAlumni => '卒業生の集まり';
   @override String get catOther2 => 'その他';
+  @override String get catFoodGourmet => 'グルメ・食べ歩き';
   @override String get memberLimitPlanHint => 'プランに応じて、設定タブで最大メンバー数を調整できます。';
 }

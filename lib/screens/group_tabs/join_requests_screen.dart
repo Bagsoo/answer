@@ -121,8 +121,10 @@ class _JoinRequestTileState extends State<_JoinRequestTile> {
       setState(() => _processing = false);
       final message = result == 'ok'
           ? widget.l.joinApproved(widget.name)
+          : result == 'full' ? widget.l.groupFull
           : result == 'banned'
-              ? '${widget.name}님은 차단된 사용자입니다. 가입 요청이 삭제되었습니다.'
+              // ? '${widget.name}님은 차단된 사용자입니다. 가입 요청이 삭제되었습니다.'
+              ? widget.l.bannedUserNotice(widget.name)
               : widget.l.joinApproveFailed;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(message),

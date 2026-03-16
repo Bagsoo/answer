@@ -9,7 +9,7 @@ class GroupInfoEditScreen extends StatefulWidget {
   final String currentType;
   final String currentCategory;
   final String currentName;
-  final bool canEditInfo; // can_edit_group_info
+  final bool canEditInfo;
 
   const GroupInfoEditScreen({
     super.key,
@@ -25,7 +25,7 @@ class GroupInfoEditScreen extends StatefulWidget {
 }
 
 class _GroupInfoEditScreenState extends State<GroupInfoEditScreen> {
-  late AppLocalizations l;
+  // ✅ 에러의 원인이었던 late AppLocalizations l; 을 삭제했습니다.
   late String _selectedType;
   late String _selectedCategory;
   bool _saving = false;
@@ -37,63 +37,71 @@ class _GroupInfoEditScreenState extends State<GroupInfoEditScreen> {
     _selectedCategory = widget.currentCategory;
   }
 
-  List<String> get _categories =>
-      GroupTypeCategoryData.getCategoriesForType(_selectedType, l);
-
-  // 타입 변경 시 카테고리 초기화
-  void _onTypeChanged(String type) {
+  // ✅ 타입 변경 시 l을 인자로 받아 카테고리 목록을 정확히 가져옵니다.
+  void _onTypeChanged(String type, AppLocalizations l) {
     setState(() {
       _selectedType = type;
       final cats = GroupTypeCategoryData.getCategoriesForType(type, l);
-      _selectedCategory = cats.contains(widget.currentCategory)
-          ? widget.currentCategory
-          : cats.first;
+      
+      // 기존 카테고리가 새 타입에도 있다면 유지, 없다면 첫 번째 카테고리로 초기화
+      _selectedCategory = cats.contains(_selectedCategory)
+          ? _selectedCategory
+          : (cats.isNotEmpty ? cats.first : "");
     });
   }
 
   Future<void> _save(AppLocalizations l) async {
     setState(() => _saving = true);
-    await FirebaseFirestore.instance
-        .collection('groups')
-        .doc(widget.groupId)
-        .update({
-      'type': _selectedType,
-      'category': _selectedCategory,
-    });
-    if (mounted) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l.profileSaved)));
+    try {
+      await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .update({
+        'type': _selectedType,
+        'category': _selectedCategory,
+      });
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(l.profileSaved)));
+      }
+    } catch (e) {
+      setState(() => _saving = false);
+      // 에러 처리 로직을 추가하면 더 좋습니다.
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ build 메서드 내에서 안전하게 l을 초기화합니다.
     final l = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
     final typeKeys = GroupTypeCategoryData.typeKeys;
+    
+    // ✅ 현재 선택된 타입에 맞는 카테고리 목록을 가져옵니다.
+    final categories = GroupTypeCategoryData.getCategoriesForType(_selectedType, l);
 
     String typeLabel(String key) {
       switch (key) {
-        case 'company':     return l.groupTypeCompany;
-        case 'club':        return l.groupTypeClub;
-        case 'small_group': return l.groupTypeSmall;
-        case 'academy':     return l.groupTypeAcademy;
-        case 'school_class':return l.groupTypeClass;
-        case 'hobby_club':  return l.groupTypeHobby;
-        default:            return key;
+        case 'company':      return l.groupTypeCompany;
+        case 'club':         return l.groupTypeClub;
+        case 'small_group':  return l.groupTypeSmall;
+        case 'academy':      return l.groupTypeAcademy;
+        case 'school_class': return l.groupTypeClass;
+        case 'hobby_club':   return l.groupTypeHobby;
+        default:             return key;
       }
     }
 
     IconData typeIcon(String key) {
       switch (key) {
-        case 'company':     return Icons.business;
-        case 'club':        return Icons.groups;
-        case 'small_group': return Icons.people;
-        case 'academy':     return Icons.school;
-        case 'school_class':return Icons.class_;
-        case 'hobby_club':  return Icons.sports_esports;
-        default:            return Icons.group;
+        case 'company':      return Icons.business;
+        case 'club':         return Icons.groups;
+        case 'small_group':  return Icons.people;
+        case 'academy':      return Icons.school;
+        case 'school_class': return Icons.class_;
+        case 'hobby_club':   return Icons.sports_esports;
+        default:             return Icons.group;
       }
     }
 
@@ -118,10 +126,8 @@ class _GroupInfoEditScreenState extends State<GroupInfoEditScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── 유형 선택 ──────────────────────────────────────────────
             Text(l.selectGroupType,
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 15)),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             const SizedBox(height: 12),
             GridView.builder(
               shrinkWrap: true,
@@ -137,7 +143,8 @@ class _GroupInfoEditScreenState extends State<GroupInfoEditScreen> {
                 final key = typeKeys[i];
                 final isSelected = _selectedType == key;
                 return InkWell(
-                  onTap: () => _onTypeChanged(key),
+                  // ✅ l을 인자로 넘겨줍니다.
+                  onTap: () => _onTypeChanged(key, l),
                   borderRadius: BorderRadius.circular(12),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
@@ -147,9 +154,7 @@ class _GroupInfoEditScreenState extends State<GroupInfoEditScreen> {
                           : colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isSelected
-                            ? colorScheme.primary
-                            : Colors.transparent,
+                        color: isSelected ? colorScheme.primary : Colors.transparent,
                         width: 2,
                       ),
                     ),
@@ -164,12 +169,8 @@ class _GroupInfoEditScreenState extends State<GroupInfoEditScreen> {
                         const SizedBox(width: 8),
                         Text(typeLabel(key),
                             style: TextStyle(
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                              color: isSelected
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurface,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              color: isSelected ? colorScheme.primary : colorScheme.onSurface,
                             )),
                       ],
                     ),
@@ -177,24 +178,20 @@ class _GroupInfoEditScreenState extends State<GroupInfoEditScreen> {
                 );
               },
             ),
-
             const SizedBox(height: 28),
-
-            // ── 카테고리 선택 ──────────────────────────────────────────
             Text(l.selectCategory,
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 15)),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             const SizedBox(height: 4),
-            Text(l.selectCategoryDesc,
+            Text(l.selectChooseOne,
                 style: TextStyle(
                     fontSize: 12,
                     color: colorScheme.onSurface.withOpacity(0.5))),
             const SizedBox(height: 12),
-
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: _categories.map((cat) {
+              // ✅ 지역 변수 categories를 사용하여 칩을 생성합니다.
+              children: categories.map((cat) {
                 final isSelected = _selectedCategory == cat;
                 return ChoiceChip(
                   label: Text(cat),
@@ -202,20 +199,13 @@ class _GroupInfoEditScreenState extends State<GroupInfoEditScreen> {
                   onSelected: (_) => setState(() => _selectedCategory = cat),
                   selectedColor: colorScheme.primaryContainer,
                   labelStyle: TextStyle(
-                    color: isSelected
-                        ? colorScheme.primary
-                        : colorScheme.onSurface,
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
+                    color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
                 );
               }).toList(),
             ),
-
             const SizedBox(height: 32),
-
-            // 현재 선택 요약
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(

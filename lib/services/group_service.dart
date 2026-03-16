@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:rxdart/rxdart.dart';
 
 class GroupService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -15,7 +16,7 @@ class GroupService {
     required String category,
     required bool requireApproval,
     required String displayName,   // UserProvider에서 전달
-    int memberLimit = 100,
+    int memberLimit = 50,
     String plan = 'free',
     bool allowPlanUpgrade = true,
   }) async {
@@ -249,19 +250,29 @@ class GroupService {
   Stream<List<Map<String, dynamic>>> getMyJoinedGroups() {
     if (currentUserId.isEmpty) return Stream.value([]);
 
-    // joined_groups에 name/type/category/member_count가 이미 저장되어 있으므로
-    // groups 컬렉션 추가 조회 불필요 — 단일 쿼리로 처리
     return _db
         .collection('users')
         .doc(currentUserId)
         .collection('joined_groups')
-        .orderBy('joined_at', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) {
-              final data = doc.data();
-              data['id'] = doc.id; // groupId
-              return data;
-            }).toList());
+        .switchMap((snapshot) {
+          final ids = snapshot.docs.map((d) => d.id).toList();
+          if (ids.isEmpty) return Stream.value([]);
+
+          return _db
+              .collection('groups')
+              .where(FieldPath.documentId, whereIn: ids)
+              .snapshots()
+              .map((groupsSnap) {
+                
+                return groupsSnap.docs.map((doc) {
+                  final data = doc.data();
+                  data['id'] = doc.id;
+                  return data;
+                }).toList();
+              });
+
+        });
   }
 
   // ── 가입 요청 대기 목록 스트림 ─────────────────────────────────────────────
@@ -313,6 +324,9 @@ class GroupService {
       final groupType = groupData?['type'] as String? ?? 'club';
       final groupCategory = groupData?['category'] as String? ?? '';
       final memberCount = groupData?['member_count'] as int? ?? 0;
+      final memberLimit = groupData?['member_limit'] as int? ?? 50;
+
+      if (memberCount >= memberLimit) return 'full';
 
       final batch = _db.batch();
 
@@ -457,17 +471,63 @@ class GroupService {
             }).toList());
   }
 
-  Future<bool> createBoard(String groupId, Map<String, dynamic> boardData) async {
+  Future<bool> createBoard(
+    String groupId,
+    Map<String, dynamic> boardData,
+  ) async {
     try {
-      final snap = await _db.collection('groups').doc(groupId).collection('boards')
-          .orderBy('order', descending: true).limit(1).get();
-      final maxOrder = snap.docs.isEmpty
-          ? 0 : (snap.docs.first.data()['order'] as int? ?? 0) + 1;
-      await _db.collection('groups').doc(groupId).collection('boards').add(
-          {...boardData, 'order': maxOrder, 'created_at': FieldValue.serverTimestamp()});
-      return true;
-    } catch (e) { debugPrint('createBoard error: $e'); return false; }
+
+      final db = FirebaseFirestore.instance;
+
+      return await db.runTransaction((tx) async {
+
+        final groupRef = db.collection('groups').doc(groupId);
+        final boardsRef = groupRef.collection('boards');
+
+        final groupDoc = await tx.get(groupRef);
+
+        final data = groupDoc.data()!;
+        final plan = data['plan'] ?? 'free';
+        final boardCount = data['board_count'] ?? 0;
+
+        int maxBoards;
+
+        switch (plan) {
+          case 'pro':
+            maxBoards = 1000000;
+            break;
+          case 'plus':
+            maxBoards = 5;
+            break;
+          default:
+            maxBoards = 3;
+        }
+
+        if (boardCount >= maxBoards) {
+          throw Exception('limit_reached');
+        }
+
+        final newBoardRef = boardsRef.doc();
+
+        tx.set(newBoardRef, {
+          ...boardData,
+          'order': boardCount,
+          'created_at': FieldValue.serverTimestamp(),
+        });
+
+        tx.update(groupRef, {
+          'board_count': FieldValue.increment(1),
+        });
+
+        return true;
+      });
+
+    } catch (e) {
+      debugPrint('createBoard error: $e');
+      return false;
+    }
   }
+
 
   Future<bool> updateBoard(String groupId, String boardId, Map<String, dynamic> data) async {
     try {
@@ -478,14 +538,40 @@ class GroupService {
 
   Future<bool> deleteBoard(String groupId, String boardId) async {
     try {
-      final postsSnap = await _db.collection('groups').doc(groupId).collection('posts')
-          .where('board_id', isEqualTo: boardId).get();
-      final batch = _db.batch();
-      for (final doc in postsSnap.docs) batch.delete(doc.reference);
-      batch.delete(_db.collection('groups').doc(groupId).collection('boards').doc(boardId));
+      final db = FirebaseFirestore.instance;
+      final groupRef = db.collection('groups').doc(groupId);
+      final boardRef = groupRef.collection('boards').doc(boardId);
+
+      // 1. 해당 게시판의 포스트들 조회
+      final postsSnap = await groupRef
+          .collection('posts')
+          .where('board_id', isEqualTo: boardId)
+          .get();
+
+      final batch = db.batch();
+
+      // 2. 포스트 삭제 예약
+      for (final doc in postsSnap.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // 3. 게시판 삭제 예약
+      batch.delete(boardRef);
+
+      // 4. 🔥 핵심: board_count 감소도 배치에 포함
+      // 이렇게 하면 삭제와 카운트 감소가 한 몸처럼 움직입니다.
+      batch.update(groupRef, {
+        'board_count': FieldValue.increment(-1),
+      });
+
+      // 5. 모든 작업을 한 번에 실행
       await batch.commit();
+
       return true;
-    } catch (e) { debugPrint('deleteBoard error: $e'); return false; }
+    } catch (e) {
+      debugPrint('deleteBoard error: $e');
+      return false;
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════

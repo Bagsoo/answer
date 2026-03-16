@@ -342,7 +342,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(l.selectCategoryDesc,
+          Text(l.selectChooseOne,
               style: TextStyle(
                   color: colorScheme.onSurface.withOpacity(0.6))),
           const SizedBox(height: 16),

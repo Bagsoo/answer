@@ -21,6 +21,8 @@ class GroupProvider extends ChangeNotifier {
   String ownerId = '';
   int memberCount = 0;
   int memberLimit = 50;
+  int boardCount = 0;
+  int chatCount = 0;
   bool requireApproval = false;
   bool allowPlanUpgrade = false;
   List<String> tags = [];
@@ -50,7 +52,43 @@ class GroupProvider extends ChangeNotifier {
       isOwner || myPerms['can_write_post'] == true;
 
   bool _loaded = false;
-  bool get loaded => _loaded;
+  bool get loaded => _loaded;  
+
+  int get absoluteMaxLimit {
+    switch (plan) {
+      case 'plus':
+        return 300;
+      case 'pro':
+        return 1000;
+      case 'free':
+      default:
+        return 50;
+    }
+  }
+
+  int getMaxBoards() {
+    switch (plan) {
+      case 'pro':
+        return 1000000; // 무제한 (사실상 매우 큰 수)
+      case 'plus':
+        return 5;
+      case 'free':
+      default:
+        return 3;
+    }
+  }
+
+  int getMaxChats() {
+    switch (plan) {
+      case 'pro':
+        return 1000000; // 무제한
+      case 'plus':
+        return 10;
+      case 'free':
+      default:
+        return 5;
+    }
+  }
 
   StreamSubscription? _groupSub;
   StreamSubscription? _memberSub;
@@ -72,6 +110,8 @@ class GroupProvider extends ChangeNotifier {
       ownerId = d['owner_id'] as String? ?? '';
       memberCount = d['member_count'] as int? ?? 0;
       memberLimit = d['member_limit'] as int? ?? 50;
+      boardCount = d['board_count'] as int? ?? 0;
+      chatCount = d['chat_count'] as int? ?? 0;
       requireApproval = d['require_approval'] as bool? ?? false;
       allowPlanUpgrade = d['allow_plan_upgrade'] as bool? ?? false;
       tags = List<String>.from(d['tags'] as List? ?? []);
