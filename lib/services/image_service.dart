@@ -30,4 +30,34 @@ class ImageService {
 
     return compressedFile != null ? File(compressedFile.path) : null;
   }
+  Future<List<File>> pickAndCompressMultipleImages() async {
+    final List<XFile> pickedFiles = await _picker.pickMultiImage();
+    if (pickedFiles.isEmpty) return [];
+
+    final dir = await getTemporaryDirectory();
+    final List<File> compressedFiles = [];
+
+    for (int i = 0; i < pickedFiles.length; i++) {
+      final file = pickedFiles[i];
+      final targetPath =
+          "${dir.path}/img_${DateTime.now().millisecondsSinceEpoch}_$i.jpg";
+
+      final XFile? compressedFile =
+          await FlutterImageCompress.compressAndGetFile(
+        file.path,
+        targetPath,
+        quality: 65,
+        minWidth: 800,
+        minHeight: 800,
+        format: CompressFormat.jpeg,
+        keepExif: true,
+      );
+
+      if (compressedFile != null) {
+        compressedFiles.add(File(compressedFile.path));
+      }
+    }
+
+    return compressedFiles;
+  }
 }

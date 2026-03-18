@@ -321,23 +321,24 @@ class _FriendsScreenState extends State<FriendsScreen> {
                         itemBuilder: (context, index) {
                           final friend = filtered[index];
                           final uid = friend['uid'] as String;
-                          final name = friend['display_name']
-                                  as String? ??
-                              l.unknown;
+                          final name = friend['display_name'] as String? ?? l.unknown;
+                          final photoUrl = friend['profile_image'] as String? ?? '';
 
                           return ListTile(
                             leading: CircleAvatar(
-                              backgroundColor:
-                                  colorScheme.primaryContainer,
-                              child: Text(
-                                name.isNotEmpty
-                                    ? name[0].toUpperCase()
-                                    : '?',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onPrimaryContainer,
-                                ),
-                              ),
+                              backgroundColor: colorScheme.primaryContainer,
+                              backgroundImage: (photoUrl != null && photoUrl.isNotEmpty) 
+                                ? NetworkImage(photoUrl) 
+                                : null,
+                              child: (photoUrl == null || photoUrl.isEmpty)
+                                ? Text(
+                                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.onPrimaryContainer,
+                                    ),
+                                  )
+                                : null,
                             ),
                             title: Text(name,
                                 style: const TextStyle(
@@ -349,6 +350,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                                 builder: (_) => UserProfileDetailScreen(
                                   uid: uid,
                                   displayName: name,
+                                  photoUrl: photoUrl,
                                 ),
                               ),
                             ),
@@ -556,6 +558,7 @@ class _AddFriendDialogState extends State<_AddFriendDialog> {
 
   Widget _buildResultTile(ColorScheme colorScheme, AppLocalizations l) {
     final name = _result!['name'] as String? ?? l.unknown;
+    final photoUrl = _result!['profile_image'] as String?;
     final alreadyFriend = _result!['already_friend'] as bool? ?? false;
     final uid = _result!['uid'] as String;
 
@@ -563,12 +566,18 @@ class _AddFriendDialogState extends State<_AddFriendDialog> {
       children: [
         CircleAvatar(
           backgroundColor: colorScheme.primaryContainer,
-          child: Text(
-            name.isNotEmpty ? name[0].toUpperCase() : '?',
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onPrimaryContainer),
-          ),
+          backgroundImage: (photoUrl != null && photoUrl.isNotEmpty) 
+            ? NetworkImage(photoUrl) 
+            : null,
+          child: (photoUrl == null || photoUrl.isEmpty)
+            ? Text(
+                name.isNotEmpty ? name[0].toUpperCase() : '?',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onPrimaryContainer,
+                ),
+              )
+            : null,
         ),
         const SizedBox(width: 12),
         Expanded(

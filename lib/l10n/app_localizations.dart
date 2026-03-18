@@ -88,6 +88,7 @@ class AppLocalizations {
   String get noMessages => _s.noMessages;
   String get typeMessage => _s.typeMessage;
   String get viewParticipants => _s.viewParticipants;
+  String get participants => _s.participants;
   String get inviteMembers => _s.inviteMembers;
   String get noInvitableMembers => _s.noInvitableMembers;
   String get invite => _s.invite;
@@ -189,6 +190,7 @@ class AppLocalizations {
   // ── 채팅방 ──────────────────────────────────────────────────────────────
   String get attachPhotos => _s.attachPhotos;
   String get attachVideos => _s.attachVideos;
+  String get videoSizeExceeded => _s.videoSizeExceeded;
   String get attachVoice => _s.attachVoice;
   String get attachCall => _s.attachCall;
   String get attachVideoCall => _s.attachVideoCall;
@@ -599,6 +601,7 @@ abstract class _AppStrings {
   String get noMessages;
   String get typeMessage;
   String get viewParticipants;
+  String get participants;
   String get inviteMembers;
   String get noInvitableMembers;
   String get invite;
@@ -700,6 +703,7 @@ abstract class _AppStrings {
   // 채팅방
   String get attachPhotos;
   String get attachVideos;
+  String get videoSizeExceeded;
   String get attachVoice;
   String get attachCall;
   String get attachVideoCall;
@@ -1116,6 +1120,7 @@ class _EnStrings extends _AppStrings {
   @override String get noMessages => 'No messages yet.';
   @override String get typeMessage => 'Type a message...';
   @override String get viewParticipants => 'View Participants';
+  @override String get participants => 'Participants';
   @override String get inviteMembers => 'Invite Members';
   @override String get noInvitableMembers => 'No members to invite.';
   @override String get invite => 'Invite';
@@ -1217,6 +1222,7 @@ class _EnStrings extends _AppStrings {
   // 채팅방
   @override String get attachPhotos => 'Photos';
   @override String get attachVideos => 'Videos';
+  @override String get videoSizeExceeded => 'Video size exceeded';
   @override String get attachVoice => 'Voice';
   @override String get attachCall => 'Call';
   @override String get attachVideoCall => 'Video Call';
@@ -1613,6 +1619,7 @@ class _KoStrings extends _AppStrings {
   @override String get noMessages => '아직 메시지가 없습니다.';
   @override String get typeMessage => '메시지를 입력하세요...';
   @override String get viewParticipants => '참여자 보기';
+  @override String get participants => '참여자 목록';
   @override String get inviteMembers => '멤버 초대';
   @override String get noInvitableMembers => '초대할 수 있는 멤버가 없습니다.';
   @override String get invite => '초대';
@@ -1714,6 +1721,7 @@ class _KoStrings extends _AppStrings {
   // 채팅방
   @override String get attachPhotos => '사진';
   @override String get attachVideos => '동영상';
+  @override String get videoSizeExceeded => '동영상 용량이 너무 커서 전송할 수 없습니다. (최대 50MB)';
   @override String get attachVoice => '음성';
   @override String get attachCall => '통화';
   @override String get attachVideoCall => '영상통화';
@@ -2110,6 +2118,7 @@ class _JaStrings extends _AppStrings {
   @override String get noMessages => 'まだメッセージはありません。';
   @override String get typeMessage => 'メッセージを入力してください...';
   @override String get viewParticipants => '参加者を見る';
+  @override String get participants => '参加者リスト';
   @override String get inviteMembers => 'メンバーを招待';
   @override String get noInvitableMembers => '招待できるメンバーがいません。';
   @override String get invite => '招待';
@@ -2211,6 +2220,7 @@ class _JaStrings extends _AppStrings {
   //채팅방
   @override String get attachPhotos => '写真';
   @override String get attachVideos => '動画';
+  @override String get videoSizeExceeded => '動画のサイズが制限（50MB）を超えているため、送信できません。';
   @override String get attachVoice => '音声メッセージ';
   @override String get attachCall => '通話';
   @override String get attachVideoCall => 'ビデオ通話';

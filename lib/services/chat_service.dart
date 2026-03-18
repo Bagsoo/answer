@@ -7,7 +7,7 @@ class ChatService {
 
   String get currentUserId => _auth.currentUser?.uid ?? '';
 
-  // ── 채팅방 목록 (비동기 없음, 단일 쿼리) ────────────────────────────────────
+  // ── 채팅방 목록 ────────────────────────────────────────────────────────────
   Stream<List<Map<String, dynamic>>> getChatRooms() {
     return _db
         .collection('chat_rooms')
@@ -16,15 +16,12 @@ class ChatService {
         .map((snapshot) {
       final rooms = snapshot.docs.map((doc) {
         final data = {...doc.data(), 'id': doc.id};
-
-        // unread_counts 맵에서 내 카운트만 추출
-        final unreadCounts = data['unread_counts'] as Map<String, dynamic>? ?? {};
+        final unreadCounts =
+            data['unread_counts'] as Map<String, dynamic>? ?? {};
         data['unread_cnt'] = unreadCounts[currentUserId] as int? ?? 0;
-
         return data;
       }).toList();
 
-      // last_time 기준 내림차순 정렬
       rooms.sort((a, b) {
         final aTime = a['last_time'] as Timestamp?;
         final bTime = b['last_time'] as Timestamp?;
@@ -38,7 +35,7 @@ class ChatService {
     });
   }
 
-  // ── 메시지 스트림 (최신 30개, 실시간) ────────────────────────────────────────
+  // ── 메시지 스트림 (최신 30개) ──────────────────────────────────────────────
   Stream<QuerySnapshot> getMessages(String roomId) {
     return _db
         .collection('chat_rooms')
@@ -49,7 +46,7 @@ class ChatService {
         .snapshots();
   }
 
-  // ── 이전 메시지 추가 로드 (페이지네이션) ────────────────────────────────────
+  // ── 이전 메시지 페이지네이션 ───────────────────────────────────────────────
   Future<List<QueryDocumentSnapshot>> loadMoreMessages(
     String roomId,
     DocumentSnapshot lastDoc, {
@@ -66,7 +63,7 @@ class ChatService {
     return snap.docs;
   }
 
-  // ── 채팅방 멤버 스트림 ────────────────────────────────────────────────────────
+  // ── 채팅방 멤버 스트림 ─────────────────────────────────────────────────────
   Stream<QuerySnapshot> getRoomMembers(String roomId) {
     return _db
         .collection('chat_rooms')
@@ -75,19 +72,44 @@ class ChatService {
         .snapshots();
   }
 
-  // ── 메시지 전송 ───────────────────────────────────────────────────────────────
+  // ── 메시지 ID 미리 생성 (Storage 업로드 전 호출) ───────────────────────────
+  // StorageService에서 messageId 기반 파일명을 쓰기 위해
+  // 실제 쓰기 없이 doc ref의 ID만 반환
+  String generateMessageId(String roomId) {
+    return _db
+        .collection('chat_rooms')
+        .doc(roomId)
+        .collection('messages')
+        .doc()
+        .id;
+  }
+
+  // ── 공통: unread_counts 증가 맵 생성 ──────────────────────────────────────
+  Future<Map<String, dynamic>> _buildUnreadUpdate(String roomId) async {
+    final roomDoc = await _db.collection('chat_rooms').doc(roomId).get();
+    final memberIds =
+        List<String>.from(roomDoc.data()?['member_ids'] ?? []);
+
+    final unreadUpdate = <String, dynamic>{};
+    for (final uid in memberIds) {
+      if (uid == currentUserId) continue;
+      unreadUpdate['unread_counts.$uid'] = FieldValue.increment(1);
+    }
+    return unreadUpdate;
+  }
+
+  // ── 텍스트 메시지 전송 ─────────────────────────────────────────────────────
   Future<void> sendMessage(
     String roomId,
     String text, {
     required String senderName,
+    String? senderPhotoUrl,
     String? replyToId,
     String? replyToText,
     String? replyToSender,
     String? pollId,
   }) async {
-    final roomDoc = await _db.collection('chat_rooms').doc(roomId).get();
-    final memberIds = List<String>.from(roomDoc.data()?['member_ids'] ?? []);
-
+    final unreadUpdate = await _buildUnreadUpdate(roomId);
     final batch = _db.batch();
 
     final msgRef = _db
@@ -99,6 +121,7 @@ class ChatService {
     final msgData = <String, dynamic>{
       'sender_id': currentUserId,
       'sender_name': senderName,
+      'sender_photo_url': senderPhotoUrl ?? '',
       'text': text,
       'type': pollId != null ? 'poll' : 'text',
       'is_system': pollId != null,
@@ -114,15 +137,6 @@ class ChatService {
     }
 
     batch.set(msgRef, msgData);
-
-    // 채팅방 last_message + unread_counts 업데이트
-    // 나를 제외한 모든 멤버의 카운트를 +1
-    final unreadUpdate = <String, dynamic>{};
-    for (final uid in memberIds) {
-      if (uid == currentUserId) continue;
-      unreadUpdate['unread_counts.$uid'] = FieldValue.increment(1);
-    }
-
     batch.update(_db.collection('chat_rooms').doc(roomId), {
       'last_message': text,
       'last_time': FieldValue.serverTimestamp(),
@@ -132,23 +146,105 @@ class ChatService {
     await batch.commit();
   }
 
-  // ── 읽음 처리 (내 unread_count 초기화) ──────────────────────────────────────
+  // ── 이미지 메시지 전송 (여러 장 지원) ─────────────────────────────────────
+  // 흐름: generateMessageId → StorageService.uploadChatImages → sendImageMessage
+  Future<void> sendImageMessage(
+    String roomId, {
+    required String messageId,       // generateMessageId()로 미리 생성한 ID
+    required List<String> imageUrls, // 업로드 완료된 URL 목록
+    required String senderName,
+    String? senderPhotoUrl,
+  }) async {
+    final unreadUpdate = await _buildUnreadUpdate(roomId);
+    final batch = _db.batch();
+
+    // 미리 생성한 ID로 doc 직접 지정
+    final msgRef = _db
+        .collection('chat_rooms')
+        .doc(roomId)
+        .collection('messages')
+        .doc(messageId);
+
+    batch.set(msgRef, {
+      'sender_id': currentUserId,
+      'sender_name': senderName,
+      'sender_photo_url': senderPhotoUrl ?? '',
+      'text': '',
+      'type': 'image',
+      'image_urls': imageUrls,       // 여러 장 → List로 저장
+      'is_system': false,
+      'created_at': FieldValue.serverTimestamp(),
+    });
+
+    final lastMsg = imageUrls.length > 1
+        ? '📷 사진 ${imageUrls.length}장'
+        : '📷 사진';
+
+    batch.update(_db.collection('chat_rooms').doc(roomId), {
+      'last_message': lastMsg,
+      'last_time': FieldValue.serverTimestamp(),
+      ...unreadUpdate,
+    });
+
+    await batch.commit();
+  }
+
+  // ── 동영상 메시지 전송 ─────────────────────────────────────────────────────
+  // 흐름: generateMessageId → StorageService.uploadChatVideo → sendVideoMessage
+  Future<void> sendVideoMessage(
+    String roomId, {
+    required String messageId,       // generateMessageId()로 미리 생성한 ID
+    required String videoUrl,
+    required String thumbnailUrl,
+    required String senderName,
+    String? senderPhotoUrl,
+  }) async {
+    final unreadUpdate = await _buildUnreadUpdate(roomId);
+    final batch = _db.batch();
+
+    final msgRef = _db
+        .collection('chat_rooms')
+        .doc(roomId)
+        .collection('messages')
+        .doc(messageId);
+
+    batch.set(msgRef, {
+      'sender_id': currentUserId,
+      'sender_name': senderName,
+      'sender_photo_url': senderPhotoUrl ?? '',
+      'text': '',
+      'type': 'video',
+      'video_url': videoUrl,
+      'thumbnail_url': thumbnailUrl,
+      'is_system': false,
+      'created_at': FieldValue.serverTimestamp(),
+    });
+
+    batch.update(_db.collection('chat_rooms').doc(roomId), {
+      'last_message': '🎥 동영상',
+      'last_time': FieldValue.serverTimestamp(),
+      ...unreadUpdate,
+    });
+
+    await batch.commit();
+  }
+
+  // ── 읽음 처리 ─────────────────────────────────────────────────────────────
   Future<void> updateLastReadTime(String roomId) async {
     final batch = _db.batch();
 
-    // room_members 업데이트 (last_read_time, unread_cnt)
     final memberRef = _db
         .collection('chat_rooms')
         .doc(roomId)
         .collection('room_members')
         .doc(currentUserId);
+
     batch.set(memberRef, {
       'user_id': currentUserId,
       'last_read_time': FieldValue.serverTimestamp(),
       'unread_cnt': 0,
     }, SetOptions(merge: true));
 
-    // chat_rooms 문서의 unread_counts 초기화
     batch.update(_db.collection('chat_rooms').doc(roomId), {
       'unread_counts.$currentUserId': 0,
     });

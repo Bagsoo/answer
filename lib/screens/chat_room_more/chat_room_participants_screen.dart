@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/chat_service.dart';
+import '../user_profile_detail_screen.dart';
 
 class ChatRoomParticipantsScreen extends StatelessWidget {
   final String roomId;
@@ -79,7 +80,7 @@ class ChatRoomParticipantsScreen extends StatelessWidget {
     final amOwner = myRole == 'owner';
 
     return Scaffold(
-      appBar: AppBar(title: Text(l.viewParticipants)),
+      appBar: AppBar(title: Text(l.participants)),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('chat_rooms')
@@ -117,6 +118,7 @@ class ChatRoomParticipantsScreen extends StatelessWidget {
               final role = data['role'] as String? ?? 'member';
               // display_name을 room_members에서 직접 읽음 — users 조회 불필요
               final name = data['display_name'] as String? ?? uid.substring(0, 8);
+              final photoUrl = data['photo_url'] as String? ?? '';
               final isMe = uid == currentUserId;
               final isOwner = role == 'owner';
 
@@ -128,14 +130,28 @@ class ChatRoomParticipantsScreen extends StatelessWidget {
                   backgroundColor: isOwner
                       ? colorScheme.primary
                       : colorScheme.surfaceContainerHighest,
-                  child: Text(
+                  backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
+                  child: photoUrl.isEmpty ? Text(
                     name.isNotEmpty ? name[0].toUpperCase() : '?',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: isOwner ? colorScheme.onPrimary : colorScheme.onSurface,
                     ),
-                  ),
+                  ) : null,
                 ),
+                onTap: () {
+                  // 프로필 보기
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => UserProfileDetailScreen(
+                        uid: uid,
+                        displayName: name,
+                        photoUrl: photoUrl,
+                      ),
+                    ),
+                  );
+                },
                 title: Text(
                   isMe ? '$name (${l.me})' : name,
                   style: TextStyle(

@@ -11,11 +11,13 @@ import 'chat_room_screen.dart';
 class UserProfileDetailScreen extends StatefulWidget {
   final String uid;
   final String displayName;
+  final String? photoUrl;
 
   const UserProfileDetailScreen({
     super.key,
     required this.uid,
     required this.displayName,
+    this.photoUrl,
   });
 
   @override
@@ -164,7 +166,7 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
     final l = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
     final name = widget.displayName;
-    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';    
 
     return Scaffold(
       appBar: AppBar(
@@ -214,6 +216,7 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
   // ── 다른 유저 프로필 ───────────────────────────────────────────────────────
   Widget _buildOtherProfile(
       ColorScheme colorScheme, AppLocalizations l, String initial) {
+    final hasPhoto = widget.photoUrl != null && widget.photoUrl!.isNotEmpty;
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -225,7 +228,9 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
             backgroundColor: _isBlocked
                 ? colorScheme.errorContainer
                 : colorScheme.primaryContainer,
-            child: Text(
+            backgroundImage: hasPhoto ? NetworkImage(widget.photoUrl!) : null,
+            child: !hasPhoto ? 
+            Text(
               initial,
               style: TextStyle(
                 fontSize: 40,
@@ -234,7 +239,7 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
                     ? colorScheme.onErrorContainer
                     : colorScheme.onPrimaryContainer,
               ),
-            ),
+            ) : null,
           ),
           const SizedBox(height: 16),
 

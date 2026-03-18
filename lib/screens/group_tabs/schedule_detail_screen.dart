@@ -8,6 +8,8 @@ import '../../providers/group_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/notification_service.dart';
 import 'schedule_form_screen.dart';
+import '../../widgets/schedule/participant_list_sheet.dart';
+import '../../providers/user_provider.dart';
 
 class ScheduleDetailScreen extends StatelessWidget {
   final String groupId;
@@ -30,8 +32,47 @@ class ScheduleDetailScreen extends StatelessWidget {
       .doc(scheduleId);
 
   // ── RSVP 업데이트 ─────────────────────────────────────────────────────────
-  Future<void> _setRsvp(String status) async {
-    await _ref.update({'rsvp.$currentUserId': status});
+  Future<void> _setRsvp(BuildContext context, String status) async {
+    final myProfile = context.read<UserProvider>();
+    if (myProfile == null) return;
+
+    // 1. 내 정보 객체 생성 (참석 시 저장될 데이터)
+    final myInfo = {
+      'uid': myProfile.uid,
+      'display_name': myProfile.name ?? 'Anonymous',
+      'photo_url': myProfile.photoUrl ?? '',
+      // 'status'는 participants가 '참석자' 전용이므로 생략 가능하지만, 
+      // 나중에 확장성을 위해 'yes'로 넣어두는 것도 방법입니다.
+      'status': 'yes', 
+    };    
+
+    try {
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        // 2. 최신 문서 데이터 가져오기 (가장 중요)
+        DocumentSnapshot snapshot = await transaction.get(_ref);
+        if (!snapshot.exists) return;
+
+        Map<String, dynamic> data = snapshot.data() as Map<String, dynamic>;
+        List<dynamic> participants = List.from(data['participants'] ?? []);
+
+        // 3. 기존 리스트에서 내 정보 일단 제거 (중복 방지 및 상태 변경 대응)
+        participants.removeWhere((p) => p['uid'] == currentUserId);
+
+        // 4. '참석'일 때만 리스트에 추가 (방법 A 적용)
+        if (status == 'yes') {
+          participants.add(myInfo);
+        }
+
+        // 5. 트랜잭션으로 한꺼번에 업데이트
+        transaction.update(_ref, {
+          'rsvp.$currentUserId': status, // 전체 상태 관리용 Map
+          'participants': participants,  // 참석자 전용 List
+        });
+      });
+    } catch (e) {
+      debugPrint('RSVP 업데이트 실패: $e');
+      // 필요시 사용자에게 에러 알림(SnackBar 등) 추가
+    }
   }
 
   // ── 삭제 ─────────────────────────────────────────────────────────────────
@@ -178,8 +219,10 @@ class ScheduleDetailScreen extends StatelessWidget {
                     label: l.endTime,
                     value: _fmt(end),
                     colorScheme: colorScheme,
-                  ),
-                ],                
+                  ),                  
+                ],
+                const SizedBox(height: 20),
+                _buildParticipantSummary(context, data['participants'] as List<dynamic>? ?? [], l),                
 
                 if (desc.isNotEmpty) ...[
                   const SizedBox(height: 20),
@@ -229,7 +272,7 @@ class ScheduleDetailScreen extends StatelessWidget {
                       activeIcon: Icons.check_circle,
                       color: Colors.green,
                       isActive: myRsvp == 'yes',
-                      onTap: () => _setRsvp('yes'),
+                      onTap: () => _setRsvp(context, 'yes'),
                     ),
                     const SizedBox(width: 8),
                     _RsvpButton(
@@ -238,7 +281,7 @@ class ScheduleDetailScreen extends StatelessWidget {
                       activeIcon: Icons.help,
                       color: Colors.orange,
                       isActive: myRsvp == 'maybe',
-                      onTap: () => _setRsvp('maybe'),
+                      onTap: () => _setRsvp(context, 'maybe'),
                     ),
                     const SizedBox(width: 8),
                     _RsvpButton(
@@ -247,7 +290,7 @@ class ScheduleDetailScreen extends StatelessWidget {
                       activeIcon: Icons.cancel,
                       color: Colors.red,
                       isActive: myRsvp == 'no',
-                      onTap: () => _setRsvp('no'),
+                      onTap: () => _setRsvp(context, 'no'),
                     ),
                   ],
                 ),
@@ -295,6 +338,108 @@ class ScheduleDetailScreen extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+
+  // ── 참여자 요약 빌더 ──────────────────────────────────────────────────────
+  Widget _buildParticipantSummary(BuildContext context, List<dynamic> participants, AppLocalizations l) {
+    if (participants == null || participants.isEmpty) return const SizedBox.shrink();
+
+    const int maxVisible = 5; // 최대 노출 사진 수
+    final int totalCount = participants.length;
+    final displayList = participants.take(maxVisible).toList();
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // 겹치는 정도를 조절하는 변수 (Avatar 크기 32 기준)
+    const double avatarSize = 32.0;
+    const double overlapOffset = 24.0; 
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "${l.participants} ($totalCount)", 
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withOpacity(0.5))
+        ),
+        const SizedBox(height: 10),
+        GestureDetector(
+          onTap: () {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              builder: (_) => ParticipantListSheet(participants: participants, l: l),
+            );
+          },
+          child: Row(
+            children: [
+              // --- Stack 시작 ---
+              SizedBox(
+                // 전체 너비 = (아이콘 개수 * 오프셋) + (마지막 아이콘의 남은 너비)
+                width: (displayList.length * overlapOffset) + (totalCount > maxVisible ? overlapOffset : 8.0),
+                height: avatarSize + 4, // 테두리 포함 높이
+                child: Stack(
+                  children: [
+                    // 역순으로 쌓아야 첫 번째 사람이 맨 위로 올라옵니다 (asMap().entries.toList().reversed)
+                    ...displayList.asMap().entries.toList().reversed.map((entry) {
+                      int idx = entry.key;
+                      var p = entry.value;
+                      return Positioned(
+                        left: idx * overlapOffset,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: colorScheme.surface, width: 2), // 겹치는 부분의 흰색 테두리
+                          ),
+                          child: CircleAvatar(
+                            radius: avatarSize / 2,
+                            backgroundColor: colorScheme.primaryContainer,
+                            backgroundImage: (p['photo_url'] != null && p['photo_url'] != '')
+                                ? NetworkImage('${p['photo_url']}?v=${p['photo_version'] ?? 0}')
+                                : null,
+                            child: (p['photo_url'] == null || p['photo_url'].toString().isEmpty)
+                                ? Text(p['display_name'].toString()[0].toUpperCase() ?? '?', 
+                                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))
+                                : null,
+                          ),
+                        ),
+                      );
+                    }),
+                    // +N 표시
+                    if (totalCount > maxVisible)
+                      Positioned(
+                        left: maxVisible * overlapOffset,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: colorScheme.surface, width: 2),
+                          ),
+                          child: CircleAvatar(
+                            radius: avatarSize / 2,
+                            backgroundColor: colorScheme.surfaceVariant,
+                            child: Text(
+                              "+${totalCount - maxVisible}",
+                              style: TextStyle(
+                                fontSize: 10, 
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurfaceVariant
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              // --- Stack 끝 ---
+              const SizedBox(width: 8),
+              Icon(Icons.arrow_forward_ios, size: 14, color: colorScheme.outline),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

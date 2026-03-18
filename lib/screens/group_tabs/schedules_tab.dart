@@ -20,6 +20,11 @@ class _SchedulesTabState extends State<SchedulesTab> {
   DateTime? _selectedDay;
   bool _showCalendar = true;
 
+  // 드래그로 조절되는 캘린더 높이 (null이면 기본값 사용)
+  double? _calendarHeight;
+  // 캘린더 최소/최대 높이
+  static const double _calendarMinHeight = 80;
+
   String get currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   Stream<List<Map<String, dynamic>>> _schedulesStream(String groupId) {
@@ -50,7 +55,6 @@ class _SchedulesTabState extends State<SchedulesTab> {
     final l = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
 
-    // GroupProvider에서 읽기
     final gp = context.watch<GroupProvider>();
     final groupId = gp.groupId;
     final canCreateSchedule = gp.canPostSchedule;
@@ -63,21 +67,22 @@ class _SchedulesTabState extends State<SchedulesTab> {
             ? _eventsForDay(_selectedDay!, all)
             : <Map<String, dynamic>>[];
 
+        // 날짜별 이벤트 맵 (점 표시용 — 있으면 1개, 없으면 빈 리스트)
         Map<DateTime, List<Map<String, dynamic>>> eventMap = {};
         for (final s in all) {
           final start = (s['start_time'] as Timestamp?)?.toDate();
           if (start == null) continue;
           final key = DateTime(start.year, start.month, start.day);
-          eventMap[key] = [...(eventMap[key] ?? []), s];
+          // 이미 key가 있으면 추가하지 않음 → 항상 1개짜리 리스트 유지
+          eventMap[key] = [s];
         }
 
         return Scaffold(
           backgroundColor: colorScheme.surface,
           floatingActionButton: canCreateSchedule
-              ? FloatingActionButton(
+              ? FloatingActionButton.small(
                   onPressed: () {
                     final gp = context.read<GroupProvider>();
-
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => ChangeNotifierProvider.value(
@@ -92,7 +97,7 @@ class _SchedulesTabState extends State<SchedulesTab> {
               : null,
           body: Column(
             children: [
-              // ── 캘린더 / 리스트 토글 ───────────────────────────────
+              // ── 캘린더 / 리스트 토글 ─────────────────────────────
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                 child: Row(
@@ -122,76 +127,148 @@ class _SchedulesTabState extends State<SchedulesTab> {
                 ),
               ),
 
-              // ── 캘린더 뷰 ──────────────────────────────────────────
-              if (_showCalendar) ...[
-                TableCalendar(
-                  firstDay: DateTime.utc(2020, 1, 1),
-                  lastDay: DateTime.utc(2030, 12, 31),
-                  focusedDay: _focusedDay,
-                  selectedDayPredicate: (day) =>
-                      isSameDay(_selectedDay, day),
-                  eventLoader: (day) {
-                    final key =
-                        DateTime(day.year, day.month, day.day);
-                    return eventMap[key] ?? [];
-                  },
-                  onDaySelected: (selected, focused) {
-                    setState(() {
-                      _selectedDay = selected;
-                      _focusedDay = focused;
-                    });
-                  },
-                  onPageChanged: (focused) =>
-                      setState(() => _focusedDay = focused),
-                  calendarStyle: CalendarStyle(
-                    todayDecoration: BoxDecoration(
-                      color: colorScheme.primary.withOpacity(0.3),
-                      shape: BoxShape.circle,
-                    ),
-                    selectedDecoration: BoxDecoration(
-                      color: colorScheme.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    markerDecoration: BoxDecoration(
-                      color: colorScheme.tertiary,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  headerStyle: HeaderStyle(
-                    formatButtonVisible: false,
-                    titleCentered: true,
-                    titleTextStyle: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-                const Divider(height: 1),
+              // ── 캘린더 뷰 ────────────────────────────────────────
+              if (_showCalendar)
                 Expanded(
-                  child: _selectedDay == null
-                      ? Center(
-                          child: Text(l.selectDayToSeeSchedules,
-                              style: TextStyle(
-                                  color: colorScheme.onSurface
-                                      .withOpacity(0.4))),
-                        )
-                      : selectedEvents.isEmpty
-                          ? Center(
-                              child: Text(l.noSchedulesOnDay,
-                                  style: TextStyle(
-                                      color: colorScheme.onSurface
-                                          .withOpacity(0.4))),
-                            )
-                          : _ScheduleList(
-                              schedules: selectedEvents,
-                              groupId: groupId,
-                              currentUserId: currentUserId,
-                              canCreateSchedule: canCreateSchedule,
-                            ),
-                ),
-              ],
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final totalHeight = constraints.maxHeight;
+                      // 기본 캘린더 높이: 전체의 70% (달력 전체가 보이도록)
+                      final defaultCalHeight = totalHeight * 0.70;
+                      final calHeight = (_calendarHeight ?? defaultCalHeight)
+                          .clamp(_calendarMinHeight, totalHeight - 80);
+                      final listHeight = totalHeight - calHeight - 12; // 12 = divider 영역
 
-              // ── 리스트 뷰 ──────────────────────────────────────────
+                      return Column(
+                        children: [
+                          // 캘린더
+                          SizedBox(
+                            height: calHeight,
+                            child: SingleChildScrollView(
+                              physics: const NeverScrollableScrollPhysics(),
+                              child: TableCalendar(
+                                firstDay: DateTime.utc(2020, 1, 1),
+                                lastDay: DateTime.utc(2030, 12, 31),
+                                focusedDay: _focusedDay,
+                                selectedDayPredicate: (day) =>
+                                    isSameDay(_selectedDay, day),
+                                // 이벤트 로더: 있으면 [dummy] 1개, 없으면 []
+                                eventLoader: (day) {
+                                  final key = DateTime(
+                                      day.year, day.month, day.day);
+                                  return eventMap[key] ?? [];
+                                },
+                                onDaySelected: (selected, focused) {
+                                  setState(() {
+                                    _selectedDay = selected;
+                                    _focusedDay = focused;
+                                  });
+                                },
+                                onPageChanged: (focused) =>
+                                    setState(() => _focusedDay = focused),
+                                calendarStyle: CalendarStyle(
+                                  todayDecoration: BoxDecoration(
+                                    color: colorScheme.primary
+                                        .withOpacity(0.3),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  selectedDecoration: BoxDecoration(
+                                    color: colorScheme.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  markerDecoration: BoxDecoration(
+                                    color: colorScheme.tertiary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  markersMaxCount: 1,
+                                  // 날짜 셀 여백 축소
+                                  cellMargin: const EdgeInsets.all(2),
+                                  cellPadding: EdgeInsets.zero,
+                                ),
+                                daysOfWeekStyle: const DaysOfWeekStyle(
+                                  // 요일 행 높이 축소
+                                  decoration: BoxDecoration(),
+                                ),
+                                headerStyle: HeaderStyle(
+                                  formatButtonVisible: false,
+                                  titleCentered: true,
+                                  // 헤더 여백 축소
+                                  headerPadding: const EdgeInsets.symmetric(vertical: 0),
+                                  titleTextStyle: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // ── 드래그 가능한 Divider ─────────────────
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onVerticalDragUpdate: (details) {
+                              setState(() {
+                                _calendarHeight = (calHeight +
+                                        details.delta.dy)
+                                    .clamp(
+                                        _calendarMinHeight, totalHeight - 80);
+                              });
+                            },
+                            onDoubleTap: () {
+                              setState(() => _calendarHeight = null);
+                            },
+                            child: Container(
+                              height: 12, // 20 → 12으로 축소
+                              color: Colors.transparent,
+                              child: Center(
+                                child: Container(
+                                  width: 36,
+                                  height: 3,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.outline
+                                        .withOpacity(0.4),
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // ── 선택된 날의 일정 목록 ─────────────────
+                          SizedBox(
+                            height: listHeight,
+                            child: _selectedDay == null
+                                ? Center(
+                                    child: Text(
+                                      l.selectDayToSeeSchedules,
+                                      style: TextStyle(
+                                          color: colorScheme.onSurface
+                                              .withOpacity(0.4)),
+                                    ),
+                                  )
+                                : selectedEvents.isEmpty
+                                    ? Center(
+                                        child: Text(
+                                          l.noSchedulesOnDay,
+                                          style: TextStyle(
+                                              color: colorScheme.onSurface
+                                                  .withOpacity(0.4)),
+                                        ),
+                                      )
+                                    : _ScheduleList(
+                                        schedules: selectedEvents,
+                                        groupId: groupId,
+                                        currentUserId: currentUserId,
+                                        canCreateSchedule: canCreateSchedule,
+                                      ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+
+              // ── 리스트 뷰 ────────────────────────────────────────
               if (!_showCalendar)
                 Expanded(
                   child: all.isEmpty
@@ -201,8 +278,8 @@ class _SchedulesTabState extends State<SchedulesTab> {
                             children: [
                               Icon(Icons.event_note,
                                   size: 64,
-                                  color: colorScheme.onSurface
-                                      .withOpacity(0.2)),
+                                  color:
+                                      colorScheme.onSurface.withOpacity(0.2)),
                               const SizedBox(height: 16),
                               Text(l.noSchedules,
                                   style: TextStyle(
@@ -226,7 +303,7 @@ class _SchedulesTabState extends State<SchedulesTab> {
   }
 }
 
-// ── 일정 리스트 ───────────────────────────────────────────────────────────────
+// ── 일정 리스트 ──────────────────────────────────────────────────────────────
 class _ScheduleList extends StatelessWidget {
   final List<Map<String, dynamic>> schedules;
   final String groupId;
@@ -328,13 +405,12 @@ class _ScheduleList extends StatelessWidget {
           trailing: _RsvpBadge(rsvp: myRsvp, colorScheme: colorScheme),
         );
       },
-      separatorBuilder: (_, __) =>
-          const Divider(height: 1, indent: 72),
+      separatorBuilder: (_, __) => const Divider(height: 1, indent: 72),
     );
   }
 }
 
-// ── RSVP 뱃지 ─────────────────────────────────────────────────────────────────
+// ── RSVP 뱃지 ────────────────────────────────────────────────────────────────
 class _RsvpBadge extends StatelessWidget {
   final String? rsvp;
   final ColorScheme colorScheme;

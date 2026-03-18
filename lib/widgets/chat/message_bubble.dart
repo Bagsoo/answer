@@ -29,11 +29,11 @@ class MessageBubble extends StatefulWidget {
   State<MessageBubble> createState() => _MessageBubbleState();
 }
 
-class _MessageBubbleState extends State<MessageBubble> with SingleTickerProviderStateMixin {
+class _MessageBubbleState extends State<MessageBubble>
+    with SingleTickerProviderStateMixin {
   static const int _collapseThreshold = 200;
   bool _expanded = false;
   late AnimationController _highlightController;
-  late Animation<Color?> _highlightAnimation;
 
   @override
   void initState() {
@@ -42,16 +42,9 @@ class _MessageBubbleState extends State<MessageBubble> with SingleTickerProvider
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
-    _highlightAnimation = ColorTween(
-      begin: Colors.transparent,
-      end: Colors.transparent,
-    ).animate(_highlightController);
-
     if (widget.isHighlighted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _highlightController.forward().then((_) {
-          _highlightController.reverse();
-        });
+        _highlightController.forward().then((_) => _highlightController.reverse());
       });
     }
   }
@@ -70,7 +63,7 @@ class _MessageBubbleState extends State<MessageBubble> with SingleTickerProvider
     super.dispose();
   }
 
-  // 검색 키워드 하이라이트 텍스트
+  // ── 검색 키워드 하이라이트 텍스트 ────────────────────────────────────────
   Widget _buildMessageText(String text, ColorScheme colorScheme) {
     final query = widget.searchQuery;
     if (query.isEmpty) {
@@ -105,6 +98,35 @@ class _MessageBubbleState extends State<MessageBubble> with SingleTickerProvider
     );
   }
 
+  // ── 아바타: 프로필 사진 있으면 사진, 없으면 이니셜 ───────────────────────
+  Widget _buildAvatar(String senderName, ColorScheme colorScheme) {
+    final photoUrl = widget.data['sender_photo_url'] as String?;
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
+
+    return GestureDetector(
+      onTap: widget.onAvatarTap,
+      child: CircleAvatar(
+        radius: 18,
+        backgroundColor: colorScheme.secondaryContainer,
+        // 프로필 사진이 있으면 NetworkImage, 없으면 이니셜
+        backgroundImage: hasPhoto ? NetworkImage(photoUrl) : null,
+        onBackgroundImageError: hasPhoto
+            ? (_, __) {} // 이미지 로드 실패 시 이니셜로 폴백
+            : null,
+        child: hasPhoto
+            ? null // 사진 있으면 child 숨김
+            : Text(
+                senderName.isNotEmpty ? senderName[0].toUpperCase() : '?',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSecondaryContainer,
+                ),
+              ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final text = widget.data['text'] as String? ?? '';
@@ -120,9 +142,8 @@ class _MessageBubbleState extends State<MessageBubble> with SingleTickerProvider
     final hasReply = replyToText != null && replyToText.isNotEmpty;
 
     final isLong = text.length > _collapseThreshold;
-    final displayText = isLong && !_expanded
-        ? '${text.substring(0, _collapseThreshold)}...'
-        : text;
+    final displayText =
+        isLong && !_expanded ? '${text.substring(0, _collapseThreshold)}...' : text;
 
     final timeStr = createdAt != null
         ? '${createdAt.toDate().hour.toString().padLeft(2, '0')}:'
@@ -131,7 +152,7 @@ class _MessageBubbleState extends State<MessageBubble> with SingleTickerProvider
 
     final topPadding = isContinuous ? 2.0 : 8.0;
 
-    // 인용 박스 위젯
+    // 인용 박스
     Widget? replyBox;
     if (hasReply) {
       replyBox = GestureDetector(
@@ -174,7 +195,7 @@ class _MessageBubbleState extends State<MessageBubble> with SingleTickerProvider
       );
     }
 
-    // 말풍선 내용 위젯
+    // 말풍선 내용
     Widget bubbleContent = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -203,148 +224,133 @@ class _MessageBubbleState extends State<MessageBubble> with SingleTickerProvider
           ? colorScheme.primaryContainer.withOpacity(0.4)
           : Colors.transparent,
       child: Padding(
-      padding: EdgeInsets.only(
-        top: topPadding,
-        bottom: 2,
-        left: 8,
-        right: 8,
-      ),
-      child: Row(
-        mainAxisAlignment:
-            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // ── 상대방 메시지 ──────────────────────────────────────────────
-          if (!isMe) ...[
-            SizedBox(
-              width: 36,
-              child: isContinuous
-                  ? null
-                  : GestureDetector(
-                      onTap: widget.onAvatarTap,
-                      child: CircleAvatar(
-                      radius: 18,
-                      backgroundColor: colorScheme.secondaryContainer,
+        padding: EdgeInsets.only(
+          top: topPadding,
+          bottom: 2,
+          left: 8,
+          right: 8,
+        ),
+        child: Row(
+          mainAxisAlignment:
+              isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // ── 상대방 메시지 ────────────────────────────────────────────
+            if (!isMe) ...[
+              SizedBox(
+                width: 36,
+                // 연속 메시지면 아바타 숨김 (공간만 유지)
+                child: isContinuous ? null : _buildAvatar(senderName, colorScheme),
+              ),
+              const SizedBox(width: 6),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (!isContinuous && senderName.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, bottom: 3),
                       child: Text(
-                        senderName.isNotEmpty
-                            ? senderName[0].toUpperCase()
-                            : '?',
+                        senderName,
                         style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSecondaryContainer,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurface.withOpacity(0.7),
                         ),
                       ),
                     ),
-                    ),
-            ),
-            const SizedBox(width: 6),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (!isContinuous && senderName.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 3),
-                    child: Text(
-                      senderName,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface.withOpacity(0.7),
-                      ),
-                    ),
-                  ),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Container(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.62,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 13, vertical: 9),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(isContinuous ? 16 : 4),
-                          topRight: const Radius.circular(16),
-                          bottomLeft: const Radius.circular(16),
-                          bottomRight: const Radius.circular(16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.62,
                         ),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 13, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(isContinuous ? 16 : 4),
+                            topRight: const Radius.circular(16),
+                            bottomLeft: const Radius.circular(16),
+                            bottomRight: const Radius.circular(16),
+                          ),
+                        ),
+                        child: bubbleContent,
                       ),
-                      child: bubbleContent,
-                    ),
-                    const SizedBox(width: 4),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (widget.unreadCount > 0)
+                      const SizedBox(width: 4),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (widget.unreadCount > 0)
+                            Text(
+                              widget.unreadCount.toString(),
+                              style: TextStyle(
+                                color: colorScheme.primary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           Text(
-                            widget.unreadCount.toString(),
+                            timeStr,
                             style: TextStyle(
-                              color: colorScheme.primary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                              color: colorScheme.onSurface.withOpacity(0.4),
                             ),
                           ),
-                        Text(
-                          timeStr,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: colorScheme.onSurface.withOpacity(0.4),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
 
-          // ── 내 메시지 ──────────────────────────────────────────────────
-          if (isMe) ...[
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (widget.unreadCount > 0)
+            // ── 내 메시지 ────────────────────────────────────────────────
+            if (isMe) ...[
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (widget.unreadCount > 0)
+                    Text(
+                      widget.unreadCount.toString(),
+                      style: TextStyle(
+                        color: colorScheme.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   Text(
-                    widget.unreadCount.toString(),
+                    timeStr,
                     style: TextStyle(
-                      color: colorScheme.primary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 10,
+                      color: colorScheme.onSurface.withOpacity(0.4),
                     ),
                   ),
-                Text(
-                  timeStr,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: colorScheme.onSurface.withOpacity(0.4),
+                ],
+              ),
+              const SizedBox(width: 4),
+              Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.62,
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withOpacity(0.15),
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(16),
+                    topRight: Radius.circular(isContinuous ? 16 : 4),
+                    bottomLeft: const Radius.circular(16),
+                    bottomRight: const Radius.circular(16),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(width: 4),
-            Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.62,
+                child: bubbleContent,
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-              decoration: BoxDecoration(
-                color: colorScheme.primary.withOpacity(0.15),
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: Radius.circular(isContinuous ? 16 : 4),
-                  bottomLeft: const Radius.circular(16),
-                  bottomRight: const Radius.circular(16),
-                ),
-              ),
-              child: bubbleContent,
-            ),
+            ],
           ],
-        ],
+        ),
       ),
-    ));
+    );
   }
 }

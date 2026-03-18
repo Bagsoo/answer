@@ -106,6 +106,7 @@ class _MembersTabState extends State<MembersTab> {
       final data = doc.data() as Map<String, dynamic>;
       final name = (data['display_name'] as String? ?? '').toLowerCase();
       final memberTags = List<String>.from(data['tags'] as List? ?? []);
+      final photoUrl = data['profile_image'] as String? ?? '';
       final nameMatch =
           _searchQuery.isEmpty || name.contains(_searchQuery.toLowerCase());
       final tagMatch =
@@ -242,6 +243,7 @@ class _MembersTabState extends State<MembersTab> {
                     final role = data['role'] as String? ?? 'member';
                     final displayName =
                         data['display_name'] as String? ?? l.unknown;
+                    final photoUrl = data['photo_url'] as String? ?? '';
                     final perms =
                         data['permissions'] as Map<String, dynamic>? ?? {};
                     final memberTags =
@@ -253,13 +255,17 @@ class _MembersTabState extends State<MembersTab> {
                       onTap: () => _showMemberProfile(
                         context, uid, displayName, role, perms,
                         memberTags, isMe, canManagePerms,
-                        myRole, myPerms, groupId, l, colorScheme,
+                        myRole, myPerms, groupId, l, colorScheme, photoUrl,
                       ),
                       leading: CircleAvatar(
                         backgroundColor: isOwner
                             ? colorScheme.primary
                             : colorScheme.surfaceContainerHighest,
-                        child: Text(
+                        backgroundImage: (photoUrl != null && photoUrl.isNotEmpty) 
+                          ? NetworkImage(photoUrl) 
+                          : null,                        
+                        child: (photoUrl == null || photoUrl.isEmpty) ?
+                        Text(
                           displayName.isNotEmpty
                               ? displayName[0].toUpperCase()
                               : '?',
@@ -269,7 +275,7 @@ class _MembersTabState extends State<MembersTab> {
                                 : colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
                           ),
-                        ),
+                        ) : null,
                       ),
                       title: Text(
                         isMe ? '$displayName (${l.me})' : displayName,
@@ -363,6 +369,7 @@ class _MembersTabState extends State<MembersTab> {
     String groupId,
     AppLocalizations l,
     ColorScheme colorScheme,
+    String photoUrl,
   ) {
     showModalBottomSheet(
       context: context,
@@ -384,6 +391,7 @@ class _MembersTabState extends State<MembersTab> {
           groupId: groupId,
           l: l,
           colorScheme: colorScheme,
+          photoUrl: photoUrl,
         ),
       ),
     );
@@ -530,6 +538,7 @@ class _MemberProfileSheet extends StatefulWidget {
   final String groupId;
   final AppLocalizations l;
   final ColorScheme colorScheme;
+  final String photoUrl;
 
   const _MemberProfileSheet({
     required this.uid,
@@ -542,6 +551,7 @@ class _MemberProfileSheet extends StatefulWidget {
     required this.groupId,
     required this.l,
     required this.colorScheme,
+    required this.photoUrl,
   });
 
   @override
@@ -766,6 +776,7 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
     final colorScheme = widget.colorScheme;
     final l = widget.l;
     final name = widget.displayName;
+    final photoUrl = widget.photoUrl;
     final isOwner = widget.role == 'owner';
     final showPerms = widget.canManagePerms && !widget.isMe && !isOwner;
 
@@ -796,7 +807,11 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
               backgroundColor: isOwner
                   ? colorScheme.primary
                   : colorScheme.primaryContainer,
-              child: Text(
+              backgroundImage: (photoUrl != null && photoUrl.isNotEmpty) 
+                ? NetworkImage(photoUrl) 
+                : null,
+              child: (photoUrl == null || photoUrl.isEmpty) ?
+              Text(
                 name.isNotEmpty ? name[0].toUpperCase() : '?',
                 style: TextStyle(
                   fontSize: 32,
@@ -805,7 +820,7 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
                       ? colorScheme.onPrimary
                       : colorScheme.onPrimaryContainer,
                 ),
-              ),
+              ) : null,
             ),
             const SizedBox(height: 12),
             Text(
@@ -852,6 +867,7 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
                       builder: (_) => UserProfileDetailScreen(
                         uid: widget.uid,
                         displayName: widget.displayName,
+                        photoUrl: widget.photoUrl,
                       ),
                     ));
                   },

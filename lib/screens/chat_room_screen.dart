@@ -24,6 +24,9 @@ import '../widgets/chat/system_message.dart';
 import '../widgets/chat/message_bubble.dart';
 import '../widgets/chat/notice_banner.dart';
 import '../widgets/chat/attach_button.dart';
+import 'package:messenger/services/storage_service.dart';
+import 'package:messenger/services/image_service.dart';
+import 'package:messenger/services/video_service.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final String roomId;
@@ -79,6 +82,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   // 메시지 스크롤 타깃용 GlobalKey 맵
   final Map<String, GlobalKey> _messageKeys = {};
+
+  // 업로드 중 표시용
+  bool _uploadingMedia  = false;
 
   String get currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
 
@@ -285,7 +291,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     ColorScheme colorScheme,
   ) {
     final text = data['text'] as String? ?? '';
-    final isMe = data['sender_id'] == currentUserId;
+    final isMe = data['sender_id'] == currentUserId;    
 
     showModalBottomSheet(
       context: context,
@@ -573,11 +579,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final replyData = _replyToData;
     if (mounted) setState(() { _replyToId = null; _replyToData = null; });
 
+    final userProvider = context.read<UserProvider>();
     final chatService = context.read<ChatService>();
+
     await chatService.sendMessage(
       widget.roomId,
       text,
       senderName: _myName,
+      senderPhotoUrl: userProvider.photoUrl,
       replyToId: replyId,
       replyToText: replyData != null
           ? (replyData['text'] as String? ?? '').length > 80
@@ -587,6 +596,106 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       replyToSender: replyData?['sender_name'] as String?,
     );
     chatService.updateLastReadTime(widget.roomId);
+  }
+
+  // ── 4. 사진 전송 메서드 추가 ─────────────────────────────────
+  Future<void> _sendImages() async {
+    setState(() => _showAttachPanel = false);
+
+    final files = await ImageService().pickAndCompressMultipleImages();
+    if (files.isEmpty || !mounted) return;
+
+    setState(() => _uploadingMedia = true);
+
+    try {
+      final chatService = context.read<ChatService>();
+      final userProvider = context.read<UserProvider>();
+
+      final messageId = chatService.generateMessageId(widget.roomId);
+
+      final imageUrls = await StorageService().uploadChatImages(
+        roomId: widget.roomId,
+        messageId: messageId,
+        files: files,
+      );
+      if (!mounted) return;
+
+      await chatService.sendImageMessage(
+        widget.roomId,
+        messageId: messageId,
+        imageUrls: imageUrls,
+        senderName: _myName,
+        senderPhotoUrl: userProvider.photoUrl,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('사진 전송에 실패했습니다')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingMedia = false);
+    }
+  }
+  
+  
+  // ── 5. 동영상 전송 메서드 추가 ───────────────────────────────
+  Future<void> _sendVideo() async {
+    setState(() => _showAttachPanel = false);
+
+    final file = await VideoService().pickVideo();
+    if (file == null || !mounted) return;
+
+    if (VideoService().isVideoSizeExceeded(file)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('동영상 크기가 50MB를 초과합니다')),
+        );
+      }
+      return;
+    }
+
+    setState(() => _uploadingMedia = true);
+
+    try {
+      final result = await VideoService().compressAndGetThumbnail(file);
+      if (result == null || !mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('동영상 처리에 실패했습니다')),
+        );
+        return;
+      }
+
+      final chatService = context.read<ChatService>();
+      final userProvider = context.read<UserProvider>();
+
+      final messageId = chatService.generateMessageId(widget.roomId);
+
+      final urls = await StorageService().uploadChatVideo(
+        roomId: widget.roomId,
+        messageId: messageId,
+        videoFile: result['video']!,
+        thumbnailFile: result['thumbnail']!,
+      );
+      if (!mounted) return;
+
+      await chatService.sendVideoMessage(
+        widget.roomId,
+        messageId: messageId,
+        videoUrl: urls['videoUrl']!,
+        thumbnailUrl: urls['thumbnailUrl']!,
+        senderName: _myName,
+        senderPhotoUrl: userProvider.photoUrl,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('동영상 전송에 실패했습니다')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingMedia = false);
+    }
   }
 
   // ── 예약 메시지 전송 체크 (채팅방 진입 시) ────────────────────────────────
@@ -950,7 +1059,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           child: Row(children: [
             Icon(Icons.people_outline, color: colorScheme.primary, size: 20),
             const SizedBox(width: 12),
-            Text(l.viewParticipants),
+            Text(l.participants),
           ]),
         ),
         PopupMenuItem(
@@ -1236,6 +1345,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               color: colorScheme.primary,
             ),
 
+          if (_uploadingMedia)
+            LinearProgressIndicator(
+              minHeight: 2,
+              backgroundColor: colorScheme.surface,
+              color: colorScheme.primary,
+            ),
+
           Expanded(
             child: StreamBuilder<Set<String>>(
                 stream: context.read<BlockService>().getBlockedUidSet(),
@@ -1371,6 +1487,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                             MaterialPageRoute(
                                               builder: (_) => UserProfileDetailScreen(
                                                 uid: data['sender_id'] as String,
+                                                photoUrl: data['sender_photo_url'] as String? ?? '',
                                                 displayName: data['sender_name'] as String? ?? '',
                                               ),
                                             ),
@@ -1538,8 +1655,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   // ── 첨부 패널 ─────────────────────────────────────────────────────────────
   Widget _buildAttachPanel(ColorScheme colorScheme, AppLocalizations l) {
     final items = [
-      AttachItem(icon: Icons.photo_outlined,         label: l.attachPhotos,     color: Colors.green,    onTap: () {}),
-      AttachItem(icon: Icons.videocam_outlined,       label: l.attachVideos,   color: Colors.red,      onTap: () {}),
+      AttachItem(icon: Icons.photo_outlined,         label: l.attachPhotos,     color: Colors.green,    onTap: _sendImages),
+      AttachItem(icon: Icons.videocam_outlined,       label: l.attachVideos,   color: Colors.red,      onTap: _sendVideo),
       AttachItem(icon: Icons.mic_outlined,            label: l.attachVoice, color: Colors.orange,  onTap: () {}),
       AttachItem(icon: Icons.call_outlined,           label: l.attachCall,     color: Colors.blue,     onTap: () {}),
       AttachItem(icon: Icons.videocam,                label: l.attachVideoCall,  color: Colors.purple,  onTap: () {}),

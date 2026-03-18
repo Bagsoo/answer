@@ -1,0 +1,22 @@
+﻿
+lib\l10n\app_localizati
+ons.dart:192:  String g
+et attachVideos => _s.a
+ttachVideos;
+lib\l10n\app_localizati
+ons.dart:705:  String g
+et attachVideos;
+lib\l10n\app_localizati
+ons.dart:1224:  @overri
+de String get attachVid
+eos => 'Videos';
+lib\l10n\app_localizati
+ons.dart:1722:  @overri
+de String get attachVid
+eos => '동영상';
+lib\l10n\app_localizati
+ons.dart:2221:  @overri
+de String get attachVid
+eos => '動画';
+
+
