@@ -184,7 +184,19 @@ class AppLocalizations {
   String get freePlanDesc => _s.freePlanDesc;
   String get plusPlanDesc => _s.plusPlanDesc;
   String get proPlanDesc => _s.proPlanDesc;
+  String get viewOnMap => _s.viewOnMap;
 
+  // ── 채팅방 ──────────────────────────────────────────────────────────────
+  String get attachPhotos => _s.attachPhotos;
+  String get attachVideos => _s.attachVideos;
+  String get attachVoice => _s.attachVoice;
+  String get attachCall => _s.attachCall;
+  String get attachVideoCall => _s.attachVideoCall;
+  String get attachAiMinutes => _s.attachAiMinutes;
+  String get attachFile => _s.attachFile;
+  String get attachContact => _s.attachContact;
+  String get attachSchedule => _s.attachSchedule;
+  String get attachPoll => _s.attachPoll;  
 
   // ── 플랜: Free ──────────────────────────────────────────────────────────────
   String get planFree => _s.planFree;
@@ -230,6 +242,8 @@ class AppLocalizations {
   String memberLimitText(int limit) => _s.memberLimitText(limit);
 
   String get next => _s.next;
+  String get location => _s.location;
+  String get locationPro => _s.locationPro;
   String get groupType => _s.groupType;
   String get groupTypeCompany => _s.groupTypeCompany;
   String get groupTypeClub => _s.groupTypeClub;
@@ -680,8 +694,21 @@ abstract class _AppStrings {
   String get advancedAdminTool;
   String get freePlanDesc;
   String get plusPlanDesc;
-  String get proPlanDesc;  
+  String get proPlanDesc;
+  String get viewOnMap;
   
+  // 채팅방
+  String get attachPhotos;
+  String get attachVideos;
+  String get attachVoice;
+  String get attachCall;
+  String get attachVideoCall;
+  String get attachFile;
+  String get attachContact;
+  String get attachSchedule;
+  String get attachPoll;
+  String get attachAiMinutes;
+
   // Free
   String get planFree;
   String get planFreePrice;
@@ -723,6 +750,8 @@ abstract class _AppStrings {
   String memberLimitText(int limit);
 
   String get next;
+  String get location;
+  String get locationPro;
   String get groupTypeCompany;
   String get groupTypeClub;
   String get groupTypeSmall;
@@ -1183,6 +1212,19 @@ class _EnStrings extends _AppStrings {
   @override String get freePlanDesc => 'Free plan description';
   @override String get plusPlanDesc => 'Plus plan description';
   @override String get proPlanDesc => 'Pro plan description';  
+  @override String get viewOnMap => 'View on map';
+
+  // 채팅방
+  @override String get attachPhotos => 'Photos';
+  @override String get attachVideos => 'Videos';
+  @override String get attachVoice => 'Voice';
+  @override String get attachCall => 'Call';
+  @override String get attachVideoCall => 'Video Call';
+  @override String get attachFile => 'File';
+  @override String get attachContact => 'Contact';
+  @override String get attachSchedule => 'Schedule';
+  @override String get attachPoll => 'Poll';
+  @override String get attachAiMinutes => 'AI Minutes';
 
   // Free
   @override String get planFree => 'Free';
@@ -1226,6 +1268,8 @@ class _EnStrings extends _AppStrings {
   @override String boardLimitText(dynamic limit) => 'Up to $limit boards';
   @override String chatLimitText(dynamic limit) => 'Up to $limit sub-chats';
   @override String memberLimitText(int limit) => 'Up to $limit members';
+  @override String get location => 'Location';
+  @override String get locationPro => 'Available in Pro Plan';
 
   @override String get next => 'Next';
   @override String get groupTypeCompany => 'Company';
@@ -1665,6 +1709,19 @@ class _KoStrings extends _AppStrings {
   @override String get freePlanDesc => '무료 플랜 혜택';
   @override String get plusPlanDesc => 'Plus 플랜 혜택';
   @override String get proPlanDesc => 'Pro 플랜 혜택';  
+  @override String get viewOnMap => '지도 보기';
+
+  // 채팅방
+  @override String get attachPhotos => '사진';
+  @override String get attachVideos => '동영상';
+  @override String get attachVoice => '음성';
+  @override String get attachCall => '통화';
+  @override String get attachVideoCall => '영상통화';
+  @override String get attachFile => '파일';
+  @override String get attachContact => '연락처';
+  @override String get attachSchedule => '예약메세지';
+  @override String get attachPoll => '투표';
+  @override String get attachAiMinutes => 'AI 회의록';
 
   // Free
   @override String get planFree => '무료';
@@ -1708,6 +1765,8 @@ class _KoStrings extends _AppStrings {
   @override String boardLimitText(dynamic limit) => '최대 $limit 게시판';
   @override String chatLimitText(dynamic limit) => '최대 $limit 서브 채팅';
   @override String memberLimitText(int limit) => '최대 $limit 명';
+  @override String get location => '장소';
+  @override String get locationPro => 'Pro 플랜에서 이용 가능합니다';
 
   @override String get next => '다음';
   @override String get groupTypeCompany => '회사';
@@ -2147,6 +2206,19 @@ class _JaStrings extends _AppStrings {
   @override String get freePlanDesc => '個人나 小規模グループに';
   @override String get plusPlanDesc => '成長中のコミュニティに';
   @override String get proPlanDesc => '大規模グループ向け';  
+  @override String get viewOnMap => '地図で確認';
+
+  //채팅방
+  @override String get attachPhotos => '写真';
+  @override String get attachVideos => '動画';
+  @override String get attachVoice => '音声メッセージ';
+  @override String get attachCall => '通話';
+  @override String get attachVideoCall => 'ビデオ通話';
+  @override String get attachFile => 'ファイル';
+  @override String get attachContact => '連絡先';
+  @override String get attachSchedule => '予約送信';
+  @override String get attachPoll => '投票';
+  @override String get attachAiMinutes => 'AI議事録';
 
   // Free
   @override String get planFree => '無料';
@@ -2190,6 +2262,8 @@ class _JaStrings extends _AppStrings {
   @override String boardLimitText(dynamic limit) => '掲示板：最大 $limit';
   @override String chatLimitText(dynamic limit) => 'チャット：最大 $limit';
   @override String memberLimitText(int limit) => 'メンバー：最大 $limit名';
+  @override String get location => '場所';
+  @override String get locationPro => 'Proプランで利用可能です';
 
   @override String get next => '次へ';
   @override String get groupTypeCompany => '会社';

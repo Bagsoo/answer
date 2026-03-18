@@ -9,6 +9,7 @@ import 'group_list_screen.dart';
 import 'app_settings_screen.dart';
 import 'friends_screen.dart';
 import 'memo_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -33,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final userProvider = context.watch<UserProvider>();
 
     final pages = [
       FriendsScreen(),
@@ -43,6 +45,35 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        // --- 1. 왼쪽 프로필 사진 추가 ---
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0), // 적절한 여백
+          child: GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              );
+            },
+            child: CircleAvatar(
+              radius: 12,
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+              // 캐시 방지 타임스탬프 적용
+              backgroundImage: userProvider.photoUrl != null
+                  ? NetworkImage('${userProvider.photoUrl}?v=${DateTime.now().millisecondsSinceEpoch}')
+                  : null,
+              child: userProvider.photoUrl == null
+                  ? Text(
+                      userProvider.name.isNotEmpty ? userProvider.name[0].toUpperCase() : '?',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      ),
+                    )
+                  : null,
+            ),
+          ),
+        ),
         title: Text(_getAppBarTitle(l, _currentIndex)),
         centerTitle: true,
         actions: [

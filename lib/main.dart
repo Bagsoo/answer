@@ -18,6 +18,7 @@ import 'l10n/app_localizations.dart';
 import 'theme/app_theme.dart';
 import 'screens/auth_wrapper.dart';
 import 'firebase_options.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +30,8 @@ void main() async {
   } catch (e) {
     debugPrint("Firebase not configured properly: $e");
   }
+
+  await dotenv.load(fileName: ".env");
 
   await NotificationService().init();
 

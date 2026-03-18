@@ -19,6 +19,12 @@ import 'report_dialog.dart';
 import 'chat_room_more/create_poll_screen.dart';
 import 'chat_room_more/poll_bubble.dart';
 
+import '../widgets/chat/date_divider.dart';
+import '../widgets/chat/system_message.dart';
+import '../widgets/chat/message_bubble.dart';
+import '../widgets/chat/notice_banner.dart';
+import '../widgets/chat/attach_button.dart';
+
 class ChatRoomScreen extends StatefulWidget {
   final String roomId;
   final String? initialScrollToMessageId;
@@ -1185,7 +1191,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           // ── 공지 배너 / 확성기 아이콘 ─────────────────────────────────
           if (_pinnedMessage != null)
             if (!_noticeBannerDismissed)
-              _NoticeBanner(
+              NoticeBanner(
                 text: _pinnedMessage!['text'] as String? ?? '',
                 onDismiss: () => setState(() => _noticeBannerDismissed = true),
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
@@ -1317,14 +1323,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                               // 날짜 구분선 — 그날의 첫 메시지 위에 표시
                               // (reverse:true 이므로 Column에서 먼저 = 화면에서 위)
                               if (needsDate)
-                                _DateDivider(
+                                DateDivider(
                                   date: (data['created_at'] as Timestamp).toDate(),
                                   colorScheme: colorScheme,
                                 ),
 
                               // 시스템 메시지
                               if (isSystem && data['type'] != 'poll')
-                                _SystemMessage(
+                                SystemMessage(
                                   text: data['text'] ?? '',
                                   colorScheme: colorScheme,
                                 )
@@ -1349,7 +1355,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                     l,
                                     colorScheme,
                                   ),
-                                  child: _MessageBubble(
+                                  child: MessageBubble(
                                     data: data,
                                     isMe: data['sender_id'] == currentUserId,
                                     isContinuous: isContinuous,
@@ -1388,7 +1394,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ),
           if (!_isSearching) _buildMessageInput(colorScheme, l),
           if (_showAttachPanel && !_isSearching)
-            _buildAttachPanel(colorScheme),
+            _buildAttachPanel(colorScheme, l),
         ],
       ),
     );
@@ -1530,28 +1536,28 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 
   // ── 첨부 패널 ─────────────────────────────────────────────────────────────
-  Widget _buildAttachPanel(ColorScheme colorScheme) {
+  Widget _buildAttachPanel(ColorScheme colorScheme, AppLocalizations l) {
     final items = [
-      _AttachItem(icon: Icons.photo_outlined,         label: '사진',     color: Colors.green,    onTap: () {}),
-      _AttachItem(icon: Icons.videocam_outlined,       label: '동영상',   color: Colors.red,      onTap: () {}),
-      _AttachItem(icon: Icons.mic_outlined,            label: '음성메세지', color: Colors.orange,  onTap: () {}),
-      _AttachItem(icon: Icons.call_outlined,           label: '통화',     color: Colors.blue,     onTap: () {}),
-      _AttachItem(icon: Icons.videocam,                label: '영상통화',  color: Colors.purple,  onTap: () {}),
-      _AttachItem(icon: Icons.auto_awesome_outlined,   label: 'AI회의록',  color: Colors.teal,    onTap: () {}),
-      _AttachItem(icon: Icons.insert_drive_file_outlined, label: '파일',  color: Colors.brown,   onTap: () {}),
-      _AttachItem(icon: Icons.contacts_outlined,       label: '연락처',   color: Colors.indigo,   onTap: () {}),
-      _AttachItem(
+      AttachItem(icon: Icons.photo_outlined,         label: l.attachPhotos,     color: Colors.green,    onTap: () {}),
+      AttachItem(icon: Icons.videocam_outlined,       label: l.attachVideos,   color: Colors.red,      onTap: () {}),
+      AttachItem(icon: Icons.mic_outlined,            label: l.attachVoice, color: Colors.orange,  onTap: () {}),
+      AttachItem(icon: Icons.call_outlined,           label: l.attachCall,     color: Colors.blue,     onTap: () {}),
+      AttachItem(icon: Icons.videocam,                label: l.attachVideoCall,  color: Colors.purple,  onTap: () {}),
+      AttachItem(icon: Icons.auto_awesome_outlined,   label: l.attachAiMinutes,  color: Colors.teal,    onTap: () {}),
+      AttachItem(icon: Icons.insert_drive_file_outlined, label: l.attachFile,  color: Colors.brown,   onTap: () {}),
+      AttachItem(icon: Icons.contacts_outlined,       label: l.attachContact,   color: Colors.indigo,   onTap: () {}),
+      AttachItem(
         icon: Icons.schedule_send_outlined,
-        label: '예약메세지',
+        label: l.attachSchedule,
         color: colorScheme.primary,
         onTap: () {
           setState(() => _showAttachPanel = false);
           _showScheduledMessageSheet();
         },
       ),
-      _AttachItem(
+      AttachItem(
         icon: Icons.poll_outlined,
-        label: '투표',
+        label: l.attachPoll,
         color: Colors.deepPurple,
         onTap: () {
           setState(() => _showAttachPanel = false);
@@ -1575,537 +1581,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: 16,
           crossAxisSpacing: 8,
-          children: items.map((item) => _AttachButton(item: item, colorScheme: colorScheme)).toList(),
+          children: items.map((item) => AttachButton(item: item, colorScheme: colorScheme)).toList(),
         ),
       ),
     );
   }
 }
 
-// ── 날짜 구분선 ───────────────────────────────────────────────────────────────
-class _DateDivider extends StatelessWidget {
-  final DateTime date;
-  final ColorScheme colorScheme;
-
-  const _DateDivider({required this.date, required this.colorScheme});
-
-  String _format(DateTime dt) {
-    const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
-    final wd = weekdays[dt.weekday - 1];
-    return '${dt.year}년 ${dt.month}월 ${dt.day}일 $wd요일';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Divider(color: colorScheme.onSurface.withOpacity(0.15)),
-          ),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withOpacity(0.8),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              _format(date),
-              style: TextStyle(
-                fontSize: 11,
-                color: colorScheme.onSurface.withOpacity(0.5),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Divider(color: colorScheme.onSurface.withOpacity(0.15)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── 시스템 메시지 ─────────────────────────────────────────────────────────────
-class _SystemMessage extends StatelessWidget {
-  final String text;
-  final ColorScheme colorScheme;
-
-  const _SystemMessage({required this.text, required this.colorScheme});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withOpacity(0.7),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-              fontSize: 12, color: colorScheme.onSurface.withOpacity(0.55)),
-        ),
-      ),
-    );
-  }
-}
-
-// ── 메시지 버블 ───────────────────────────────────────────────────────────────
-class _MessageBubble extends StatefulWidget {
-  final Map<String, dynamic> data;
-  final bool isMe;
-  final bool isContinuous;
-  final int unreadCount;
-  final ColorScheme colorScheme;
-  final bool isHighlighted;
-  final String searchQuery;
-  final VoidCallback? onAvatarTap;
-  final VoidCallback? onReplyTap;
-
-  const _MessageBubble({
-    required this.data,
-    required this.isMe,
-    required this.isContinuous,
-    required this.unreadCount,
-    required this.colorScheme,
-    this.isHighlighted = false,
-    this.searchQuery = '',
-    this.onAvatarTap,
-    this.onReplyTap,
-  });
-
-  @override
-  State<_MessageBubble> createState() => _MessageBubbleState();
-}
-
-class _MessageBubbleState extends State<_MessageBubble> with SingleTickerProviderStateMixin {
-  static const int _collapseThreshold = 200;
-  bool _expanded = false;
-  late AnimationController _highlightController;
-  late Animation<Color?> _highlightAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _highlightController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-    _highlightAnimation = ColorTween(
-      begin: Colors.transparent,
-      end: Colors.transparent,
-    ).animate(_highlightController);
-
-    if (widget.isHighlighted) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _highlightController.forward().then((_) {
-          _highlightController.reverse();
-        });
-      });
-    }
-  }
-
-  @override
-  void didUpdateWidget(_MessageBubble oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isHighlighted && !oldWidget.isHighlighted) {
-      _highlightController.forward().then((_) => _highlightController.reverse());
-    }
-  }
-
-  @override
-  void dispose() {
-    _highlightController.dispose();
-    super.dispose();
-  }
-
-  // 검색 키워드 하이라이트 텍스트
-  Widget _buildMessageText(String text, ColorScheme colorScheme) {
-    final query = widget.searchQuery;
-    if (query.isEmpty) {
-      return Text(text, style: TextStyle(color: colorScheme.onSurface));
-    }
-    final lowerText = text.toLowerCase();
-    final lowerQuery = query.toLowerCase();
-    final spans = <TextSpan>[];
-    int start = 0;
-    while (true) {
-      final idx = lowerText.indexOf(lowerQuery, start);
-      if (idx == -1) {
-        spans.add(TextSpan(text: text.substring(start)));
-        break;
-      }
-      if (idx > start) spans.add(TextSpan(text: text.substring(start, idx)));
-      spans.add(TextSpan(
-        text: text.substring(idx, idx + query.length),
-        style: TextStyle(
-          backgroundColor: colorScheme.primary.withOpacity(0.35),
-          fontWeight: FontWeight.bold,
-          color: colorScheme.onSurface,
-        ),
-      ));
-      start = idx + query.length;
-    }
-    return RichText(
-      text: TextSpan(
-        style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
-        children: spans,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final text = widget.data['text'] as String? ?? '';
-    final createdAt = widget.data['created_at'] as Timestamp?;
-    final senderName = widget.data['sender_name'] as String? ?? '';
-    final isMe = widget.isMe;
-    final isContinuous = widget.isContinuous;
-    final colorScheme = widget.colorScheme;
-
-    // 답장 데이터
-    final replyToText = widget.data['reply_to_text'] as String?;
-    final replyToSender = widget.data['reply_to_sender'] as String?;
-    final hasReply = replyToText != null && replyToText.isNotEmpty;
-
-    final isLong = text.length > _collapseThreshold;
-    final displayText = isLong && !_expanded
-        ? '${text.substring(0, _collapseThreshold)}...'
-        : text;
-
-    final timeStr = createdAt != null
-        ? '${createdAt.toDate().hour.toString().padLeft(2, '0')}:'
-            '${createdAt.toDate().minute.toString().padLeft(2, '0')}'
-        : '';
-
-    final topPadding = isContinuous ? 2.0 : 8.0;
-
-    // 인용 박스 위젯
-    Widget? replyBox;
-    if (hasReply) {
-      replyBox = GestureDetector(
-        onTap: widget.onReplyTap,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 4),
-          padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-          decoration: BoxDecoration(
-            color: colorScheme.onSurface.withOpacity(0.07),
-            borderRadius: BorderRadius.circular(8),
-            border: Border(
-              left: BorderSide(color: colorScheme.primary, width: 3),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (replyToSender != null && replyToSender.isNotEmpty)
-                Text(
-                  replyToSender,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.primary,
-                  ),
-                ),
-              Text(
-                replyToText!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: colorScheme.onSurface.withOpacity(0.55),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // 말풍선 내용 위젯
-    Widget bubbleContent = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (replyBox != null) replyBox,
-        _buildMessageText(displayText, colorScheme),
-        if (isLong) ...[
-          const SizedBox(height: 4),
-          GestureDetector(
-            onTap: () => setState(() => _expanded = !_expanded),
-            child: Text(
-              _expanded ? '접기' : '더보기',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: colorScheme.primary,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 600),
-      color: widget.isHighlighted
-          ? colorScheme.primaryContainer.withOpacity(0.4)
-          : Colors.transparent,
-      child: Padding(
-      padding: EdgeInsets.only(
-        top: topPadding,
-        bottom: 2,
-        left: 8,
-        right: 8,
-      ),
-      child: Row(
-        mainAxisAlignment:
-            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // ── 상대방 메시지 ──────────────────────────────────────────────
-          if (!isMe) ...[
-            SizedBox(
-              width: 36,
-              child: isContinuous
-                  ? null
-                  : GestureDetector(
-                      onTap: widget.onAvatarTap,
-                      child: CircleAvatar(
-                      radius: 18,
-                      backgroundColor: colorScheme.secondaryContainer,
-                      child: Text(
-                        senderName.isNotEmpty
-                            ? senderName[0].toUpperCase()
-                            : '?',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSecondaryContainer,
-                        ),
-                      ),
-                    ),
-                    ),
-            ),
-            const SizedBox(width: 6),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (!isContinuous && senderName.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 3),
-                    child: Text(
-                      senderName,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface.withOpacity(0.7),
-                      ),
-                    ),
-                  ),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Container(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.62,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 13, vertical: 9),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(isContinuous ? 16 : 4),
-                          topRight: const Radius.circular(16),
-                          bottomLeft: const Radius.circular(16),
-                          bottomRight: const Radius.circular(16),
-                        ),
-                      ),
-                      child: bubbleContent,
-                    ),
-                    const SizedBox(width: 4),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (widget.unreadCount > 0)
-                          Text(
-                            widget.unreadCount.toString(),
-                            style: TextStyle(
-                              color: colorScheme.primary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        Text(
-                          timeStr,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: colorScheme.onSurface.withOpacity(0.4),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-
-          // ── 내 메시지 ──────────────────────────────────────────────────
-          if (isMe) ...[
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (widget.unreadCount > 0)
-                  Text(
-                    widget.unreadCount.toString(),
-                    style: TextStyle(
-                      color: colorScheme.primary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                Text(
-                  timeStr,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: colorScheme.onSurface.withOpacity(0.4),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 4),
-            Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.62,
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-              decoration: BoxDecoration(
-                color: colorScheme.primary.withOpacity(0.15),
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: Radius.circular(isContinuous ? 16 : 4),
-                  bottomLeft: const Radius.circular(16),
-                  bottomRight: const Radius.circular(16),
-                ),
-              ),
-              child: bubbleContent,
-            ),
-          ],
-        ],
-      ),
-    ));
-  }
-}
-
-// ── 공지 배너 ─────────────────────────────────────────────────────────────────
-class _NoticeBanner extends StatelessWidget {
-  final String text;
-  final VoidCallback onDismiss;
-  final VoidCallback onTap;
-  final ColorScheme colorScheme;
-
-  const _NoticeBanner({
-    required this.text,
-    required this.onDismiss,
-    required this.onTap,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: colorScheme.primaryContainer.withOpacity(0.6),
-          border: Border(
-            bottom: BorderSide(
-                color: colorScheme.primary.withOpacity(0.15), width: 1),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.campaign_outlined,
-                size: 16, color: colorScheme.primary),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                text,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            GestureDetector(
-              onTap: onDismiss,
-              child: Icon(Icons.close,
-                  size: 16,
-                  color: colorScheme.onSurface.withOpacity(0.4)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── 첨부 아이템 모델 ──────────────────────────────────────────────────────────
-class _AttachItem {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  _AttachItem({required this.icon, required this.label, required this.color, required this.onTap});
-}
-
-// ── 첨부 버튼 위젯 ────────────────────────────────────────────────────────────
-class _AttachButton extends StatelessWidget {
-  final _AttachItem item;
-  final ColorScheme colorScheme;
-
-  const _AttachButton({required this.item, required this.colorScheme});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: item.onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: item.color.withOpacity(0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(item.icon, color: item.color, size: 26),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            item.label,
-            style: TextStyle(
-              fontSize: 11,
-              color: colorScheme.onSurface.withOpacity(0.7),
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-}

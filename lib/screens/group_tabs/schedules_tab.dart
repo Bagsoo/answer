@@ -75,11 +75,18 @@ class _SchedulesTabState extends State<SchedulesTab> {
           backgroundColor: colorScheme.surface,
           floatingActionButton: canCreateSchedule
               ? FloatingActionButton(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => ScheduleFormScreen(groupId: groupId),
-                    ),
-                  ),
+                  onPressed: () {
+                    final gp = context.read<GroupProvider>();
+
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ChangeNotifierProvider.value(
+                          value: gp,
+                          child: ScheduleFormScreen(groupId: groupId),
+                        ),
+                      ),
+                    );
+                  },
                   child: const Icon(Icons.add),
                 )
               : null,
@@ -251,16 +258,22 @@ class _ScheduleList extends StatelessWidget {
             start != null && start.isAfter(DateTime.now());
 
         return ListTile(
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ScheduleDetailScreen(
-                groupId: groupId,
-                scheduleId: s['id'] as String,
-                canEdit: canCreateSchedule ||
-                    s['created_by'] == currentUserId,
+          onTap: () {
+            final gp = context.read<GroupProvider>();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ChangeNotifierProvider.value(
+                  value: gp,
+                  child: ScheduleDetailScreen(
+                    groupId: groupId,
+                    scheduleId: s['id'] as String,
+                    canEdit: canCreateSchedule ||
+                        s['created_by'] == currentUserId,
+                  ),
+                ),
               ),
-            ),
-          ),
+            );
+          },
           leading: Container(
             width: 48,
             decoration: BoxDecoration(

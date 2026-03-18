@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../../services/notification_service.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../../providers/group_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/notification_service.dart';
 import 'schedule_form_screen.dart';
 
@@ -57,13 +59,27 @@ class ScheduleDetailScreen extends StatelessWidget {
     if (confirmed != true) return;
 
     await _ref.delete();
-    context.read<NotificationService>().cancelNotification(NotificationService.notificationId(scheduleId));
+    if (context.mounted) {
+      context.read<NotificationService>().cancelNotification(
+          NotificationService.notificationId(scheduleId));
+    }
 
     if (context.mounted) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l.scheduleDeleted)),
       );
+    }
+  }
+
+  // ── 지도 열기 ──────────────────────────────────────────────────────────────
+  Future<void> _launchMaps(String locationName) async {
+    final query = Uri.encodeComponent(locationName);
+    final url = 'https://www.google.com/maps/search/?api=1&query=$query';
+    final uri = Uri.parse(url);
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -75,6 +91,9 @@ class ScheduleDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
+    
+    // 현재 화면에서 사용 중인 GroupProvider를 미리 읽어둡니다.
+    final groupProvider = context.read<GroupProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -88,10 +107,15 @@ class ScheduleDetailScreen extends StatelessWidget {
                 if (!context.mounted) return;
                 final data = snap.data() as Map<String, dynamic>;
                 data['id'] = scheduleId;
+
                 Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => ScheduleFormScreen(
-                    groupId: groupId,
-                    existing: data,
+                  // .value를 사용하여 기존 GroupProvider 인스턴스를 수정 화면에 전달합니다.
+                  builder: (_) => ChangeNotifierProvider.value(
+                    value: groupProvider,
+                    child: ScheduleFormScreen(
+                      groupId: groupId,
+                      existing: data,
+                    ),
                   ),
                 ));
               },
@@ -116,12 +140,13 @@ class ScheduleDetailScreen extends StatelessWidget {
           final data = snap.data!.data() as Map<String, dynamic>;
           final title = data['title'] as String? ?? '';
           final desc = data['description'] as String? ?? '';
+          final locationName = data['location']?['name'] as String? ?? '';
           final start = (data['start_time'] as Timestamp?)?.toDate();
           final end = (data['end_time'] as Timestamp?)?.toDate();
           final rsvp = data['rsvp'] as Map<String, dynamic>? ?? {};
           final myRsvp = rsvp[currentUserId] as String?;
+          final isPro = groupProvider.plan == 'pro';
 
-          // RSVP 집계
           int yesCount = 0, noCount = 0, maybeCount = 0;
           for (final v in rsvp.values) {
             if (v == 'yes') yesCount++;
@@ -134,13 +159,11 @@ class ScheduleDetailScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 제목
                 Text(title,
                     style: const TextStyle(
                         fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
 
-                // 시간
                 if (start != null)
                   _InfoRow(
                     icon: Icons.play_circle_outline,
@@ -156,9 +179,8 @@ class ScheduleDetailScreen extends StatelessWidget {
                     value: _fmt(end),
                     colorScheme: colorScheme,
                   ),
-                ],
+                ],                
 
-                // 설명
                 if (desc.isNotEmpty) ...[
                   const SizedBox(height: 20),
                   Text(l.scheduleDescription,
@@ -170,17 +192,15 @@ class ScheduleDetailScreen extends StatelessWidget {
                   Text(desc),
                 ],
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 6),
                 const Divider(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
 
-                // RSVP
                 Text(l.rsvp,
                     style: const TextStyle(
                         fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
 
-                // RSVP 집계
                 Row(
                   children: [
                     _RsvpCount(icon: Icons.check_circle, color: Colors.green,
@@ -196,7 +216,6 @@ class ScheduleDetailScreen extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // 내 RSVP 선택
                 Text(l.myRsvp,
                     style: TextStyle(
                         fontSize: 13,
@@ -232,6 +251,45 @@ class ScheduleDetailScreen extends StatelessWidget {
                     ),
                   ],
                 ),
+
+                // ── 장소 정보 및 지도 버튼 추가 ───────────────────
+                if (isPro && locationName.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  Text(l.location,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurface.withOpacity(0.5),
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on_outlined, 
+                           size: 18, color: colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(locationName, 
+                                   style: const TextStyle(fontWeight: FontWeight.w500)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _launchMaps(locationName),
+                      icon: const Icon(Icons.map_outlined),
+                      label: Text(l.viewOnMap), // l10n에 viewOnMap: "지도 보기" 추가 필요
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: colorScheme.primary,
+                        side: BorderSide(color: colorScheme.outlineVariant),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           );
