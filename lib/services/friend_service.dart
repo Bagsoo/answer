@@ -13,17 +13,13 @@ class FriendService {
     final cleaned = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
     if (cleaned.isEmpty) return null;
 
-    // 입력 형식 정규화
-    // +821012345678  → +821012345678 (이미 국제번호)
-    // 01012345678    → +821012345678 (한국 로컬번호)
-    // 그 외           → 입력값 그대로 (해외 사용자는 +1, +81 등 직접 입력)
     String normalized;
     if (cleaned.startsWith('+')) {
-      normalized = cleaned; // 이미 국제번호 형식
+      normalized = cleaned;
     } else if (cleaned.startsWith('0')) {
-      normalized = '+82${cleaned.substring(1)}'; // 한국 로컬번호
+      normalized = '+82${cleaned.substring(1)}';
     } else {
-      normalized = cleaned; // 알 수 없는 형식 → 그대로 검색
+      normalized = cleaned;
     }
 
     final snap = await _db
@@ -34,7 +30,7 @@ class FriendService {
 
     if (snap.docs.isEmpty) return null;
     final doc = snap.docs.first;
-    if (doc.id == currentUserId) return null; // 자기 자신 제외
+    if (doc.id == currentUserId) return null;
 
     final data = doc.data();
     data['uid'] = doc.id;
@@ -42,12 +38,15 @@ class FriendService {
   }
 
   // ── 친구 추가 ─────────────────────────────────────────────────────────────
+  // profile_image 파라미터 추가 — 양쪽 friends 서브컬렉션에 저장
   Future<bool> addFriend(
     String friendUid,
     String friendName, {
     required String myName,
     String myPhoneNumber = '',
+    String myProfileImage = '',       // ← 추가: 내 프로필 사진
     String friendPhoneNumber = '',
+    String friendProfileImage = '',   // ← 추가: 상대방 프로필 사진
   }) async {
     if (currentUserId.isEmpty) return false;
     try {
@@ -61,22 +60,34 @@ class FriendService {
 
       final batch = _db.batch();
 
+      // 내 friends에 상대방 저장 (상대방 프로필 사진 포함)
       batch.set(
-        _db.collection('users').doc(currentUserId).collection('friends').doc(friendUid),
+        _db
+            .collection('users')
+            .doc(currentUserId)
+            .collection('friends')
+            .doc(friendUid),
         {
           'uid': friendUid,
           'display_name': friendName,
           'phone_number': friendPhoneNumber,
+          'profile_image': friendProfileImage, // ← 추가
           'added_at': FieldValue.serverTimestamp(),
         },
       );
 
+      // 상대방 friends에 나 저장 (내 프로필 사진 포함)
       batch.set(
-        _db.collection('users').doc(friendUid).collection('friends').doc(currentUserId),
+        _db
+            .collection('users')
+            .doc(friendUid)
+            .collection('friends')
+            .doc(currentUserId),
         {
           'uid': currentUserId,
           'display_name': myName,
           'phone_number': myPhoneNumber,
+          'profile_image': myProfileImage, // ← 추가
           'added_at': FieldValue.serverTimestamp(),
         },
       );
@@ -93,10 +104,18 @@ class FriendService {
   Future<void> removeFriend(String friendUid) async {
     final batch = _db.batch();
     batch.delete(
-      _db.collection('users').doc(currentUserId).collection('friends').doc(friendUid),
+      _db
+          .collection('users')
+          .doc(currentUserId)
+          .collection('friends')
+          .doc(friendUid),
     );
     batch.delete(
-      _db.collection('users').doc(friendUid).collection('friends').doc(currentUserId),
+      _db
+          .collection('users')
+          .doc(friendUid)
+          .collection('friends')
+          .doc(currentUserId),
     );
     await batch.commit();
   }
@@ -117,13 +136,26 @@ class FriendService {
             }).toList());
   }
 
+  // ── 친구 여부 확인 ────────────────────────────────────────────────────────
+  Future<bool> isFriend(String uid) async {
+    final doc = await _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('friends')
+        .doc(uid)
+        .get();
+    return doc.exists;
+  }
+
   // ── DM 채팅방 가져오기 or 생성 ────────────────────────────────────────────
-  Future<String> getOrCreateDmRoom(String friendUid, String friendName, {required String myName}) async {
-    // dm_key: 두 uid를 정렬해서 항상 같은 키 생성
+  Future<String> getOrCreateDmRoom(
+    String friendUid,
+    String friendName, {
+    required String myName,
+  }) async {
     final ids = [currentUserId, friendUid]..sort();
     final dmKey = '${ids[0]}_${ids[1]}';
 
-    // 기존 DM방 확인
     final existing = await _db
         .collection('chat_rooms')
         .where('dm_key', isEqualTo: dmKey)
@@ -134,7 +166,6 @@ class FriendService {
       return existing.docs.first.id;
     }
 
-    // 새 DM방 생성
     final batch = _db.batch();
     final roomRef = _db.collection('chat_rooms').doc();
 
@@ -150,7 +181,6 @@ class FriendService {
       'unread_counts': {currentUserId: 0, friendUid: 0},
     });
 
-    // 내 room_members
     batch.set(roomRef.collection('room_members').doc(currentUserId), {
       'uid': currentUserId,
       'display_name': myName,
@@ -160,7 +190,6 @@ class FriendService {
       'unread_cnt': 0,
     });
 
-    // 상대방 room_members
     batch.set(roomRef.collection('room_members').doc(friendUid), {
       'uid': friendUid,
       'display_name': friendName,
@@ -174,39 +203,24 @@ class FriendService {
     return roomRef.id;
   }
 
-  // ── 친구 여부 확인 ────────────────────────────────────────────────────────
-  Future<bool> isFriend(String uid) async {
-    final doc = await _db
-        .collection('users')
-        .doc(currentUserId)
-        .collection('friends')
-        .doc(uid)
-        .get();
-    return doc.exists;
-  }
-
   // ── 단체톡방 생성 ──────────────────────────────────────────────────────────
   Future<String> createGroupDirectRoom({
     required String roomName,
     required List<String> memberUids,
     required List<String> memberNames,
-    required String myName,   // UserProvider에서 전달
+    required String myName,
   }) async {
     if (currentUserId.isEmpty) return '';
 
-    // 전체 멤버 (나 포함)
     final allUids = [currentUserId, ...memberUids];
     final allNames = [myName, ...memberNames];
 
     final roomRef = _db.collection('chat_rooms').doc();
     final batch = _db.batch();
 
-    // 채팅방 생성
     batch.set(roomRef, {
       'type': 'group_direct',
-      'name': roomName.isNotEmpty
-          ? roomName
-          : allNames.take(4).join(', '),
+      'name': roomName.isNotEmpty ? roomName : allNames.take(4).join(', '),
       'member_ids': allUids,
       'last_message': '',
       'last_time': FieldValue.serverTimestamp(),
@@ -217,13 +231,12 @@ class FriendService {
       'unread_counts': {for (final uid in allUids) uid: 0},
     });
 
-    // 모든 멤버 room_members 추가
     for (int i = 0; i < allUids.length; i++) {
       final uid = allUids[i];
       batch.set(roomRef.collection('room_members').doc(uid), {
         'uid': uid,
         'display_name': allNames[i],
-        'role': 'member',   // group_direct는 방장 없음
+        'role': 'member',
         'joined_at': FieldValue.serverTimestamp(),
         'last_read_time': FieldValue.serverTimestamp(),
         'unread_cnt': 0,
@@ -233,9 +246,9 @@ class FriendService {
 
     await batch.commit();
 
-    // 입장 시스템 메시지
     final names = allNames.take(4).join(', ');
-    final suffix = allNames.length > 4 ? ' 외 ${allNames.length - 4}명' : '';
+    final suffix =
+        allNames.length > 4 ? ' 외 ${allNames.length - 4}명' : '';
     await roomRef.collection('messages').add({
       'text': '$names$suffix 님이 채팅방에 입장했습니다.',
       'is_system': true,

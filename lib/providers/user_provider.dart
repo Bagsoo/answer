@@ -23,8 +23,8 @@ class UserProvider extends ChangeNotifier {
   String get timezone => _timezone;
   bool get isLoaded => _loaded;
 
-  // 유저 정보 초기화 로직
-  void setUser(String uid, String name, String? photoUrl, String phoneNumber, String locale, String timezone) {
+  void setUser(String uid, String name, String? photoUrl, String phoneNumber,
+      String locale, String timezone) {
     _uid = uid;
     _name = name;
     _photoUrl = photoUrl;
@@ -45,7 +45,8 @@ class UserProvider extends ChangeNotifier {
 
     _name = data?['name'] as String? ?? '';
     _phoneNumber = data?['phone_number'] as String? ?? '';
-    _photoUrl = data?['photo_url'] as String?;
+    // ← 'photo_url' → 'profile_image'
+    _photoUrl = data?['profile_image'] as String?;
     _locale = data?['locale'] as String? ?? 'ko';
     _timezone = data?['timezone'] as String? ?? 'Asia/Seoul';
     _loaded = true;
@@ -53,53 +54,121 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── 프로필 사진 ─────────────────────────────────────────────────────────
+  // ── 프로필 사진 업로드 + friends/groups 동기화 ──────────────────────────────
   Future<void> updateProfileImage(File compressedFile) async {
     try {
-      // 1. 기존 이미지가 있다면 Storage에서 삭제 (비용 절감)
-      if (_photoUrl != null) {
+      // 1. 기존 이미지 Storage에서 삭제
+      if (_photoUrl != null && _photoUrl!.isNotEmpty) {
         try {
           final oldRef = FirebaseStorage.instance.refFromURL(_photoUrl!);
           await oldRef.delete();
         } catch (e) {
-          debugPrint("기존 이미지 삭제 실패(무시 가능): $e");
+          debugPrint('기존 이미지 삭제 실패(무시): $e');
         }
       }
 
-      // 2. Storage 업로드 (파일명에 타임스탬프를 붙여 고유성 확보)
+      // 2. Storage 업로드
       final storageRef = FirebaseStorage.instance
           .ref()
           .child('user_profiles')
-          .child('$_uid\_${DateTime.now().millisecondsSinceEpoch}.jpg');
-
+          .child('${_uid}_${DateTime.now().millisecondsSinceEpoch}.jpg');
       await storageRef.putFile(compressedFile);
 
-      // 3. 새로운 URL 획득
+      // 3. URL 획득
       final newUrl = await storageRef.getDownloadURL();
 
-      // 4. Firestore 본인 정보 업데이트
-      await FirebaseFirestore.instance
+      // 4. 내 users 문서 업데이트 (profile_image 필드)
+      await _db
           .collection('users')
           .doc(_uid)
-          .update({'photo_url': newUrl});
+          .update({'profile_image': newUrl});
 
       // 5. 로컬 상태 갱신
       _photoUrl = newUrl;
       notifyListeners();
+
+      // 6. friends 서브컬렉션 동기화
+      await _syncProfileImageToFriends(newUrl);
+
+      // 7. 가입한 그룹들의 members 서브컬렉션 동기화
+      await _syncProfileImageToGroups(newUrl);
     } catch (e) {
-      debugPrint("Upload Error: $e");
+      debugPrint('Upload Error: $e');
       rethrow;
     }
   }
 
-  // ── 이름 변경 시 Firestore + 로컬 상태 동기화 ──────────────────────────────
-  Future<void> updateName(String newName) async {
+  // 내 친구들의 friends/{내uid}.profile_image 동기화
+  Future<void> _syncProfileImageToFriends(String newUrl) async {
     try {
-      await FirebaseFirestore.instance
+      final friendsSnap = await _db
           .collection('users')
           .doc(_uid)
-          .update({'display_name': newName});
-      
+          .collection('friends')
+          .get();
+      if (friendsSnap.docs.isEmpty) return;
+
+      WriteBatch batch = _db.batch();
+      int count = 0;
+
+      for (final friendDoc in friendsSnap.docs) {
+        final ref = _db
+            .collection('users')
+            .doc(friendDoc.id)
+            .collection('friends')
+            .doc(_uid);
+        batch.update(ref, {'profile_image': newUrl});
+        count++;
+        if (count == 490) {
+          await batch.commit();
+          batch = _db.batch();
+          count = 0;
+        }
+      }
+      if (count > 0) await batch.commit();
+    } catch (e) {
+      debugPrint('friends profile_image sync failed: $e');
+    }
+  }
+
+  // 가입한 그룹들의 members/{내uid}.profile_image 동기화
+  Future<void> _syncProfileImageToGroups(String newUrl) async {
+    try {
+      final joinedGroupsSnap = await _db
+          .collection('users')
+          .doc(_uid)
+          .collection('joined_groups')
+          .get();
+      if (joinedGroupsSnap.docs.isEmpty) return;
+
+      WriteBatch batch = _db.batch();
+      int count = 0;
+
+      for (final groupDoc in joinedGroupsSnap.docs) {
+        final ref = _db
+            .collection('groups')
+            .doc(groupDoc.id)
+            .collection('members')
+            .doc(_uid);
+        batch.update(ref, {'profile_image': newUrl});
+        count++;
+        if (count == 490) {
+          await batch.commit();
+          batch = _db.batch();
+          count = 0;
+        }
+      }
+      if (count > 0) await batch.commit();
+    } catch (e) {
+      debugPrint('groups profile_image sync failed: $e');
+    }
+  }
+
+  // ── 이름 변경 ───────────────────────────────────────────────────────────────
+  Future<void> updateName(String newName) async {
+    try {
+      // ← 'display_name' → 'name'
+      await _db.collection('users').doc(_uid).update({'name': newName});
       _name = newName;
       notifyListeners();
     } catch (e) {
@@ -107,6 +176,7 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
+  // ── 타임존 변경 ─────────────────────────────────────────────────────────────
   Future<void> updateTimezone(String newTimezone) async {
     if (_uid.isEmpty) return;
     await _db.collection('users').doc(_uid).update({'timezone': newTimezone});
@@ -114,30 +184,39 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── 로그아웃 시 초기화 ─────────────────────────────────────────────────────
+  // ── 로그아웃 시 초기화 ──────────────────────────────────────────────────────
   void clear() {
     _uid = '';
     _name = '';
     _phoneNumber = '';
+    _photoUrl = null;
     _locale = 'ko';
     _timezone = 'Asia/Seoul';
     _loaded = false;
     notifyListeners();
   }
 
-  // ── 계정 삭제 ──────────────────────────────────────────────────────────────
+  // ── 계정 삭제 ───────────────────────────────────────────────────────────────
   Future<void> deleteAccount() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    final joinedGroupsSnap = await _db.collection('users').doc(uid)
-        .collection('joined_groups').get();
+    final joinedGroupsSnap = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('joined_groups')
+        .get();
 
     final batch = _db.batch();
     for (final doc in joinedGroupsSnap.docs) {
       final groupId = doc.id;
-      batch.delete(_db.collection('groups').doc(groupId).collection('members').doc(uid));
-      batch.update(_db.collection('groups').doc(groupId), {'member_count': FieldValue.increment(-1)});
+      batch.delete(_db
+          .collection('groups')
+          .doc(groupId)
+          .collection('members')
+          .doc(uid));
+      batch.update(_db.collection('groups').doc(groupId),
+          {'member_count': FieldValue.increment(-1)});
       batch.delete(doc.reference);
     }
     batch.delete(_db.collection('users').doc(uid));
@@ -146,6 +225,4 @@ class UserProvider extends ChangeNotifier {
     await FirebaseAuth.instance.currentUser?.delete();
     clear();
   }
-
-  
 }

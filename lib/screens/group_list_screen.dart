@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/group_service.dart';
 import '../providers/user_provider.dart';
+import '../widgets/group_settings/group_avatar_widget.dart';
 import 'create_group_screen.dart';
 import 'group_detail_screen.dart';
+import 'group_preview_screen.dart';
 import '../l10n/app_localizations.dart';
 
 class GroupListScreen extends StatefulWidget {
@@ -21,28 +23,30 @@ class _GroupListScreenState extends State<GroupListScreen>
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  // ── 로컬 상태 ──────────────────────────────────────────────────────────────
   List<Map<String, dynamic>> _joinedGroups = [];
   bool _joinedLoading = true;
 
-  // 검색 결과
   List<Map<String, dynamic>> _searchResults = [];
   bool _searchLoading = false;
 
   StreamSubscription? _joinedSub;
   StreamSubscription? _searchSub;
-  Timer? _debounce; // 검색 디바운스
+  Timer? _debounce;
+
+  String get _currentUserId =>
+      context.read<UserProvider>().uid;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
 
-    // 내 그룹 목록 1회 구독
-    _joinedSub = context.read<GroupService>().getMyJoinedGroups().listen((list) {
+    _joinedSub =
+        context.read<GroupService>().getMyJoinedGroups().listen((list) {
       if (mounted) {
         setState(() {
-          _joinedGroups = list.map((g) => {'id': g['id'] ?? g.keys.first, ...g}).toList();
+          _joinedGroups =
+              list.map((g) => {'id': g['id'] ?? g.keys.first, ...g}).toList();
           _joinedLoading = false;
         });
       }
@@ -59,7 +63,6 @@ class _GroupListScreenState extends State<GroupListScreen>
     super.dispose();
   }
 
-  // 검색어 변경 시 디바운스 후 스트림 구독
   void _onSearchChanged(String val) {
     final query = val.trim();
     setState(() {
@@ -76,9 +79,9 @@ class _GroupListScreenState extends State<GroupListScreen>
       return;
     }
 
-    // 300ms 디바운스: 타이핑 멈춘 후에 Firestore 쿼리
     _debounce = Timer(const Duration(milliseconds: 300), () {
-      _searchSub = context.read<GroupService>().searchGroups(query).listen((list) {
+      _searchSub =
+          context.read<GroupService>().searchGroups(query).listen((list) {
         if (mounted) {
           setState(() {
             _searchResults =
@@ -90,7 +93,8 @@ class _GroupListScreenState extends State<GroupListScreen>
     });
   }
 
-  void _onJoinPressed(Map<String, dynamic> group) async {
+  Future<void> _onJoinPressed(Map<String, dynamic> group) async {
+    final l = AppLocalizations.of(context);
     final groupService = context.read<GroupService>();
     final requireApproval = group['require_approval'] ?? false;
     final groupId = group['id'];
@@ -98,13 +102,11 @@ class _GroupListScreenState extends State<GroupListScreen>
     final groupType = group['type'] ?? 'club';
     final groupCategory = group['category'] ?? 'Other';
     final memberCount = group['member_count'] ?? 1;
-    final l = AppLocalizations.of(context);
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) =>
-          const Center(child: CircularProgressIndicator()),
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
     final userProvider = context.read<UserProvider>();
@@ -117,6 +119,7 @@ class _GroupListScreenState extends State<GroupListScreen>
       memberCount,
       userProvider.name,
       userProvider.phoneNumber,
+      userProvider.photoUrl ?? '',
     );
 
     if (!mounted) return;
@@ -141,7 +144,7 @@ class _GroupListScreenState extends State<GroupListScreen>
           .showSnackBar(SnackBar(content: Text(l.groupFull)));
     } else if (result == 'banned') {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('이 그룹에서 차단된 사용자입니다.')),
+        SnackBar(content: Text(l.bannedFromGroup)),
       );
     } else {
       ScaffoldMessenger.of(context)
@@ -186,7 +189,7 @@ class _GroupListScreenState extends State<GroupListScreen>
     );
   }
 
-  // ── Tab 1: My Joined Groups ──────────────────────────────────────────────
+  // ── Tab 1: My Joined Groups ───────────────────────────────────────────────
   Widget _buildMyGroupsTab(AppLocalizations l, ColorScheme colorScheme) {
     if (_joinedLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -204,8 +207,8 @@ class _GroupListScreenState extends State<GroupListScreen>
             Text(
               l.noGroupsJoined,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                  color: colorScheme.onSurface.withOpacity(0.4)),
+              style:
+                  TextStyle(color: colorScheme.onSurface.withOpacity(0.4)),
             ),
           ],
         ),
@@ -217,17 +220,21 @@ class _GroupListScreenState extends State<GroupListScreen>
       itemCount: _joinedGroups.length,
       itemBuilder: (context, index) {
         final group = _joinedGroups[index];
+        final groupId = group['id'] as String? ?? '';
         final name = group['name'] as String? ?? l.unknown;
         final type = group['type'] as String? ?? 'N/A';
         final category = group['category'] as String? ?? 'N/A';
-        final memberCount =
-            (group['member_count'] as num?)?.toInt() ?? 1;
+        final memberCount = (group['member_count'] as num?)?.toInt() ?? 1;
+        final imageUrl = group['group_profile_image'] as String? ?? '';
 
         return ListTile(
-          leading: CircleAvatar(
+          leading: GroupAvatarSync(
+            groupName: name,
+            imageUrl: imageUrl,
+            radius: 22,
+            fallbackIcon: Icons.business,
             backgroundColor: colorScheme.primaryContainer,
-            child: Icon(Icons.business,
-                color: colorScheme.onPrimaryContainer),
+            foregroundColor: colorScheme.onPrimaryContainer,
           ),
           title: Row(children: [
             Flexible(
@@ -245,7 +252,7 @@ class _GroupListScreenState extends State<GroupListScreen>
               color: colorScheme.onSurface.withOpacity(0.4)),
           onTap: () => Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => GroupDetailScreen(
-              groupId: group['id'] as String,
+              groupId: groupId,
               groupName: name,
             ),
           )),
@@ -328,32 +335,55 @@ class _GroupListScreenState extends State<GroupListScreen>
         final name = group['name'] as String? ?? l.unknown;
         final type = group['type'] as String? ?? 'N/A';
         final category = group['category'] as String? ?? 'N/A';
-        final memberCount =
-            (group['member_count'] as num?)?.toInt() ?? 1;
-        final requireApproval =
-            group['require_approval'] as bool? ?? false;
+        final memberCount = (group['member_count'] as num?)?.toInt() ?? 1;
+        final requireApproval = group['require_approval'] as bool? ?? false;
+        final imageUrl = group['group_profile_image'] as String? ?? '';
+        final likes = List<String>.from(group['likes'] as List? ?? []);
+        final isAlreadyJoined = joinedIds.contains(group['id']);
 
         return ListTile(
-          leading: CircleAvatar(
+          // ── 그룹 프로필 사진 ────────────────────────────────────────
+          leading: GroupAvatarSync(
+            groupName: name,
+            imageUrl: imageUrl,
+            radius: 22,
+            fallbackIcon: Icons.group,
             backgroundColor: colorScheme.secondaryContainer,
-            child: Icon(Icons.group,
-                color: colorScheme.onSecondaryContainer),
+            foregroundColor: colorScheme.onSecondaryContainer,
           ),
           title: Row(children: [
             Flexible(
               child: Text(name,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
-                  style:
-                      const TextStyle(fontWeight: FontWeight.w600)),
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
             ),
             const SizedBox(width: 8),
-            _memberBadge(
-                memberCount, colorScheme.surfaceContainerHighest),
+            _memberBadge(memberCount, colorScheme.surfaceContainerHighest),
           ]),
-          subtitle:
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text("${l.type}: $type  •  ${l.category}: $category"),
-          trailing: joinedIds.contains(group['id'])
+              // ── 좋아요 표시 ──────────────────────────────────────────
+              if (likes.isNotEmpty)
+                Row(
+                  children: [
+                    Icon(Icons.favorite,
+                        size: 12, color: Colors.red.withOpacity(0.7)),
+                    const SizedBox(width: 3),
+                    Text(
+                      '${likes.length}',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.red.withOpacity(0.7)),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          // ── 가입 여부에 따른 trailing ──────────────────────────────
+          trailing: isAlreadyJoined
               ? Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 10, vertical: 6),
@@ -400,25 +430,40 @@ class _GroupListScreenState extends State<GroupListScreen>
                         fontSize: 12, fontWeight: FontWeight.w600),
                   ),
                 ),
+          // ── 그룹 클릭 시 미리보기 화면으로 이동 ─────────────────────
+          onTap: () {
+            if (isAlreadyJoined) {
+              // 가입된 그룹이면 그룹 상세로
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => GroupDetailScreen(
+                  groupId: group['id'] as String,
+                  groupName: name,
+                ),
+              ));
+            } else {
+              // 미가입 그룹이면 미리보기로
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => GroupPreviewScreen(group: group),
+              ));
+            }
+          },
         );
       },
       separatorBuilder: (_, __) => const Divider(height: 1),
     );
   }
 
-  // ── Helper ────────────────────────────────────────────────────────────────
   Widget _memberBadge(int count, Color color) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
         '$count',
-        style: const TextStyle(
-            fontSize: 12, fontWeight: FontWeight.bold),
+        style:
+            const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
       ),
     );
   }

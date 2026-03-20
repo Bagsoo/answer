@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_compress/video_compress.dart';
 
@@ -6,29 +7,26 @@ class VideoService {
   final ImagePicker _picker = ImagePicker();
 
   Future<File?> pickVideo() async {
-    final XFile? pickedFile = await _picker.pickVideo(source: ImageSource.gallery);
+    final XFile? pickedFile =
+        await _picker.pickVideo(source: ImageSource.gallery);
     if (pickedFile == null) return null;
     return File(pickedFile.path);
   }
 
-  /// 비디오 파일 크기가 limitMB를 초과하는지 검사
-  bool isVideoSizeExceeded(File file, {int limitMB = 50}) {
+  bool isVideoSizeExceeded(File file, {int limitMB = 20}) {
     final length = file.lengthSync();
     final sizeInMB = length / (1024 * 1024);
     return sizeInMB > limitMB;
   }
 
-  /// 비디오 압축 및 썸네일 추출 (성공 시 Map 반환, 실패 시 null)
-  /// 반환 포맷: {'video': File, 'thumbnail': File}
   Future<Map<String, File>?> compressAndGetThumbnail(File videoFile) async {
     try {
-      // 1. 썸네일 추출 (압축 전 원본에서 추출이 더 빠를 수 있음)
-      final thumbnailFile = await VideoCompress.getFileThumbnail(videoFile.path);
+      final thumbnailFile =
+          await VideoCompress.getFileThumbnail(videoFile.path);
 
-      // 2. 비디오 압축 (MediumQuality 권장)
       final MediaInfo? mediaInfo = await VideoCompress.compressVideo(
         videoFile.path,
-        quality: VideoQuality.MediumQuality,
+        quality: VideoQuality.LowQuality,
         deleteOrigin: false,
       );
 
@@ -42,9 +40,19 @@ class VideoService {
     } catch (e) {
       print('Video compression error: $e');
       return null;
-    } finally {
-      // 진행중인 임시 파일 정리
-      VideoCompress.deleteAllCache();
+    }
+    // ← finally 블록 전체 제거
+    // VideoCompress.deleteAllCache()를 여기서 호출하면
+    // 업로드 전에 압축 파일이 삭제됨
+  }
+
+  /// 업로드 완료 후 호출해서 캐시 정리
+  Future<void> clearCache() async {
+    try {
+      await VideoCompress.deleteAllCache();
+    } catch (e) {
+      // video_compress kotlin.Unit 버그 — 무시해도 됨
+      debugPrint('clearCache error (ignored): $e');
     }
   }
 }

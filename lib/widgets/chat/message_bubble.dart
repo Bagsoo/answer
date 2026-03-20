@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 
 class MessageBubble extends StatefulWidget {
   final Map<String, dynamic> data;
@@ -44,7 +45,9 @@ class _MessageBubbleState extends State<MessageBubble>
     );
     if (widget.isHighlighted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _highlightController.forward().then((_) => _highlightController.reverse());
+        _highlightController
+            .forward()
+            .then((_) => _highlightController.reverse());
       });
     }
   }
@@ -53,7 +56,9 @@ class _MessageBubbleState extends State<MessageBubble>
   void didUpdateWidget(MessageBubble oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isHighlighted && !oldWidget.isHighlighted) {
-      _highlightController.forward().then((_) => _highlightController.reverse());
+      _highlightController
+          .forward()
+          .then((_) => _highlightController.reverse());
     }
   }
 
@@ -98,7 +103,7 @@ class _MessageBubbleState extends State<MessageBubble>
     );
   }
 
-  // ── 아바타: 프로필 사진 있으면 사진, 없으면 이니셜 ───────────────────────
+  // ── 아바타 ────────────────────────────────────────────────────────────────
   Widget _buildAvatar(String senderName, ColorScheme colorScheme) {
     final photoUrl = widget.data['sender_photo_url'] as String?;
     final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
@@ -108,13 +113,10 @@ class _MessageBubbleState extends State<MessageBubble>
       child: CircleAvatar(
         radius: 18,
         backgroundColor: colorScheme.secondaryContainer,
-        // 프로필 사진이 있으면 NetworkImage, 없으면 이니셜
         backgroundImage: hasPhoto ? NetworkImage(photoUrl) : null,
-        onBackgroundImageError: hasPhoto
-            ? (_, __) {} // 이미지 로드 실패 시 이니셜로 폴백
-            : null,
+        onBackgroundImageError: hasPhoto ? (_, __) {} : null,
         child: hasPhoto
-            ? null // 사진 있으면 child 숨김
+            ? null
             : Text(
                 senderName.isNotEmpty ? senderName[0].toUpperCase() : '?',
                 style: TextStyle(
@@ -127,6 +129,174 @@ class _MessageBubbleState extends State<MessageBubble>
     );
   }
 
+  // ── 이미지 풀스크린 뷰어 ──────────────────────────────────────────────────
+  void _showImageViewer(List<String> urls, int initialIndex) {
+    Navigator.of(context).push(MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => _ImageViewerScreen(
+        urls: urls,
+        initialIndex: initialIndex,
+      ),
+    ));
+  }
+
+  // ── 동영상 플레이어 ────────────────────────────────────────────────────────
+  void _showVideoPlayer(String videoUrl) {
+    Navigator.of(context).push(MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => _VideoPlayerScreen(videoUrl: videoUrl),
+    ));
+  }
+
+  // ── 말풍선 내용 빌드 ──────────────────────────────────────────────────────
+  Widget _buildBubbleContent({
+    required String type,
+    required String text,
+    required String displayText,
+    required bool isLong,
+    required List<String> imageUrls,
+    required String videoUrl,
+    required String thumbnailUrl,
+    required Widget? replyBox,
+    required ColorScheme colorScheme,
+  }) {
+    // ── 이미지 ──────────────────────────────────────────────────────────────
+    if (type == 'image' && imageUrls.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (replyBox != null) replyBox,
+          if (imageUrls.length == 1)
+            GestureDetector(
+              onTap: () => _showImageViewer(imageUrls, 0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  imageUrls[0],
+                  width: 200,
+                  height: 200,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (_, child, progress) => progress == null
+                      ? child
+                      : const SizedBox(
+                          width: 200,
+                          height: 200,
+                          child: Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.broken_image, size: 40),
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              width: 200,
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 2,
+                  mainAxisSpacing: 2,
+                ),
+                itemCount: imageUrls.length,
+                itemBuilder: (_, i) => GestureDetector(
+                  onTap: () => _showImageViewer(imageUrls, i),
+                  child: Image.network(
+                    imageUrls[i],
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        const Icon(Icons.broken_image),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+
+    // ── 동영상 ──────────────────────────────────────────────────────────────
+    if (type == 'video') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (replyBox != null) replyBox,
+          GestureDetector(
+            onTap: videoUrl.isNotEmpty
+                ? () => _showVideoPlayer(videoUrl)
+                : null,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  thumbnailUrl.isNotEmpty
+                      ? Image.network(
+                          thumbnailUrl,
+                          width: 200,
+                          height: 150,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 200,
+                            height: 150,
+                            color: Colors.black54,
+                            child: const Icon(Icons.videocam,
+                                color: Colors.white, size: 40),
+                          ),
+                        )
+                      : Container(
+                          width: 200,
+                          height: 150,
+                          color: Colors.black54,
+                          child: const Icon(Icons.videocam,
+                              color: Colors.white, size: 40),
+                        ),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.play_arrow,
+                        color: Colors.white, size: 32),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // ── 텍스트 (기본) ────────────────────────────────────────────────────────
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (replyBox != null) replyBox,
+        _buildMessageText(displayText, colorScheme),
+        if (isLong) ...[
+          const SizedBox(height: 4),
+          GestureDetector(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Text(
+              _expanded ? '접기' : '더보기',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.primary,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final text = widget.data['text'] as String? ?? '';
@@ -136,14 +306,21 @@ class _MessageBubbleState extends State<MessageBubble>
     final isContinuous = widget.isContinuous;
     final colorScheme = widget.colorScheme;
 
+    final type = widget.data['type'] as String? ?? 'text';
+    final imageUrls =
+        List<String>.from(widget.data['image_urls'] as List? ?? []);
+    final videoUrl = widget.data['video_url'] as String? ?? '';
+    final thumbnailUrl = widget.data['thumbnail_url'] as String? ?? '';
+
     // 답장 데이터
     final replyToText = widget.data['reply_to_text'] as String?;
     final replyToSender = widget.data['reply_to_sender'] as String?;
     final hasReply = replyToText != null && replyToText.isNotEmpty;
 
     final isLong = text.length > _collapseThreshold;
-    final displayText =
-        isLong && !_expanded ? '${text.substring(0, _collapseThreshold)}...' : text;
+    final displayText = isLong && !_expanded
+        ? '${text.substring(0, _collapseThreshold)}...'
+        : text;
 
     final timeStr = createdAt != null
         ? '${createdAt.toDate().hour.toString().padLeft(2, '0')}:'
@@ -196,27 +373,23 @@ class _MessageBubbleState extends State<MessageBubble>
     }
 
     // 말풍선 내용
-    Widget bubbleContent = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (replyBox != null) replyBox,
-        _buildMessageText(displayText, colorScheme),
-        if (isLong) ...[
-          const SizedBox(height: 4),
-          GestureDetector(
-            onTap: () => setState(() => _expanded = !_expanded),
-            child: Text(
-              _expanded ? '접기' : '더보기',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: colorScheme.primary,
-              ),
-            ),
-          ),
-        ],
-      ],
+    final bubbleContent = _buildBubbleContent(
+      type: type,
+      text: text,
+      displayText: displayText,
+      isLong: isLong,
+      imageUrls: imageUrls,
+      videoUrl: videoUrl,
+      thumbnailUrl: thumbnailUrl,
+      replyBox: replyBox,
+      colorScheme: colorScheme,
     );
+
+    // 이미지/동영상은 패딩 줄임
+    final isMedia = type == 'image' || type == 'video';
+    final bubblePadding = isMedia
+        ? const EdgeInsets.all(4)
+        : const EdgeInsets.symmetric(horizontal: 13, vertical: 9);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 600),
@@ -235,12 +408,13 @@ class _MessageBubbleState extends State<MessageBubble>
               isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            // ── 상대방 메시지 ────────────────────────────────────────────
+            // ── 상대방 메시지 ──────────────────────────────────────────
             if (!isMe) ...[
               SizedBox(
                 width: 36,
-                // 연속 메시지면 아바타 숨김 (공간만 유지)
-                child: isContinuous ? null : _buildAvatar(senderName, colorScheme),
+                child: isContinuous
+                    ? null
+                    : _buildAvatar(senderName, colorScheme),
               ),
               const SizedBox(width: 6),
               Column(
@@ -263,14 +437,15 @@ class _MessageBubbleState extends State<MessageBubble>
                     children: [
                       Container(
                         constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.62,
+                          maxWidth:
+                              MediaQuery.of(context).size.width * 0.62,
                         ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 13, vertical: 9),
+                        padding: bubblePadding,
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(isContinuous ? 16 : 4),
+                            topLeft:
+                                Radius.circular(isContinuous ? 16 : 4),
                             topRight: const Radius.circular(16),
                             bottomLeft: const Radius.circular(16),
                             bottomRight: const Radius.circular(16),
@@ -295,7 +470,8 @@ class _MessageBubbleState extends State<MessageBubble>
                             timeStr,
                             style: TextStyle(
                               fontSize: 10,
-                              color: colorScheme.onSurface.withOpacity(0.4),
+                              color:
+                                  colorScheme.onSurface.withOpacity(0.4),
                             ),
                           ),
                         ],
@@ -306,7 +482,7 @@ class _MessageBubbleState extends State<MessageBubble>
               ),
             ],
 
-            // ── 내 메시지 ────────────────────────────────────────────────
+            // ── 내 메시지 ──────────────────────────────────────────────
             if (isMe) ...[
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -334,8 +510,7 @@ class _MessageBubbleState extends State<MessageBubble>
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.of(context).size.width * 0.62,
                 ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                padding: bubblePadding,
                 decoration: BoxDecoration(
                   color: colorScheme.primary.withOpacity(0.15),
                   borderRadius: BorderRadius.only(
@@ -351,6 +526,138 @@ class _MessageBubbleState extends State<MessageBubble>
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── 이미지 풀스크린 뷰어 ──────────────────────────────────────────────────────
+class _ImageViewerScreen extends StatefulWidget {
+  final List<String> urls;
+  final int initialIndex;
+
+  const _ImageViewerScreen(
+      {required this.urls, required this.initialIndex});
+
+  @override
+  State<_ImageViewerScreen> createState() => _ImageViewerScreenState();
+}
+
+class _ImageViewerScreenState extends State<_ImageViewerScreen> {
+  late int _current;
+
+  @override
+  void initState() {
+    super.initState();
+    _current = widget.initialIndex;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text('${_current + 1} / ${widget.urls.length}'),
+      ),
+      body: PageView.builder(
+        controller: PageController(initialPage: widget.initialIndex),
+        itemCount: widget.urls.length,
+        onPageChanged: (i) => setState(() => _current = i),
+        itemBuilder: (_, i) => InteractiveViewer(
+          child: Center(
+            child: Image.network(
+              widget.urls[i],
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.broken_image,
+                color: Colors.white,
+                size: 48,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── 동영상 플레이어 ────────────────────────────────────────────────────────────
+class _VideoPlayerScreen extends StatefulWidget {
+  final String videoUrl;
+
+  const _VideoPlayerScreen({required this.videoUrl});
+
+  @override
+  State<_VideoPlayerScreen> createState() => _VideoPlayerScreenState();
+}
+
+class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
+  late VideoPlayerController _controller;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller =
+        VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+          ..initialize().then((_) {
+            if (mounted) {
+              setState(() => _initialized = true);
+              _controller.play();
+            }
+          });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+      ),
+      body: Center(
+        child: _initialized
+            ? GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _controller.value.isPlaying
+                        ? _controller.pause()
+                        : _controller.play();
+                  });
+                },
+                child: AspectRatio(
+                  aspectRatio: _controller.value.aspectRatio,
+                  child: VideoPlayer(_controller),
+                ),
+              )
+            : const CircularProgressIndicator(color: Colors.white),
+      ),
+      floatingActionButton: _initialized
+          ? FloatingActionButton(
+              backgroundColor: Colors.white24,
+              onPressed: () {
+                setState(() {
+                  _controller.value.isPlaying
+                      ? _controller.pause()
+                      : _controller.play();
+                });
+              },
+              child: Icon(
+                _controller.value.isPlaying
+                    ? Icons.pause
+                    : Icons.play_arrow,
+                color: Colors.white,
+              ),
+            )
+          : null,
     );
   }
 }

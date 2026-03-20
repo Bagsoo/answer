@@ -19,6 +19,7 @@ class GroupProvider extends ChangeNotifier {
   String category = '';
   String plan = '';
   String ownerId = '';
+  String profileImageUrl = '';
   int memberCount = 0;
   int memberLimit = 50;
   int boardCount = 0;
@@ -112,6 +113,7 @@ class GroupProvider extends ChangeNotifier {
       memberLimit = d['member_limit'] as int? ?? 50;
       boardCount = d['board_count'] as int? ?? 0;
       chatCount = d['chat_count'] as int? ?? 0;
+      profileImageUrl = d['group_profile_image'] as String? ?? '';
       requireApproval = d['require_approval'] as bool? ?? false;
       allowPlanUpgrade = d['allow_plan_upgrade'] as bool? ?? false;
       tags = List<String>.from(d['tags'] as List? ?? []);

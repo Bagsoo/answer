@@ -6,6 +6,7 @@ import 'group_tabs/boards_tab.dart';
 import 'group_tabs/schedules_tab.dart';
 import 'group_tabs/chats_tab.dart';
 import 'group_tabs/settings_tab.dart';
+import 'group_tabs/group_profile_screen.dart';
 
 class GroupDetailScreen extends StatelessWidget {
   final String groupId;
@@ -115,11 +116,46 @@ class _GroupDetailBody extends StatelessWidget {
         context.select<GroupProvider, bool>((gp) => gp.isLiked);
     final name =
         context.select<GroupProvider, String>((gp) => gp.name);
+    final profileImageUrl =
+        context.select<GroupProvider, String>((gp) => gp.profileImageUrl);
 
     return DefaultTabController(
       length: 5,
       child: Scaffold(
         appBar: AppBar(
+          leading: GestureDetector(
+            onTap: () {
+              final gp = context.read<GroupProvider>();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ChangeNotifierProvider.value(
+                    value: gp,
+                    child: GroupProfileScreen(groupId: gp.groupId),
+                  ),
+                ),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: CircleAvatar(
+                radius: 18,
+                backgroundColor: colorScheme.primaryContainer,
+                backgroundImage: profileImageUrl.isNotEmpty
+                    ? NetworkImage(profileImageUrl)
+                    : null,
+                child: profileImageUrl.isEmpty
+                    ? Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onPrimaryContainer,
+                        ),
+                      )
+                    : null,
+              ),
+            ),
+          ),
           title: Row(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,

@@ -6,58 +6,41 @@ import 'package:path_provider/path_provider.dart';
 class ImageService {
   final ImagePicker _picker = ImagePicker();
 
+  // ── 단일 이미지 선택 + 압축 ────────────────────────────────────────────────
   Future<File?> pickAndCompressImage() async {
-    final XFile? pickedFile = await _picker.pickImage(
-      source: ImageSource.gallery,
-    );
-
-    if (pickedFile == null) return null;
-
-    final dir = await getTemporaryDirectory();
-    final targetPath =
-        "${dir.path}/profile_${DateTime.now().millisecondsSinceEpoch}.jpg";
-
-    final XFile? compressedFile =
-        await FlutterImageCompress.compressAndGetFile(
-      pickedFile.path,
-      targetPath,
-      quality: 65,
-      minWidth: 500,
-      minHeight: 500,
-      format: CompressFormat.jpeg,
-      keepExif: true,
-    );
-
-    return compressedFile != null ? File(compressedFile.path) : null;
+    final xfile = await _picker.pickImage(source: ImageSource.gallery);
+    if (xfile == null) return null;
+    return _compress(File(xfile.path));
   }
+
+  // ── 여러 장 선택 + 병렬 압축 ──────────────────────────────────────────────
   Future<List<File>> pickAndCompressMultipleImages() async {
-    final List<XFile> pickedFiles = await _picker.pickMultiImage();
+    final pickedFiles = await _picker.pickMultiImage();
     if (pickedFiles.isEmpty) return [];
 
-    final dir = await getTemporaryDirectory();
-    final List<File> compressedFiles = [];
+    final compressed = await Future.wait(
+      pickedFiles.map((xfile) => _compress(File(xfile.path))),
+    );
+    return compressed.whereType<File>().toList();
+  }
 
-    for (int i = 0; i < pickedFiles.length; i++) {
-      final file = pickedFiles[i];
+  Future<File?> _compress(File file) async {
+    try {
+      final dir = await getTemporaryDirectory();
       final targetPath =
-          "${dir.path}/img_${DateTime.now().millisecondsSinceEpoch}_$i.jpg";
+          '${dir.path}/${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}.jpg';
 
-      final XFile? compressedFile =
-          await FlutterImageCompress.compressAndGetFile(
-        file.path,
+      final result = await FlutterImageCompress.compressAndGetFile(
+        file.absolute.path,  // ← absolutePath → absolute.path
         targetPath,
-        quality: 65,
-        minWidth: 800,
-        minHeight: 800,
+        minWidth: 400,
+        minHeight: 400,
+        quality: 60,
         format: CompressFormat.jpeg,
-        keepExif: true,
       );
-
-      if (compressedFile != null) {
-        compressedFiles.add(File(compressedFile.path));
-      }
+      return result != null ? File(result.path) : file;
+    } catch (e) {
+      return file;
     }
-
-    return compressedFiles;
   }
 }

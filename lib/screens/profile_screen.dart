@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
 import '../../services/image_service.dart';
 import '../../l10n/app_localizations.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -83,6 +84,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final l = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
     final userProvider = context.watch<UserProvider>();
+    final photoUrl = userProvider.photoUrl ?? '';
 
     return Scaffold(
       appBar: AppBar(
@@ -114,10 +116,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     radius: 52,
                     backgroundColor: colorScheme.primaryContainer,
                     // 캐시 방지를 위해 URL 끝에 쿼리 파라미터 추가
-                    backgroundImage: userProvider.photoUrl != null 
-                        ? NetworkImage('${userProvider.photoUrl}?v=${DateTime.now().millisecondsSinceEpoch}') 
+                    backgroundImage: photoUrl.isNotEmpty
+                        ? CachedNetworkImageProvider(photoUrl)
                         : null,
-                    child: userProvider.photoUrl == null
+                    child: photoUrl.isEmpty
                         ? Text(
                             userProvider.name.isNotEmpty ? userProvider.name[0].toUpperCase() : '?',
                             style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: colorScheme.onPrimaryContainer),

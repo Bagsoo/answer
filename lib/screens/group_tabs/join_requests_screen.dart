@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/group_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class JoinRequestsScreen extends StatelessWidget {
   final String groupId;
@@ -18,7 +19,7 @@ class JoinRequestsScreen extends StatelessWidget {
     if (diff.inHours < 1) return l.minutesAgo(diff.inMinutes);
     if (diff.inDays < 1) return l.hoursAgo(diff.inHours);
     if (diff.inDays < 7) return l.daysAgo(diff.inDays);
-    return '${dt.year}.${dt.month.toString().padLeft(2,'0')}.${dt.day.toString().padLeft(2,'0')}';
+    return '${dt.year}.${dt.month.toString().padLeft(2, '0')}.${dt.day.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -64,11 +65,14 @@ class JoinRequestsScreen extends StatelessWidget {
               final name = req['display_name'] as String? ?? l.unknown;
               final phone = req['phone_number'] as String? ?? '';
               final ts = req['requested_at'] as Timestamp?;
+              // join_requests 서브컬렉션에 저장된 profile_image 사용
+              final photoUrl = req['profile_image'] as String? ?? '';
 
               return _JoinRequestTile(
                 uid: uid,
                 name: name,
                 phone: phone,
+                photoUrl: photoUrl,
                 timeLabel: _formatDate(ts, l),
                 groupId: groupId,
                 groupService: groupService,
@@ -89,6 +93,7 @@ class _JoinRequestTile extends StatefulWidget {
   final String uid;
   final String name;
   final String phone;
+  final String photoUrl;   // ← 추가
   final String timeLabel;
   final String groupId;
   final GroupService groupService;
@@ -99,6 +104,7 @@ class _JoinRequestTile extends StatefulWidget {
     required this.uid,
     required this.name,
     required this.phone,
+    required this.photoUrl,
     required this.timeLabel,
     required this.groupId,
     required this.groupService,
@@ -121,25 +127,26 @@ class _JoinRequestTileState extends State<_JoinRequestTile> {
       setState(() => _processing = false);
       final message = result == 'ok'
           ? widget.l.joinApproved(widget.name)
-          : result == 'full' ? widget.l.groupFull
-          : result == 'banned'
-              // ? '${widget.name}님은 차단된 사용자입니다. 가입 요청이 삭제되었습니다.'
-              ? widget.l.bannedUserNotice(widget.name)
-              : widget.l.joinApproveFailed;
+          : result == 'full'
+              ? widget.l.groupFull
+              : result == 'banned'
+                  ? widget.l.bannedUserNotice(widget.name)
+                  : widget.l.joinApproveFailed;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(message),
-        backgroundColor: result == 'ok' ? Colors.green : widget.colorScheme.error,
+        backgroundColor:
+            result == 'ok' ? Colors.green : widget.colorScheme.error,
       ));
     }
   }
 
   Future<void> _reject() async {
-    // 거절 확인 다이얼로그
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(widget.l.rejectJoinRequest),
-        content: Text(widget.l.rejectJoinRequestConfirm(widget.name)),
+        content:
+            Text(widget.l.rejectJoinRequestConfirm(widget.name)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -173,15 +180,23 @@ class _JoinRequestTileState extends State<_JoinRequestTile> {
   @override
   Widget build(BuildContext context) {
     final cs = widget.colorScheme;
+    final hasPhoto = widget.photoUrl.isNotEmpty;
 
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: cs.primaryContainer,
-        child: Text(
-          widget.name.isNotEmpty ? widget.name[0].toUpperCase() : '?',
-          style: TextStyle(
-              color: cs.onPrimaryContainer, fontWeight: FontWeight.bold),
-        ),
+        backgroundImage: hasPhoto ? CachedNetworkImageProvider(widget.photoUrl) : null,
+        onBackgroundImageError: hasPhoto ? (_, __) {} : null,
+        child: hasPhoto
+            ? null
+            : Text(
+                widget.name.isNotEmpty
+                    ? widget.name[0].toUpperCase()
+                    : '?',
+                style: TextStyle(
+                    color: cs.onPrimaryContainer,
+                    fontWeight: FontWeight.bold),
+              ),
       ),
       title: Text(widget.name,
           style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -202,19 +217,18 @@ class _JoinRequestTileState extends State<_JoinRequestTile> {
       isThreeLine: widget.phone.isNotEmpty,
       trailing: _processing
           ? const SizedBox(
-              width: 24, height: 24,
+              width: 24,
+              height: 24,
               child: CircularProgressIndicator(strokeWidth: 2))
           : Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 거절
                 IconButton(
                   icon: Icon(Icons.close_rounded, color: cs.error),
                   tooltip: widget.l.reject,
                   onPressed: _reject,
                 ),
                 const SizedBox(width: 4),
-                // 승인
                 FilledButton(
                   onPressed: _approve,
                   style: FilledButton.styleFrom(

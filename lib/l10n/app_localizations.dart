@@ -187,6 +187,30 @@ class AppLocalizations {
   String get proPlanDesc => _s.proPlanDesc;
   String get viewOnMap => _s.viewOnMap;
 
+  // ── 게시판 파일 작성 ──────────────────────────────────────────────────────────────
+  String get videoProcessingFailed => _s.videoProcessingFailed;
+  String get fileSizeExceeded => _s.fileSizeExceeded;
+  String get audioFileSizeExceeded => _s.audioFileSizeExceeded;
+  String get saveError => _s.saveError;
+  String get existingFile => _s.existingFile;
+  String pendingAttachments(int count) => _s.pendingAttachments(count);
+
+  // ── 그룹 가입 ──────────────────────────────────────────────────────────────
+  String get bannedFromGroup => _s.bannedFromGroup;
+  String get joinMethod => _s.joinMethod;
+  String get requiresApproval => _s.requiresApproval;
+  String get freeJoin => _s.freeJoin;
+
+  // ── 그룹 프로필 ──────────────────────────────────────────────────────────────
+  String get groupProfileImageUpdate => _s.groupProfileImageUpdate;
+  String get groupProfileImageUpdated => _s.groupProfileImageUpdated;
+  String get groupProfileImageUpdateFailed => _s.groupProfileImageUpdateFailed;
+  String get deleteGroupProfileImage => _s.deleteGroupProfileImage;
+  String get deleteGroupProfileConfirm => _s.deleteGroupProfileConfirm;
+  String get groupProfileImageDeleted => _s.groupProfileImageDeleted;
+  String get groupProfileImage => _s.groupProfileImage;
+  String get noPermissionToChangeGroupProfileImage => _s.noPermissionToChangeGroupProfileImage;  
+
   // ── 채팅방 ──────────────────────────────────────────────────────────────
   String get attachPhotos => _s.attachPhotos;
   String get attachVideos => _s.attachVideos;
@@ -699,6 +723,30 @@ abstract class _AppStrings {
   String get plusPlanDesc;
   String get proPlanDesc;
   String get viewOnMap;
+
+  // 게시글 파일
+  String get videoProcessingFailed;
+  String get fileSizeExceeded;
+  String get audioFileSizeExceeded;
+  String get saveError;
+  String get existingFile;
+  String pendingAttachments(int count);
+
+  // 그룹 가입
+  String get bannedFromGroup;
+  String get joinMethod;
+  String get requiresApproval;
+  String get freeJoin;
+
+  // 그룹 프로필
+  String get groupProfileImageUpdate;
+  String get groupProfileImageUpdated;
+  String get groupProfileImageUpdateFailed;
+  String get deleteGroupProfileImage;
+  String get deleteGroupProfileConfirm;
+  String get groupProfileImageDeleted;
+  String get groupProfileImage;
+  String get noPermissionToChangeGroupProfileImage;
   
   // 채팅방
   String get attachPhotos;
@@ -1219,6 +1267,30 @@ class _EnStrings extends _AppStrings {
   @override String get proPlanDesc => 'Pro plan description';  
   @override String get viewOnMap => 'View on map';
 
+  // 게시글 파일
+  @override String get videoProcessingFailed => 'Failed to process video';
+  @override String get fileSizeExceeded => 'File size exceeds 50MB';
+  @override String get audioFileSizeExceeded => 'Audio file must be 20MB or less';
+  @override String get saveError => 'Failed to save';
+  @override String get existingFile => 'Existing attachments';
+  @override String pendingAttachments(int count) => 'Pending attachments ($count)';
+
+  // 그룹 가입
+  @override String get bannedFromGroup => 'You are banned from this group.';
+  @override String get joinMethod => 'Join Method';
+  @override String get requiresApproval => 'Requires Approval';
+  @override String get freeJoin => 'Open to All';
+
+  // 그룹 프로필
+  @override String get groupProfileImageUpdate => 'Update group profile image';
+  @override String get groupProfileImageUpdated => 'Group profile picture has been updated';
+  @override String get groupProfileImageUpdateFailed => 'Failed to update group profile image';
+  @override String get deleteGroupProfileImage => 'Delete group profile image';
+  @override String get deleteGroupProfileConfirm => 'Are you sure you want to delete the group profile image?';
+  @override String get groupProfileImageDeleted => 'Group profile image deleted successfully';
+  @override String get groupProfileImage => 'Group profile image';
+  @override String get noPermissionToChangeGroupProfileImage => 'You do not have permission to change the group profile image';
+
   // 채팅방
   @override String get attachPhotos => 'Photos';
   @override String get attachVideos => 'Videos';
@@ -1718,6 +1790,30 @@ class _KoStrings extends _AppStrings {
   @override String get proPlanDesc => 'Pro 플랜 혜택';  
   @override String get viewOnMap => '지도 보기';
 
+  // 게시글 파일
+  @override String get videoProcessingFailed => '동영상 처리 실패';
+  @override String get fileSizeExceeded => '파일 크기가 50MB를 초과합니다';
+  @override String get audioFileSizeExceeded => '오디오 파일은 20MB 이하만 가능합니다';
+  @override String get saveError => '저장 실패';
+  @override String get existingFile => '기존 첨부파일';
+  @override String pendingAttachments(int count) => '업로드 대기 중 ($count)';
+
+  // 그룹 가입
+  @override String get bannedFromGroup => '이 그룹에서 차단되었습니다.';
+  @override String get joinMethod => '가입 방법';
+  @override String get requiresApproval => '승인 필요';
+  @override String get freeJoin => '누구나 가입';
+
+  // 그룹 프로필
+  @override String get groupProfileImageUpdate => '그룹 프로필 사진 변경';
+  @override String get groupProfileImageUpdated => '그룹 프로필 사진이 변경되었습니다';
+  @override String get groupProfileImageUpdateFailed => '그룹 프로필 사진 변경에 실패했습니다';
+  @override String get deleteGroupProfileImage => '그룹 프로필 사진 삭제';
+  @override String get deleteGroupProfileConfirm => '그룹 프로필 사진을 삭제하시겠습니까?';
+  @override String get groupProfileImageDeleted => '그룹 프로필 사진이 삭제되었습니다';
+  @override String get groupProfileImage => '그룹 프로필 사진';
+  @override String get noPermissionToChangeGroupProfileImage => '그룹 프로필 사진을 변경할 권한이 없습니다';
+
   // 채팅방
   @override String get attachPhotos => '사진';
   @override String get attachVideos => '동영상';
@@ -2216,6 +2312,30 @@ class _JaStrings extends _AppStrings {
   @override String get plusPlanDesc => '成長中のコミュニティに';
   @override String get proPlanDesc => '大規模グループ向け';  
   @override String get viewOnMap => '地図で確認';
+
+  // 게시글 파일
+  @override String get videoProcessingFailed => '動画の処理に失敗しました';
+  @override String get fileSizeExceeded => 'ファイルサイズが50MBを超えています';
+  @override String get audioFileSizeExceeded => '音声ファイルは20MB以下にしてください';
+  @override String get saveError => '保存中にエラーが発生しました';
+  @override String get existingFile => '既存の添付ファイル';
+  @override String pendingAttachments(int count) => '追加するファイル (${count})';
+
+  // 그룹 가입
+  @override String get bannedFromGroup => 'このグループから追放されました。';
+  @override String get joinMethod => '参加方法';
+  @override String get requiresApproval => '承認が必要';
+  @override String get freeJoin => '自由参加';
+
+  // 그룹 프로필
+  @override String get groupProfileImageUpdate => 'グループプロフィールの写真の更新';
+  @override String get groupProfileImageUpdated => 'グループプロフィールの写真が更新されました';
+  @override String get groupProfileImageUpdateFailed => 'グループプロフィールの写真の更新に失敗しました';
+  @override String get deleteGroupProfileImage => 'グループプロフィールの写真を削除';
+  @override String get deleteGroupProfileConfirm => 'グループプロフィールの写真を削除してもよろしいですか？';
+  @override String get groupProfileImageDeleted => 'グループプロフィールの写真が削除されました';
+  @override String get groupProfileImage => 'グループプロフィールの写真';
+  @override String get noPermissionToChangeGroupProfileImage => 'グループプロフィールの写真を変更する権限がありません';
 
   //채팅방
   @override String get attachPhotos => '写真';

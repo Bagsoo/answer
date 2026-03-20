@@ -9,13 +9,14 @@ class GroupService {
 
   String get currentUserId => _auth.currentUser?.uid ?? '';
 
-  // 1. Create a New Group
+  // ── 그룹 생성 ──────────────────────────────────────────────────────────────
   Future<String?> createGroup({
     required String name,
     required String type,
     required String category,
     required bool requireApproval,
-    required String displayName,   // UserProvider에서 전달
+    required String displayName,
+    String profileImage = '',   // ← 추가
     int memberLimit = 50,
     String plan = 'free',
     bool allowPlanUpgrade = true,
@@ -42,11 +43,10 @@ class GroupService {
       'searchable_keywords': keywords,
     });
 
-    // Add creator as member with 'owner' role
-    final memberDoc = groupDoc.collection('members').doc(currentUserId);
-    batch.set(memberDoc, {
+    batch.set(groupDoc.collection('members').doc(currentUserId), {
       'user_id': currentUserId,
-      'display_name': displayName, // ✅ 추가
+      'display_name': displayName,
+      'profile_image': profileImage,   // ← 추가
       'joined_at': FieldValue.serverTimestamp(),
       'role': 'owner',
       'permissions': {
@@ -55,24 +55,24 @@ class GroupService {
         'can_write_post': true,
         'can_edit_group_info': true,
         'can_manage_permissions': true,
-      }
+      },
     });
 
-    // Update user's joined_groups subcollection
-    final userJoinedGroupDoc = _db
-        .collection('users')
-        .doc(currentUserId)
-        .collection('joined_groups')
-        .doc(groupDoc.id);
-    batch.set(userJoinedGroupDoc, {
-      'joined_at': FieldValue.serverTimestamp(),
-      'name': name,
-      'type': type,
-      'category': category,
-      'member_count': 1,
-    });
+    batch.set(
+      _db
+          .collection('users')
+          .doc(currentUserId)
+          .collection('joined_groups')
+          .doc(groupDoc.id),
+      {
+        'joined_at': FieldValue.serverTimestamp(),
+        'name': name,
+        'type': type,
+        'category': category,
+        'member_count': 1,
+      },
+    );
 
-    // Auto-generate the ALL Chat Room
     final chatDoc = _db.collection('chat_rooms').doc();
     batch.set(chatDoc, {
       'type': 'group_all',
@@ -86,9 +86,7 @@ class GroupService {
       'unread_counts': {currentUserId: 0},
     });
 
-    // Add owner to room_members
-    final roomMemberDoc = chatDoc.collection('room_members').doc(currentUserId);
-    batch.set(roomMemberDoc, {
+    batch.set(chatDoc.collection('room_members').doc(currentUserId), {
       'uid': currentUserId,
       'display_name': displayName,
       'role': 'owner',
@@ -106,26 +104,23 @@ class GroupService {
     }
   }
 
-  // 2. Search Groups by Keyword
+  // ── 그룹 검색 ──────────────────────────────────────────────────────────────
   Stream<List<Map<String, dynamic>>> searchGroups(String query) {
     if (query.trim().isEmpty) return Stream.value([]);
     final lowerQuery = query.toLowerCase();
-
     return _db
         .collection('groups')
         .where('searchable_keywords', arrayContains: lowerQuery)
         .limit(20)
         .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        var data = doc.data();
-        data['id'] = doc.id;
-        return data;
-      }).toList();
-    });
+        .map((snapshot) => snapshot.docs.map((doc) {
+              final data = doc.data();
+              data['id'] = doc.id;
+              return data;
+            }).toList());
   }
 
-  // 3. Request to Join a Group
+  // ── 그룹 가입 요청 ──────────────────────────────────────────────────────────
   Future<String> requestToJoin(
     String groupId,
     bool requireApproval,
@@ -133,26 +128,31 @@ class GroupService {
     String groupType,
     String groupCategory,
     int currentMemberCount,
-    String displayName,   // UserProvider에서 전달
-    String phoneNumber,   // UserProvider에서 전달
+    String displayName,
+    String phoneNumber,
+    String profileImage,   // ← 추가
   ) async {
     if (currentUserId.isEmpty) return 'error';
 
     try {
-      // 차단된 유저면 가입 불가
       final bannedDoc = await _db
-          .collection('groups').doc(groupId)
-          .collection('banned').doc(currentUserId)
+          .collection('groups')
+          .doc(groupId)
+          .collection('banned')
+          .doc(currentUserId)
           .get();
       if (bannedDoc.exists) return 'banned';
 
       final groupDoc = await _db.collection('groups').doc(groupId).get();
       final groupData = groupDoc.data();
       final memberLimit = groupData?['member_limit'] as int? ?? 50;
-      final memberCount = groupData?['member_count'] as int? ?? currentMemberCount;
+      final memberCount =
+          groupData?['member_count'] as int? ?? currentMemberCount;
 
       if (memberCount >= memberLimit) return 'full';
+
       if (requireApproval) {
+        // 가입 요청에 profile_image 포함
         await _db
             .collection('groups')
             .doc(groupId)
@@ -162,49 +162,54 @@ class GroupService {
           'user_id': currentUserId,
           'display_name': displayName,
           'phone_number': phoneNumber,
+          'profile_image': profileImage,   // ← 추가
           'requested_at': FieldValue.serverTimestamp(),
           'status': 'pending',
         });
       } else {
         final batch = _db.batch();
 
-        final memberDoc = _db
-            .collection('groups')
-            .doc(groupId)
-            .collection('members')
-            .doc(currentUserId);
-        batch.set(memberDoc, {
-          'user_id': currentUserId,
-          'display_name': displayName, // ✅ 추가
-          'joined_at': FieldValue.serverTimestamp(),
-          'role': 'member',
-          'permissions': {
-            'can_post_schedule': false,
-            'can_create_sub_chat': false,
-            'can_write_post': true,
-            'can_edit_group_info': false,
-            'can_manage_permissions': false,
-          }
-        });
+        batch.set(
+          _db
+              .collection('groups')
+              .doc(groupId)
+              .collection('members')
+              .doc(currentUserId),
+          {
+            'user_id': currentUserId,
+            'display_name': displayName,
+            'profile_image': profileImage,   // ← 추가
+            'joined_at': FieldValue.serverTimestamp(),
+            'role': 'member',
+            'permissions': {
+              'can_post_schedule': false,
+              'can_create_sub_chat': false,
+              'can_write_post': true,
+              'can_edit_group_info': false,
+              'can_manage_permissions': false,
+            },
+          },
+        );
 
         batch.update(_db.collection('groups').doc(groupId), {
           'member_count': FieldValue.increment(1),
         });
 
-        final userJoinedGroupDoc = _db
-            .collection('users')
-            .doc(currentUserId)
-            .collection('joined_groups')
-            .doc(groupId);
-        batch.set(userJoinedGroupDoc, {
-          'joined_at': FieldValue.serverTimestamp(),
-          'name': groupName,
-          'type': groupType,
-          'category': groupCategory,
-          'member_count': currentMemberCount + 1,
-        });
+        batch.set(
+          _db
+              .collection('users')
+              .doc(currentUserId)
+              .collection('joined_groups')
+              .doc(groupId),
+          {
+            'joined_at': FieldValue.serverTimestamp(),
+            'name': groupName,
+            'type': groupType,
+            'category': groupCategory,
+            'member_count': currentMemberCount + 1,
+          },
+        );
 
-        // Find existing group_all chat and add the user
         final chatRoomsSnapshot = await _db
             .collection('chat_rooms')
             .where('ref_group_id', isEqualTo: groupId)
@@ -214,12 +219,10 @@ class GroupService {
 
         if (chatRoomsSnapshot.docs.isNotEmpty) {
           final chatId = chatRoomsSnapshot.docs.first.id;
-
           batch.update(_db.collection('chat_rooms').doc(chatId), {
             'member_ids': FieldValue.arrayUnion([currentUserId]),
             'unread_counts.$currentUserId': 0,
           });
-
           batch.set(
             _db
                 .collection('chat_rooms')
@@ -246,63 +249,71 @@ class GroupService {
     }
   }
 
-  // 4. Get My Joined Groups
+  // ── 내 가입 그룹 목록 ──────────────────────────────────────────────────────
   Stream<List<Map<String, dynamic>>> getMyJoinedGroups() {
     if (currentUserId.isEmpty) return Stream.value([]);
-
     return _db
         .collection('users')
         .doc(currentUserId)
         .collection('joined_groups')
         .snapshots()
         .switchMap((snapshot) {
-          final ids = snapshot.docs.map((d) => d.id).toList();
-          if (ids.isEmpty) return Stream.value([]);
-
-          return _db
-              .collection('groups')
-              .where(FieldPath.documentId, whereIn: ids)
-              .snapshots()
-              .map((groupsSnap) {
-                
-                return groupsSnap.docs.map((doc) {
-                  final data = doc.data();
-                  data['id'] = doc.id;
-                  return data;
-                }).toList();
-              });
-
-        });
+      final ids = snapshot.docs.map((d) => d.id).toList();
+      if (ids.isEmpty) return Stream.value([]);
+      return _db
+          .collection('groups')
+          .where(FieldPath.documentId, whereIn: ids)
+          .snapshots()
+          .map((groupsSnap) => groupsSnap.docs.map((doc) {
+                final data = doc.data();
+                data['id'] = doc.id;
+                return data;
+              }).toList());
+    });
   }
 
-  // ── 가입 요청 대기 목록 스트림 ─────────────────────────────────────────────
+  // ── 가입 요청 대기 목록 ────────────────────────────────────────────────────
   Stream<List<Map<String, dynamic>>> getPendingJoinRequests(String groupId) {
     return _db
         .collection('groups')
         .doc(groupId)
         .collection('join_requests')
         .where('status', isEqualTo: 'pending')
-        .orderBy('requested_at', descending: false)
         .snapshots()
-        .map((snap) => snap.docs.map((doc) {
-              final data = doc.data();
-              data['id'] = doc.id;
-              return data;
-            }).toList());
+        .map((snap) {
+      final docs = snap.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+      docs.sort((a, b) {
+        final aTs = a['requested_at'] as Timestamp?;
+        final bTs = b['requested_at'] as Timestamp?;
+        if (aTs == null && bTs == null) return 0;
+        if (aTs == null) return 1;
+        if (bTs == null) return -1;
+        return aTs.compareTo(bTs);
+      });
+      return docs;
+    });
   }
 
   // ── 가입 승인 ──────────────────────────────────────────────────────────────
-  Future<String> approveJoinRequest(String groupId, String applicantUid) async {
+  Future<String> approveJoinRequest(
+      String groupId, String applicantUid) async {
     try {
-      // 차단된 유저면 승인 불가 — join_request만 삭제하고 'banned' 반환
       final bannedDoc = await _db
-          .collection('groups').doc(groupId)
-          .collection('banned').doc(applicantUid)
+          .collection('groups')
+          .doc(groupId)
+          .collection('banned')
+          .doc(applicantUid)
           .get();
       if (bannedDoc.exists) {
         await _db
-            .collection('groups').doc(groupId)
-            .collection('join_requests').doc(applicantUid)
+            .collection('groups')
+            .doc(groupId)
+            .collection('join_requests')
+            .doc(applicantUid)
             .delete();
         return 'banned';
       }
@@ -316,9 +327,14 @@ class GroupService {
       final requestData = requestDoc.data();
       if (requestData == null) return 'error';
 
-      final displayName = requestData['display_name'] as String? ?? 'Unknown';
+      final displayName =
+          requestData['display_name'] as String? ?? 'Unknown';
+      // join_requests에 저장된 profile_image 사용
+      final profileImage =
+          requestData['profile_image'] as String? ?? '';
 
-      final groupDoc = await _db.collection('groups').doc(groupId).get();
+      final groupDoc =
+          await _db.collection('groups').doc(groupId).get();
       final groupData = groupDoc.data();
       final groupName = groupData?['name'] as String? ?? '';
       final groupType = groupData?['type'] as String? ?? 'club';
@@ -330,12 +346,17 @@ class GroupService {
 
       final batch = _db.batch();
 
-      // members에 추가
+      // members에 추가 (profile_image 포함)
       batch.set(
-        _db.collection('groups').doc(groupId).collection('members').doc(applicantUid),
+        _db
+            .collection('groups')
+            .doc(groupId)
+            .collection('members')
+            .doc(applicantUid),
         {
           'user_id': applicantUid,
           'display_name': displayName,
+          'profile_image': profileImage,   // ← 추가
           'joined_at': FieldValue.serverTimestamp(),
           'role': 'member',
           'permissions': {
@@ -348,14 +369,16 @@ class GroupService {
         },
       );
 
-      // member_count 증가
       batch.update(_db.collection('groups').doc(groupId), {
         'member_count': FieldValue.increment(1),
       });
 
-      // users joined_groups 추가
       batch.set(
-        _db.collection('users').doc(applicantUid).collection('joined_groups').doc(groupId),
+        _db
+            .collection('users')
+            .doc(applicantUid)
+            .collection('joined_groups')
+            .doc(groupId),
         {
           'joined_at': FieldValue.serverTimestamp(),
           'name': groupName,
@@ -365,12 +388,14 @@ class GroupService {
         },
       );
 
-      // join_requests 삭제
       batch.delete(
-        _db.collection('groups').doc(groupId).collection('join_requests').doc(applicantUid),
+        _db
+            .collection('groups')
+            .doc(groupId)
+            .collection('join_requests')
+            .doc(applicantUid),
       );
 
-      // group_all 채팅방에 추가
       final chatSnap = await _db
           .collection('chat_rooms')
           .where('ref_group_id', isEqualTo: groupId)
@@ -385,7 +410,11 @@ class GroupService {
           'unread_counts.$applicantUid': 0,
         });
         batch.set(
-          _db.collection('chat_rooms').doc(chatId).collection('room_members').doc(applicantUid),
+          _db
+              .collection('chat_rooms')
+              .doc(chatId)
+              .collection('room_members')
+              .doc(applicantUid),
           {
             'uid': applicantUid,
             'display_name': displayName,
@@ -406,7 +435,8 @@ class GroupService {
   }
 
   // ── 가입 거절 ──────────────────────────────────────────────────────────────
-  Future<bool> rejectJoinRequest(String groupId, String applicantUid) async {
+  Future<bool> rejectJoinRequest(
+      String groupId, String applicantUid) async {
     try {
       await _db
           .collection('groups')
@@ -426,10 +456,12 @@ class GroupService {
   // ══════════════════════════════════════════════════════════════════════════
 
   Stream<List<String>> getGroupTags(String groupId) {
-    return _db.collection('groups').doc(groupId).snapshots().map((snap) {
-      final data = snap.data();
-      return List<String>.from(data?['tags'] as List? ?? []);
-    });
+    return _db
+        .collection('groups')
+        .doc(groupId)
+        .snapshots()
+        .map((snap) =>
+            List<String>.from(snap.data()?['tags'] as List? ?? []));
   }
 
   Future<bool> addGroupTag(String groupId, String tag) async {
@@ -438,7 +470,10 @@ class GroupService {
         'tags': FieldValue.arrayUnion([tag]),
       });
       return true;
-    } catch (e) { debugPrint('addGroupTag error: $e'); return false; }
+    } catch (e) {
+      debugPrint('addGroupTag error: $e');
+      return false;
+    }
   }
 
   Future<bool> removeGroupTag(String groupId, String tag) async {
@@ -447,15 +482,26 @@ class GroupService {
         'tags': FieldValue.arrayRemove([tag]),
       });
       return true;
-    } catch (e) { debugPrint('removeGroupTag error: $e'); return false; }
+    } catch (e) {
+      debugPrint('removeGroupTag error: $e');
+      return false;
+    }
   }
 
-  Future<bool> updateMemberTags(String groupId, String uid, List<String> tags) async {
+  Future<bool> updateMemberTags(
+      String groupId, String uid, List<String> tags) async {
     try {
-      await _db.collection('groups').doc(groupId).collection('members').doc(uid)
+      await _db
+          .collection('groups')
+          .doc(groupId)
+          .collection('members')
+          .doc(uid)
           .update({'tags': tags});
       return true;
-    } catch (e) { debugPrint('updateMemberTags error: $e'); return false; }
+    } catch (e) {
+      debugPrint('updateMemberTags error: $e');
+      return false;
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -463,35 +509,31 @@ class GroupService {
   // ══════════════════════════════════════════════════════════════════════════
 
   Stream<List<Map<String, dynamic>>> getBoards(String groupId) {
-    return _db.collection('groups').doc(groupId).collection('boards')
+    return _db
+        .collection('groups')
+        .doc(groupId)
+        .collection('boards')
         .orderBy('order', descending: false)
         .snapshots()
         .map((snap) => snap.docs.map((doc) {
-              final data = doc.data(); data['id'] = doc.id; return data;
+              final data = doc.data();
+              data['id'] = doc.id;
+              return data;
             }).toList());
   }
 
   Future<bool> createBoard(
-    String groupId,
-    Map<String, dynamic> boardData,
-  ) async {
+      String groupId, Map<String, dynamic> boardData) async {
     try {
-
       final db = FirebaseFirestore.instance;
-
       return await db.runTransaction((tx) async {
-
         final groupRef = db.collection('groups').doc(groupId);
         final boardsRef = groupRef.collection('boards');
-
         final groupDoc = await tx.get(groupRef);
-
         final data = groupDoc.data()!;
         final plan = data['plan'] ?? 'free';
         final boardCount = data['board_count'] ?? 0;
-
         int maxBoards;
-
         switch (plan) {
           case 'pro':
             maxBoards = 1000000;
@@ -502,38 +544,36 @@ class GroupService {
           default:
             maxBoards = 3;
         }
-
-        if (boardCount >= maxBoards) {
-          throw Exception('limit_reached');
-        }
-
+        if (boardCount >= maxBoards) throw Exception('limit_reached');
         final newBoardRef = boardsRef.doc();
-
         tx.set(newBoardRef, {
           ...boardData,
           'order': boardCount,
           'created_at': FieldValue.serverTimestamp(),
         });
-
-        tx.update(groupRef, {
-          'board_count': FieldValue.increment(1),
-        });
-
+        tx.update(groupRef, {'board_count': FieldValue.increment(1)});
         return true;
       });
-
     } catch (e) {
       debugPrint('createBoard error: $e');
       return false;
     }
   }
 
-
-  Future<bool> updateBoard(String groupId, String boardId, Map<String, dynamic> data) async {
+  Future<bool> updateBoard(
+      String groupId, String boardId, Map<String, dynamic> data) async {
     try {
-      await _db.collection('groups').doc(groupId).collection('boards').doc(boardId).update(data);
+      await _db
+          .collection('groups')
+          .doc(groupId)
+          .collection('boards')
+          .doc(boardId)
+          .update(data);
       return true;
-    } catch (e) { debugPrint('updateBoard error: $e'); return false; }
+    } catch (e) {
+      debugPrint('updateBoard error: $e');
+      return false;
+    }
   }
 
   Future<bool> deleteBoard(String groupId, String boardId) async {
@@ -541,32 +581,15 @@ class GroupService {
       final db = FirebaseFirestore.instance;
       final groupRef = db.collection('groups').doc(groupId);
       final boardRef = groupRef.collection('boards').doc(boardId);
-
-      // 1. 해당 게시판의 포스트들 조회
       final postsSnap = await groupRef
           .collection('posts')
           .where('board_id', isEqualTo: boardId)
           .get();
-
       final batch = db.batch();
-
-      // 2. 포스트 삭제 예약
-      for (final doc in postsSnap.docs) {
-        batch.delete(doc.reference);
-      }
-
-      // 3. 게시판 삭제 예약
+      for (final doc in postsSnap.docs) batch.delete(doc.reference);
       batch.delete(boardRef);
-
-      // 4. 🔥 핵심: board_count 감소도 배치에 포함
-      // 이렇게 하면 삭제와 카운트 감소가 한 몸처럼 움직입니다.
-      batch.update(groupRef, {
-        'board_count': FieldValue.increment(-1),
-      });
-
-      // 5. 모든 작업을 한 번에 실행
+      batch.update(groupRef, {'board_count': FieldValue.increment(-1)});
       await batch.commit();
-
       return true;
     } catch (e) {
       debugPrint('deleteBoard error: $e');
@@ -578,28 +601,46 @@ class GroupService {
   // 게시글 관리
   // ══════════════════════════════════════════════════════════════════════════
 
-  Stream<List<Map<String, dynamic>>> getPosts(String groupId, String boardId) {
-    return _db.collection('groups').doc(groupId).collection('posts')
+  Stream<List<Map<String, dynamic>>> getPosts(
+      String groupId, String boardId) {
+    return _db
+        .collection('groups')
+        .doc(groupId)
+        .collection('posts')
         .where('board_id', isEqualTo: boardId)
         .orderBy('is_pinned', descending: true)
         .orderBy('created_at', descending: true)
         .snapshots()
         .map((snap) => snap.docs.map((doc) {
-              final data = doc.data(); data['id'] = doc.id; return data;
+              final data = doc.data();
+              data['id'] = doc.id;
+              return data;
             }).toList());
   }
 
   Stream<Map<String, dynamic>?> getPost(String groupId, String postId) {
-    return _db.collection('groups').doc(groupId).collection('posts').doc(postId)
-        .snapshots().map((snap) {
+    return _db
+        .collection('groups')
+        .doc(groupId)
+        .collection('posts')
+        .doc(postId)
+        .snapshots()
+        .map((snap) {
       if (!snap.exists) return null;
-      final data = snap.data()!; data['id'] = snap.id; return data;
+      final data = snap.data()!;
+      data['id'] = snap.id;
+      return data;
     });
   }
 
-  Future<String?> createPost(String groupId, Map<String, dynamic> postData) async {
+  Future<String?> createPost(
+      String groupId, Map<String, dynamic> postData) async {
     try {
-      final doc = await _db.collection('groups').doc(groupId).collection('posts').add({
+      final doc = await _db
+          .collection('groups')
+          .doc(groupId)
+          .collection('posts')
+          .add({
         ...postData,
         'is_pinned': false,
         'reactions': {},
@@ -608,41 +649,78 @@ class GroupService {
         'updated_at': FieldValue.serverTimestamp(),
       });
       return doc.id;
-    } catch (e) { debugPrint('createPost error: $e'); return null; }
+    } catch (e) {
+      debugPrint('createPost error: $e');
+      return null;
+    }
   }
 
-  Future<bool> updatePost(String groupId, String postId, Map<String, dynamic> data) async {
+  Future<bool> updatePost(
+      String groupId, String postId, Map<String, dynamic> data) async {
     try {
-      await _db.collection('groups').doc(groupId).collection('posts').doc(postId)
+      await _db
+          .collection('groups')
+          .doc(groupId)
+          .collection('posts')
+          .doc(postId)
           .update({...data, 'updated_at': FieldValue.serverTimestamp()});
       return true;
-    } catch (e) { debugPrint('updatePost error: $e'); return false; }
+    } catch (e) {
+      debugPrint('updatePost error: $e');
+      return false;
+    }
   }
 
   Future<bool> deletePost(String groupId, String postId) async {
     try {
-      final commentsSnap = await _db.collection('groups').doc(groupId)
-          .collection('posts').doc(postId).collection('comments').get();
+      final commentsSnap = await _db
+          .collection('groups')
+          .doc(groupId)
+          .collection('posts')
+          .doc(postId)
+          .collection('comments')
+          .get();
       final batch = _db.batch();
       for (final doc in commentsSnap.docs) batch.delete(doc.reference);
-      batch.delete(_db.collection('groups').doc(groupId).collection('posts').doc(postId));
+      batch.delete(_db
+          .collection('groups')
+          .doc(groupId)
+          .collection('posts')
+          .doc(postId));
       await batch.commit();
       return true;
-    } catch (e) { debugPrint('deletePost error: $e'); return false; }
+    } catch (e) {
+      debugPrint('deletePost error: $e');
+      return false;
+    }
   }
 
-  Future<bool> togglePinPost(String groupId, String postId, bool currentPin) async {
+  Future<bool> togglePinPost(
+      String groupId, String postId, bool currentPin) async {
     try {
-      await _db.collection('groups').doc(groupId).collection('posts').doc(postId)
+      await _db
+          .collection('groups')
+          .doc(groupId)
+          .collection('posts')
+          .doc(postId)
           .update({'is_pinned': !currentPin});
       return true;
-    } catch (e) { debugPrint('togglePinPost error: $e'); return false; }
+    } catch (e) {
+      debugPrint('togglePinPost error: $e');
+      return false;
+    }
   }
 
-  Future<void> toggleReaction(String groupId, String postId, String emoji) async {
-    final ref = _db.collection('groups').doc(groupId).collection('posts').doc(postId);
+  Future<void> toggleReaction(
+      String groupId, String postId, String emoji) async {
+    final ref = _db
+        .collection('groups')
+        .doc(groupId)
+        .collection('posts')
+        .doc(postId);
     final snap = await ref.get();
-    final reactions = Map<String, dynamic>.from(snap.data()?['reactions'] as Map? ?? {});
+    final reactions = Map<String, dynamic>.from(
+        snap.data()?['reactions'] as Map? ?? {});
     if (reactions[currentUserId] == emoji) {
       reactions.remove(currentUserId);
     } else {
@@ -655,22 +733,34 @@ class GroupService {
   // 댓글 관리
   // ══════════════════════════════════════════════════════════════════════════
 
-  Stream<List<Map<String, dynamic>>> getComments(String groupId, String postId) {
-    return _db.collection('groups').doc(groupId).collection('posts').doc(postId)
+  Stream<List<Map<String, dynamic>>> getComments(
+      String groupId, String postId) {
+    return _db
+        .collection('groups')
+        .doc(groupId)
+        .collection('posts')
+        .doc(postId)
         .collection('comments')
         .orderBy('created_at', descending: false)
         .snapshots()
         .map((snap) => snap.docs.map((doc) {
-              final data = doc.data(); data['id'] = doc.id; return data;
+              final data = doc.data();
+              data['id'] = doc.id;
+              return data;
             }).toList());
   }
 
-  Future<bool> addComment(
-      String groupId, String postId, String content, String authorName) async {
+  Future<bool> addComment(String groupId, String postId, String content,
+      String authorName) async {
     try {
       final batch = _db.batch();
-      final commentRef = _db.collection('groups').doc(groupId)
-          .collection('posts').doc(postId).collection('comments').doc();
+      final commentRef = _db
+          .collection('groups')
+          .doc(groupId)
+          .collection('posts')
+          .doc(postId)
+          .collection('comments')
+          .doc();
       batch.set(commentRef, {
         'content': content,
         'author_id': currentUserId,
@@ -678,41 +768,71 @@ class GroupService {
         'created_at': FieldValue.serverTimestamp(),
       });
       batch.update(
-        _db.collection('groups').doc(groupId).collection('posts').doc(postId),
+        _db
+            .collection('groups')
+            .doc(groupId)
+            .collection('posts')
+            .doc(postId),
         {'comment_count': FieldValue.increment(1)},
       );
       await batch.commit();
       return true;
-    } catch (e) { debugPrint('addComment error: $e'); return false; }
+    } catch (e) {
+      debugPrint('addComment error: $e');
+      return false;
+    }
   }
 
-  Future<bool> deleteComment(String groupId, String postId, String commentId) async {
+  Future<bool> deleteComment(
+      String groupId, String postId, String commentId) async {
     try {
       final batch = _db.batch();
-      batch.delete(_db.collection('groups').doc(groupId).collection('posts')
-          .doc(postId).collection('comments').doc(commentId));
+      batch.delete(_db
+          .collection('groups')
+          .doc(groupId)
+          .collection('posts')
+          .doc(postId)
+          .collection('comments')
+          .doc(commentId));
       batch.update(
-        _db.collection('groups').doc(groupId).collection('posts').doc(postId),
+        _db
+            .collection('groups')
+            .doc(groupId)
+            .collection('posts')
+            .doc(postId),
         {'comment_count': FieldValue.increment(-1)},
       );
       await batch.commit();
       return true;
-    } catch (e) { debugPrint('deleteComment error: $e'); return false; }
+    } catch (e) {
+      debugPrint('deleteComment error: $e');
+      return false;
+    }
+  }
+
+  // ── 그룹 프로필 사진 업데이트 ──────────────────────────────────────────────
+  Future<void> updateGroupProfileImage({
+    required String groupId,
+    required String imageUrl,
+  }) async {
+    await _db
+        .collection('groups')
+        .doc(groupId)
+        .update({'group_profile_image': imageUrl});
   }
 
   // ── 방장 위임 ──────────────────────────────────────────────────────────────
-  // 1. 신규 owner: role → 'owner', 모든 permissions true
-  // 2. 기존 owner: role → 'member', permissions 유지 (임의 조정 가능)
-  // 3. groups.owner_id 업데이트
-  // 4. group_all 채팅방 room_members role 동기화
-  Future<bool> transferOwnership(String groupId, String newOwnerUid) async {
+  Future<bool> transferOwnership(
+      String groupId, String newOwnerUid) async {
     if (currentUserId.isEmpty) return false;
     try {
       final batch = _db.batch();
-
-      // 신규 owner 권한 설정
       batch.update(
-        _db.collection('groups').doc(groupId).collection('members').doc(newOwnerUid),
+        _db
+            .collection('groups')
+            .doc(groupId)
+            .collection('members')
+            .doc(newOwnerUid),
         {
           'role': 'owner',
           'permissions': {
@@ -724,38 +844,41 @@ class GroupService {
           },
         },
       );
-
-      // 기존 owner → member로 강등
       batch.update(
-        _db.collection('groups').doc(groupId).collection('members').doc(currentUserId),
+        _db
+            .collection('groups')
+            .doc(groupId)
+            .collection('members')
+            .doc(currentUserId),
         {'role': 'member'},
       );
-
-      // groups.owner_id 업데이트
       batch.update(
-        _db.collection('groups').doc(groupId),
-        {'owner_id': newOwnerUid},
-      );
+          _db.collection('groups').doc(groupId), {'owner_id': newOwnerUid});
 
-      // group_all 채팅방만 room_members role 동기화 (group_sub는 독립적)
       final chatSnap = await _db
           .collection('chat_rooms')
           .where('ref_group_id', isEqualTo: groupId)
           .where('type', isEqualTo: 'group_all')
           .get();
-
       for (final chatDoc in chatSnap.docs) {
         final chatId = chatDoc.id;
         batch.update(
-          _db.collection('chat_rooms').doc(chatId).collection('room_members').doc(newOwnerUid),
+          _db
+              .collection('chat_rooms')
+              .doc(chatId)
+              .collection('room_members')
+              .doc(newOwnerUid),
           {'role': 'owner'},
         );
         batch.update(
-          _db.collection('chat_rooms').doc(chatId).collection('room_members').doc(currentUserId),
+          _db
+              .collection('chat_rooms')
+              .doc(chatId)
+              .collection('room_members')
+              .doc(currentUserId),
           {'role': 'member'},
         );
       }
-
       await batch.commit();
       return true;
     } catch (e) {
@@ -763,31 +886,33 @@ class GroupService {
       return false;
     }
   }
-  Future<bool> kickMember(String groupId, String targetUid, {bool ban = false, String displayName = ''}) async {
+
+  // ── 멤버 추방 ──────────────────────────────────────────────────────────────
+  Future<bool> kickMember(String groupId, String targetUid,
+      {bool ban = false, String displayName = ''}) async {
     if (currentUserId.isEmpty) return false;
     try {
       final batch = _db.batch();
+      batch.delete(_db
+          .collection('groups')
+          .doc(groupId)
+          .collection('members')
+          .doc(targetUid));
+      batch.update(_db.collection('groups').doc(groupId),
+          {'member_count': FieldValue.increment(-1)});
+      batch.delete(_db
+          .collection('users')
+          .doc(targetUid)
+          .collection('joined_groups')
+          .doc(groupId));
 
-      // 그룹 members 서브컬렉션에서 제거
-      batch.delete(
-        _db.collection('groups').doc(groupId).collection('members').doc(targetUid),
-      );
-
-      // groups.member_count 감소
-      batch.update(
-        _db.collection('groups').doc(groupId),
-        {'member_count': FieldValue.increment(-1)},
-      );
-
-      // 해당 유저의 joined_groups에서 제거
-      batch.delete(
-        _db.collection('users').doc(targetUid).collection('joined_groups').doc(groupId),
-      );
-
-      // 그룹 차단 → banned 컬렉션에 저장
       if (ban) {
         batch.set(
-          _db.collection('groups').doc(groupId).collection('banned').doc(targetUid),
+          _db
+              .collection('groups')
+              .doc(groupId)
+              .collection('banned')
+              .doc(targetUid),
           {
             'display_name': displayName,
             'banned_at': FieldValue.serverTimestamp(),
@@ -796,26 +921,23 @@ class GroupService {
         );
       }
 
-      // 그룹에 속한 모든 채팅방(group_all + group_sub)에서 제거
       final chatSnap = await _db
           .collection('chat_rooms')
           .where('ref_group_id', isEqualTo: groupId)
           .get();
-
       for (final chatDoc in chatSnap.docs) {
         final chatId = chatDoc.id;
-        final memberIds = List<String>.from(chatDoc.data()['member_ids'] as List? ?? []);
+        final memberIds = List<String>.from(
+            chatDoc.data()['member_ids'] as List? ?? []);
         memberIds.remove(targetUid);
-
-        batch.update(
-          _db.collection('chat_rooms').doc(chatId),
-          {'member_ids': memberIds},
-        );
-        batch.delete(
-          _db.collection('chat_rooms').doc(chatId).collection('room_members').doc(targetUid),
-        );
+        batch.update(_db.collection('chat_rooms').doc(chatId),
+            {'member_ids': memberIds});
+        batch.delete(_db
+            .collection('chat_rooms')
+            .doc(chatId)
+            .collection('room_members')
+            .doc(targetUid));
       }
-
       await batch.commit();
       return true;
     } catch (e) {
@@ -824,7 +946,7 @@ class GroupService {
     }
   }
 
-  // 그룹 차단 해제
+  // ── 차단 해제 ──────────────────────────────────────────────────────────────
   Future<void> unbanMember(String groupId, String targetUid) async {
     await _db
         .collection('groups')
@@ -834,7 +956,6 @@ class GroupService {
         .delete();
   }
 
-  // 차단된 멤버 목록
   Stream<QuerySnapshot> bannedMembersStream(String groupId) {
     return _db
         .collection('groups')
@@ -843,7 +964,6 @@ class GroupService {
         .snapshots();
   }
 
-  // 가입 시 차단 여부 확인
   Future<bool> isBanned(String groupId, String uid) async {
     final doc = await _db
         .collection('groups')

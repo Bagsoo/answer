@@ -9,6 +9,7 @@ import '../../services/memo_service.dart';
 import '../../services/report_service.dart';
 import '../report_dialog.dart';
 import 'board_post_form_screen.dart';
+import '../../widgets/post/post_attachment_widget.dart';
 
 class BoardPostDetailScreen extends StatefulWidget {
   final String groupId;
@@ -205,6 +206,9 @@ class _BoardPostDetailScreenState extends State<BoardPostDetailScreen> {
                     postTitle: title,
                     authorName: authorName,
                     originalCreatedAt: createdAt ?? Timestamp.now(),
+                    attachments: (post['attachments'] as List? ?? [])
+                        .map((e) => Map<String, dynamic>.from(e as Map))
+                        .toList(),
                   );
                   if (ctx.mounted) {
                     Navigator.pop(ctx);
@@ -445,8 +449,23 @@ class _BoardPostDetailScreenState extends State<BoardPostDetailScreen> {
                         style: const TextStyle(fontSize: 15, height: 1.6),
                       ),
 
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
+                      // ── 첨부파일 ──────────────────────────────────────────
+                      Builder(builder: (context){
+                        final attachments = List<Map<String, dynamic>>.from(
+                          post['attachments'] as List? ?? [],
+                        );
+                        if(attachments.isEmpty) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: PostAttachmentsView(
+                            attachments: attachments,
+                            colorScheme: colorScheme,
+                          ),
+                        );
+                      }),
 
+                      const SizedBox(height: 8),
                       // ── 반응 ────────────────────────────────────────────
                       Row(children: [
                         // 반응 추가 버튼

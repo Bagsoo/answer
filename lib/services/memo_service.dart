@@ -13,28 +13,31 @@ class MemoService {
   Stream<QuerySnapshot> memosStream() =>
       _memos.orderBy('updated_at', descending: true).snapshots();
 
-  // ── 직접 작성 메모 저장/수정 ───────────────────────────────────────────────
+  // ── 직접 작성 메모 저장/수정 (첨부파일 포함) ───────────────────────────────
   Future<void> saveMemo({
     String? memoId,
     required String content,
+    List<Map<String, dynamic>> attachments = const [],
   }) async {
     final now = FieldValue.serverTimestamp();
     if (memoId != null) {
       await _memos.doc(memoId).update({
         'content': content,
+        'attachments': attachments,
         'updated_at': now,
       });
     } else {
       await _memos.add({
         'content': content,
         'source': 'direct',
+        'attachments': attachments,
         'created_at': now,
         'updated_at': now,
       });
     }
   }
 
-  // ── 채팅 메시지 → 메모 ────────────────────────────────────────────────────
+  // ── 채팅 메시지 → 메모 (첨부파일 포함) ───────────────────────────────────
   Future<void> memoFromChat({
     required String content,
     required String groupId,
@@ -44,6 +47,7 @@ class MemoService {
     required String messageId,
     required String senderName,
     required Timestamp originalSentAt,
+    List<Map<String, dynamic>> attachments = const [],  // ← 추가
   }) async {
     final now = FieldValue.serverTimestamp();
     await _memos.add({
@@ -56,6 +60,7 @@ class MemoService {
       'message_id': messageId,
       'sender_name': senderName,
       'original_sent_at': originalSentAt,
+      'attachments': attachments,   // ← 추가
       'created_at': now,
       'updated_at': now,
     });
@@ -72,6 +77,7 @@ class MemoService {
     required String postTitle,
     required String authorName,
     required Timestamp originalCreatedAt,
+    List<Map<String, dynamic>> attachments = const [],
   }) async {
     final now = FieldValue.serverTimestamp();
     await _memos.add({
@@ -84,6 +90,7 @@ class MemoService {
       'post_id': postId,
       'post_title': postTitle,
       'author_name': authorName,
+      'attachments': attachments,
       'original_created_at': originalCreatedAt,
       'created_at': now,
       'updated_at': now,

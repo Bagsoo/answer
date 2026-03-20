@@ -10,6 +10,7 @@ import '../../providers/user_provider.dart';
 import '../../providers/group_provider.dart';
 import '../chat_room_screen.dart';
 import '../user_profile_detail_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 const _kAllTag = '__ALL__';
 
@@ -243,7 +244,7 @@ class _MembersTabState extends State<MembersTab> {
                     final role = data['role'] as String? ?? 'member';
                     final displayName =
                         data['display_name'] as String? ?? l.unknown;
-                    final photoUrl = data['photo_url'] as String? ?? '';
+                    final photoUrl = data['profile_image'] as String? ?? '';
                     final perms =
                         data['permissions'] as Map<String, dynamic>? ?? {};
                     final memberTags =
@@ -262,7 +263,7 @@ class _MembersTabState extends State<MembersTab> {
                             ? colorScheme.primary
                             : colorScheme.surfaceContainerHighest,
                         backgroundImage: (photoUrl != null && photoUrl.isNotEmpty) 
-                          ? NetworkImage(photoUrl) 
+                          ? CachedNetworkImageProvider(photoUrl) 
                           : null,                        
                         child: (photoUrl == null || photoUrl.isEmpty) ?
                         Text(
@@ -808,7 +809,7 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
                   ? colorScheme.primary
                   : colorScheme.primaryContainer,
               backgroundImage: (photoUrl != null && photoUrl.isNotEmpty) 
-                ? NetworkImage(photoUrl) 
+                ? CachedNetworkImageProvider(photoUrl) 
                 : null,
               child: (photoUrl == null || photoUrl.isEmpty) ?
               Text(

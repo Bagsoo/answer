@@ -17,6 +17,8 @@
 		<string>https</string>
 		<string>http</string>
 	</array>
+	<key>GoogleMapsApiKey</key>
+	<string>$(GOOGLE_API_KEY)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>

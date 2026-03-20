@@ -8,6 +8,7 @@ import '../providers/user_provider.dart';
 import '../l10n/app_localizations.dart';
 import 'chat_room_screen.dart';
 import 'user_profile_detail_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class FriendsScreen extends StatefulWidget {
   const FriendsScreen({super.key});
@@ -21,7 +22,6 @@ class _FriendsScreenState extends State<FriendsScreen> {
   String _filterQuery = '';
   bool _isFiltering = false;
 
-  // 스트림 데이터를 로컬 상태로 저장
   List<Map<String, dynamic>> _friends = [];
   Set<String> _blockedUids = {};
   bool _loading = true;
@@ -33,13 +33,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
   void initState() {
     super.initState();
 
-    // 차단 목록 구독
-    _blockedSub = context.read<BlockService>().getBlockedUidSet().listen((uids) {
+    _blockedSub =
+        context.read<BlockService>().getBlockedUidSet().listen((uids) {
       if (mounted) setState(() => _blockedUids = uids);
     });
 
-    // 친구 목록 구독
-    _friendsSub = context.read<FriendService>().getFriends().listen((list) {
+    _friendsSub =
+        context.read<FriendService>().getFriends().listen((list) {
       if (mounted) {
         setState(() {
           _friends = list;
@@ -113,7 +113,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
     }
   }
 
-  Future<void> _removeFriend(String friendUid, String friendName) async {
+  Future<void> _removeFriend(
+      String friendUid, String friendName) async {
     final l = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -162,7 +163,6 @@ class _FriendsScreenState extends State<FriendsScreen> {
     final l = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
 
-    // 차단 제외 + 필터 적용 — 스트림 재구독 없이 계산만
     final allFriends =
         _friends.where((f) => !_blockedUids.contains(f['uid'])).toList();
 
@@ -176,7 +176,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
             if (name.contains(q)) return true;
 
-            final digitsStored = phone.replaceAll(RegExp(r'\D'), '');
+            final digitsStored =
+                phone.replaceAll(RegExp(r'\D'), '');
             final digitsQuery =
                 _filterQuery.replaceAll(RegExp(r'\D'), '');
 
@@ -200,7 +201,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
       ),
       body: Column(
         children: [
-          // ── 헤더 + 필터 검색 ──────────────────────────────────────
+          // ── 헤더 + 필터 검색 ────────────────────────────────────────
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -264,7 +265,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
                       prefixIcon: const Icon(Icons.search, size: 18),
                       suffixIcon: _filterQuery.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.close, size: 16),
+                              icon:
+                                  const Icon(Icons.close, size: 16),
                               onPressed: () => setState(() {
                                 _filterController.clear();
                                 _filterQuery = '';
@@ -322,32 +324,42 @@ class _FriendsScreenState extends State<FriendsScreen> {
                           final friend = filtered[index];
                           final uid = friend['uid'] as String;
                           final name = friend['display_name'] as String? ?? l.unknown;
+                          // profile_image 필드 — String 타입이므로 isNotEmpty로 체크
                           final photoUrl = friend['profile_image'] as String? ?? '';
+                          final hasPhoto = photoUrl.isNotEmpty;
 
                           return ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: colorScheme.primaryContainer,
-                              backgroundImage: (photoUrl != null && photoUrl.isNotEmpty) 
-                                ? NetworkImage(photoUrl) 
+                              radius: 22,
+                              backgroundColor:
+                                  colorScheme.primaryContainer,
+                              backgroundImage: hasPhoto
+                                ? CachedNetworkImageProvider(photoUrl)
                                 : null,
-                              child: (photoUrl == null || photoUrl.isEmpty)
-                                ? Text(
-                                    name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.onPrimaryContainer,
+                              onBackgroundImageError:
+                                  hasPhoto ? (_, __) {} : null,
+                              child: hasPhoto
+                                  ? null
+                                  : Text(
+                                      name.isNotEmpty
+                                          ? name[0].toUpperCase()
+                                          : '?',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme
+                                            .onPrimaryContainer,
+                                      ),
                                     ),
-                                  )
-                                : null,
                             ),
                             title: Text(name,
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w500)),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () =>
-                                Navigator.of(context).push(
+                            trailing:
+                                const Icon(Icons.chevron_right),
+                            onTap: () => Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => UserProfileDetailScreen(
+                                builder: (_) =>
+                                    UserProfileDetailScreen(
                                   uid: uid,
                                   displayName: name,
                                   photoUrl: photoUrl,
@@ -356,8 +368,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
                             ),
                           );
                         },
-                        separatorBuilder: (_, __) =>
-                            const Divider(height: 1, indent: 72),
+                        separatorBuilder: (_, __) => const Divider(
+                            height: 1, indent: 72),
                       ),
           ),
         ],
@@ -429,15 +441,19 @@ class _AddFriendDialogState extends State<_AddFriendDialog> {
       _result!['name'] as String? ?? l.unknown,
       myName: myName,
       myPhoneNumber: myPhone,
+      myProfileImage: userProvider.photoUrl ?? '',
       friendPhoneNumber: _result!['phone_number'] as String? ?? '',
+      friendProfileImage: _result!['profile_image'] as String? ?? '',
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-          content: Text(success ? l.friendAdded : l.friendAddFailed)),
+          content: Text(
+              success ? l.friendAdded : l.friendAddFailed)),
     );
     if (success) {
-      setState(() => _result = {..._result!, 'already_friend': true});
+      setState(
+          () => _result = {..._result!, 'already_friend': true});
     }
   }
 
@@ -447,8 +463,8 @@ class _AddFriendDialogState extends State<_AddFriendDialog> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Dialog(
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20)),
       insetPadding:
           const EdgeInsets.symmetric(horizontal: 32, vertical: 80),
       child: Padding(
@@ -489,8 +505,8 @@ class _AddFriendDialogState extends State<_AddFriendDialog> {
                           const Icon(Icons.phone_outlined),
                       suffixIcon: _controller.text.isNotEmpty
                           ? IconButton(
-                              icon:
-                                  const Icon(Icons.clear, size: 18),
+                              icon: const Icon(Icons.clear,
+                                  size: 18),
                               onPressed: () => setState(() {
                                 _controller.clear();
                                 _result = null;
@@ -500,7 +516,8 @@ class _AddFriendDialogState extends State<_AddFriendDialog> {
                           : null,
                       isDense: true,
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                          borderRadius:
+                              BorderRadius.circular(12)),
                     ),
                     onChanged: (_) => setState(() {}),
                     onSubmitted: (_) => _search(),
@@ -533,13 +550,14 @@ class _AddFriendDialogState extends State<_AddFriendDialog> {
                 children: [
                   Icon(Icons.info_outline,
                       size: 14,
-                      color: colorScheme.onSurface.withOpacity(0.4)),
+                      color:
+                          colorScheme.onSurface.withOpacity(0.4)),
                   const SizedBox(width: 6),
                   Text(_error,
                       style: TextStyle(
                           fontSize: 13,
-                          color:
-                              colorScheme.onSurface.withOpacity(0.5))),
+                          color: colorScheme.onSurface
+                              .withOpacity(0.5))),
                 ],
               ),
             ],
@@ -556,28 +574,34 @@ class _AddFriendDialogState extends State<_AddFriendDialog> {
     );
   }
 
-  Widget _buildResultTile(ColorScheme colorScheme, AppLocalizations l) {
+  Widget _buildResultTile(
+      ColorScheme colorScheme, AppLocalizations l) {
     final name = _result!['name'] as String? ?? l.unknown;
-    final photoUrl = _result!['profile_image'] as String?;
-    final alreadyFriend = _result!['already_friend'] as bool? ?? false;
+    final photoUrl =
+        _result!['profile_image'] as String? ?? '';
+    final hasPhoto = photoUrl.isNotEmpty;
+    final alreadyFriend =
+        _result!['already_friend'] as bool? ?? false;
     final uid = _result!['uid'] as String;
 
     return Row(
       children: [
         CircleAvatar(
+          radius: 22,
           backgroundColor: colorScheme.primaryContainer,
-          backgroundImage: (photoUrl != null && photoUrl.isNotEmpty) 
-            ? NetworkImage(photoUrl) 
+          backgroundImage: hasPhoto
+            ? CachedNetworkImageProvider(photoUrl)
             : null,
-          child: (photoUrl == null || photoUrl.isEmpty)
-            ? Text(
-                name.isNotEmpty ? name[0].toUpperCase() : '?',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onPrimaryContainer,
+          onBackgroundImageError: hasPhoto ? (_, __) {} : null,
+          child: hasPhoto
+              ? null
+              : Text(
+                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
                 ),
-              )
-            : null,
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -585,11 +609,13 @@ class _AddFriendDialogState extends State<_AddFriendDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(name,
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600)),
               if (alreadyFriend)
                 Text(l.alreadyFriend,
                     style: TextStyle(
-                        fontSize: 12, color: colorScheme.primary)),
+                        fontSize: 12,
+                        color: colorScheme.primary)),
             ],
           ),
         ),
@@ -605,8 +631,8 @@ class _AddFriendDialogState extends State<_AddFriendDialog> {
             icon: const Icon(Icons.person_add, size: 16),
             label: Text(l.addFriend),
             style: FilledButton.styleFrom(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 8),
             ),
           ),
       ],
