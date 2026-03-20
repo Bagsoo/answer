@@ -1,0 +1,315 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import '../../screens/chat_room_screen.dart';
+
+// ── 유저 프로필 메모리 캐시 ────────────────────────────────────────────────────
+class UserCache {
+  static final Map<String, Map<String, dynamic>> _cache = {};
+
+  static Future<Map<String, dynamic>> get(String uid) async {
+    if (_cache.containsKey(uid)) return _cache[uid]!;
+    final doc =
+        await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final data = {
+      'name': doc.data()?['name'] as String? ?? '',
+      'photo': doc.data()?['profile_image'] as String? ?? '',
+    };
+    _cache[uid] = data;
+    return data;
+  }
+
+  static void invalidate(String uid) => _cache.remove(uid);
+}
+
+// ── 1:1 DM 타일 ───────────────────────────────────────────────────────────────
+class DmTile extends StatefulWidget {
+  final Map<String, dynamic> room;
+  final ColorScheme colorScheme;
+  final String myUid;
+
+  const DmTile({
+    super.key,
+    required this.room,
+    required this.colorScheme,
+    required this.myUid,
+  });
+
+  @override
+  State<DmTile> createState() => _DmTileState();
+}
+
+class _DmTileState extends State<DmTile> {
+  String _otherName = '';
+  String _otherPhoto = '';
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOtherUser();
+  }
+
+  Future<void> _loadOtherUser() async {
+    final memberIds =
+        List<String>.from(widget.room['member_ids'] as List? ?? []);
+    final otherUid = memberIds.firstWhere(
+      (id) => id != widget.myUid,
+      orElse: () => '',
+    );
+    if (otherUid.isEmpty) {
+      if (mounted) setState(() => _loaded = true);
+      return;
+    }
+    final data = await UserCache.get(otherUid);
+    if (mounted) {
+      setState(() {
+        _otherName = data['name'] as String? ?? '';
+        _otherPhoto = data['photo'] as String? ?? '';
+        _loaded = true;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = widget.colorScheme;
+    final roomId = widget.room['id'] as String;
+    final lastMessage = widget.room['last_message'] as String? ?? '';
+    final unreadCnt = widget.room['unread_cnt'] as int? ?? 0;
+    final hasPhoto = _otherPhoto.isNotEmpty;
+
+    return ListTile(
+      contentPadding: const EdgeInsets.only(left: 16, right: 16),
+      leading: CircleAvatar(
+        radius: 22,
+        backgroundColor: cs.tertiaryContainer,
+        backgroundImage:
+            hasPhoto ? CachedNetworkImageProvider(_otherPhoto) : null,
+        onBackgroundImageError: hasPhoto ? (_, __) {} : null,
+        child: hasPhoto
+            ? null
+            : _loaded
+                ? (_otherName.isNotEmpty
+                    ? Text(_otherName[0].toUpperCase(),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: cs.onTertiaryContainer))
+                    : Icon(Icons.person, color: cs.onTertiaryContainer, size: 22))
+                : Icon(Icons.person, color: cs.onTertiaryContainer, size: 22),
+      ),
+      title: Text(
+        _loaded ? (_otherName.isNotEmpty ? _otherName : '...') : '...',
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+            fontWeight: unreadCnt > 0 ? FontWeight.bold : FontWeight.normal),
+      ),
+      subtitle: Text(
+        lastMessage,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(color: cs.onSurface.withOpacity(0.6)),
+      ),
+      trailing: unreadCnt > 0
+          ? CircleAvatar(
+              radius: 12,
+              backgroundColor: cs.error,
+              child: Text(
+                unreadCnt > 99 ? '99+' : unreadCnt.toString(),
+                style: TextStyle(
+                    color: cs.onError,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold),
+              ),
+            )
+          : null,
+      onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => ChatRoomScreen(roomId: roomId))),
+    );
+  }
+}
+
+// ── 단체 채팅 아바타 (겹치기) ─────────────────────────────────────────────────
+class GroupDirectAvatar extends StatefulWidget {
+  final String myUid;
+  final List<String> memberIds;
+  final ColorScheme colorScheme;
+
+  const GroupDirectAvatar({
+    super.key,
+    required this.myUid,
+    required this.memberIds,
+    required this.colorScheme,
+  });
+
+  @override
+  State<GroupDirectAvatar> createState() => _GroupDirectAvatarState();
+}
+
+class _GroupDirectAvatarState extends State<GroupDirectAvatar> {
+  List<Map<String, dynamic>> _members = [];
+
+  @override
+  void initState() {
+    super.initState();
+    final others = widget.memberIds
+        .where((id) => id != widget.myUid)
+        .take(4)
+        .toList();
+    _loadMembers(others);
+  }
+
+  Future<void> _loadMembers(List<String> uids) async {
+    final results = await Future.wait(uids.map((uid) => UserCache.get(uid)));
+    if (mounted) setState(() => _members = results);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = widget.colorScheme;
+    if (_members.isEmpty) {
+      return CircleAvatar(
+        radius: 22,
+        backgroundColor: cs.surfaceContainerHighest,
+        child: Icon(Icons.people, color: cs.onSurface, size: 22),
+      );
+    }
+
+    final show = _members.take(4).toList();
+    const size = 44.0;
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        children: show.asMap().entries.map((entry) {
+          final i = entry.key;
+          final data = entry.value;
+          final photoUrl = data['photo'] as String? ?? '';
+          final name = data['name'] as String? ?? '';
+          final hasPhoto = photoUrl.isNotEmpty;
+
+          final positions = [
+            const Offset(0, 0),
+            const Offset(22, 0),
+            const Offset(0, 22),
+            const Offset(22, 22),
+          ];
+          final pos = i < positions.length ? positions[i] : Offset.zero;
+          final radius = show.length == 1 ? 22.0 : 13.0;
+
+          return Positioned(
+            left: pos.dx,
+            top: pos.dy,
+            child: CircleAvatar(
+              radius: radius,
+              backgroundColor: cs.primaryContainer,
+              backgroundImage:
+                  hasPhoto ? CachedNetworkImageProvider(photoUrl) : null,
+              onBackgroundImageError: hasPhoto ? (_, __) {} : null,
+              child: hasPhoto
+                  ? null
+                  : Text(
+                      name.isNotEmpty ? name[0].toUpperCase() : '?',
+                      style: TextStyle(
+                        fontSize: radius * 0.65,
+                        fontWeight: FontWeight.bold,
+                        color: cs.onPrimaryContainer,
+                      ),
+                    ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+// ── 채팅방 타일 (direct 제외) ──────────────────────────────────────────────────
+class ChatTile extends StatelessWidget {
+  final Map<String, dynamic> room;
+  final ColorScheme colorScheme;
+  final bool isInGroup;
+  final String myUid;
+
+  const ChatTile({
+    super.key,
+    required this.room,
+    required this.colorScheme,
+    required this.myUid,
+    this.isInGroup = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final roomId = room['id'] as String;
+    final name = room['name'] as String? ?? roomId;
+    final lastMessage = room['last_message'] as String? ?? '';
+    final unreadCnt = room['unread_cnt'] as int? ?? 0;
+    final type = room['type'] as String? ?? 'direct';
+    final memberIds = List<String>.from(room['member_ids'] as List? ?? []);
+
+    Widget avatar;
+    if (type == 'group_direct') {
+      avatar = GroupDirectAvatar(
+        myUid: myUid,
+        memberIds: memberIds,
+        colorScheme: colorScheme,
+      );
+    } else if (type == 'group_all') {
+      avatar = CircleAvatar(
+        radius: 22,
+        backgroundColor: colorScheme.primaryContainer,
+        child:
+            Icon(Icons.group, color: colorScheme.onPrimaryContainer, size: 22),
+      );
+    } else {
+      avatar = CircleAvatar(
+        radius: 22,
+        backgroundColor: colorScheme.secondaryContainer,
+        child: Icon(Icons.chat_bubble,
+            color: colorScheme.onSecondaryContainer, size: 20),
+      );
+    }
+
+    return ListTile(
+      contentPadding: EdgeInsets.only(left: isInGroup ? 32 : 16, right: 16),
+      leading: avatar,
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(name,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontWeight:
+                        unreadCnt > 0 ? FontWeight.bold : FontWeight.normal)),
+          ),
+          if (type == 'group_direct') ...[
+            const SizedBox(width: 4),
+            Icon(Icons.people,
+                size: 12, color: colorScheme.onSurface.withOpacity(0.35)),
+          ],
+        ],
+      ),
+      subtitle: Text(lastMessage,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6))),
+      trailing: unreadCnt > 0
+          ? CircleAvatar(
+              radius: 12,
+              backgroundColor: colorScheme.error,
+              child: Text(
+                unreadCnt > 99 ? '99+' : unreadCnt.toString(),
+                style: TextStyle(
+                    color: colorScheme.onError,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold),
+              ),
+            )
+          : null,
+      onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => ChatRoomScreen(roomId: roomId))),
+    );
+  }
+}

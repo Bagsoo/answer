@@ -23,22 +23,23 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e) {
-    debugPrint("Firebase not configured properly: $e");
-  }
+  // ── Firebase 먼저 초기화 (다른 서비스가 Firebase에 의존하므로 반드시 먼저) ──
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)
+      .catchError((e) {
+    debugPrint('Firebase init error: $e');
+  });
 
-  await dotenv.load(fileName: ".env");
-
-  await NotificationService().init();
+  // ── Firebase 완료 후 나머지 병렬 초기화 ────────────────────────────────────
+  await Future.wait<void>([
+    dotenv.load(fileName: '.env'),
+    NotificationService().init(),
+  ]);
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthService>(create: (_) => AuthService()),
+        // LocaleProvider, ThemeProvider는 생성자에서 SharedPreferences 즉시 로드
         ChangeNotifierProvider<LocaleProvider>(create: (_) => LocaleProvider()),
         ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
         ChangeNotifierProvider<UserProvider>(create: (_) => UserProvider()),
@@ -66,11 +67,9 @@ class MessengerApp extends StatelessWidget {
 
     return MaterialApp(
       title: 'Group Messenger',
-      // ✅ 테마
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
-      // ✅ 다국어
       locale: locale,
       supportedLocales: const [
         Locale('en'),

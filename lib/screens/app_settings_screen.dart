@@ -111,7 +111,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
     if (!context.mounted) return;
     context.read<LocaleProvider>().reset();
     context.read<ThemeProvider>().reset();
-    context.read<UserProvider>().clear();
+    await context.read<UserProvider>().clear();
     await context.read<AuthService>().signOut();
   }
 

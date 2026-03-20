@@ -26,9 +26,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<UserProvider>().loadUser();       // 유저 정보 1번만 로드
-      context.read<LocaleProvider>().loadFromFirestore();
-      context.read<ThemeProvider>().loadFromFirestore();
+      // 세 가지 로드를 병렬로 실행 — 순차 대기 없음
+      Future.wait<void>([
+        context.read<UserProvider>().loadUser(),
+        context.read<LocaleProvider>().loadFromFirestore(),
+        context.read<ThemeProvider>().loadFromFirestore(),
+      ]);
     });
   }
 
@@ -47,9 +50,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        // --- 1. 왼쪽 프로필 사진 추가 ---
         leading: Padding(
-          padding: const EdgeInsets.all(8.0), // 적절한 여백
+          padding: const EdgeInsets.all(8.0),
           child: GestureDetector(
             onTap: () {
               Navigator.of(context).push(
@@ -59,17 +61,19 @@ class _HomeScreenState extends State<HomeScreen> {
             child: CircleAvatar(
               radius: 12,
               backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              // 캐시 방지 타임스탬프 적용
               backgroundImage: photoUrl.isNotEmpty
-                ? CachedNetworkImageProvider(photoUrl)
-                : null,
+                  ? CachedNetworkImageProvider(photoUrl)
+                  : null,
               child: photoUrl.isEmpty
                   ? Text(
-                      userProvider.name.isNotEmpty ? userProvider.name[0].toUpperCase() : '?',
+                      userProvider.name.isNotEmpty
+                          ? userProvider.name[0].toUpperCase()
+                          : '?',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        color:
+                            Theme.of(context).colorScheme.onPrimaryContainer,
                       ),
                     )
                   : null,

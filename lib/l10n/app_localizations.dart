@@ -187,6 +187,17 @@ class AppLocalizations {
   String get proPlanDesc => _s.proPlanDesc;
   String get viewOnMap => _s.viewOnMap;
 
+  String get uploadFailed => _s.uploadFailed;
+  String get uploadingMessage => _s.uploadingMessage;
+  String get scheduledMessage => _s.scheduledMessage;
+  String get scheduledMessageHint => _s.scheduledMessageHint;
+  String get selectSendTime => _s.selectSendTime;
+  String get scheduledMessageEmpty => _s.scheduledMessageEmpty;
+  String get scheduledTimeEmpty => _s.scheduledTimeEmpty;
+  String get scheduledTimeMin => _s.scheduledTimeMin;
+  String get scheduledRegister => _s.scheduledRegister;
+  String scheduledAt(String dateTime) => _s.scheduledAt(dateTime);
+
   // ── 게시판 파일 작성 ──────────────────────────────────────────────────────────────
   String get videoProcessingFailed => _s.videoProcessingFailed;
   String get fileSizeExceeded => _s.fileSizeExceeded;
@@ -356,6 +367,8 @@ class AppLocalizations {
   String get memoSourceChat => _s.memoSourceChat;
   String get memoSourceBoard => _s.memoSourceBoard;
   String get memoSourceDirect => _s.memoSourceDirect;
+  String get memoGoToChat => _s.memoGoToChat;
+  String get memoGoToBoard => _s.memoGoToBoard;
   String get shareMessage => _s.shareMessage;
   String get reportMessage => _s.reportMessage;
   String get reportPost => _s.reportPost;
@@ -724,6 +737,21 @@ abstract class _AppStrings {
   String get proPlanDesc;
   String get viewOnMap;
 
+  // 업로딩 상태
+  String get uploadFailed;        // '실패' / 'Failed' / '失敗'
+  String get uploadingMessage;    // '전송 중...' / 'Sending...' / '送信中...'
+
+  // 예약 메시지
+  String get scheduledMessage;         // '예약 메시지' / 'Scheduled Message' / '予約メッセージ'
+  String get scheduledMessageHint;     // '메시지를 입력하세요' / 'Enter a message' / 'メッセージを入力してください'
+  String get selectSendTime;           // '전송 시간 선택' / 'Select send time' / '送信時間を選択'
+  String get scheduledMessageEmpty;    // '메시지를 입력해주세요' / 'Please enter a message' / 'メッセージを入力してください'
+  String get scheduledTimeEmpty;       // '전송 시간을 선택해주세요' / 'Please select a send time' / '送信時間を選択してください'
+  String get scheduledTimeMin;         // '현재 시간보다 최소 1분 이후로 설정해주세요' / 'Please set at least 1 minute in the future' / '現在時刻より1分以上後に設定してください'
+  String get scheduledRegister;        // '예약 등록' / 'Schedule' / '予約登録'
+  // 전송 예약됨 메시지 (날짜 포함이라 함수형)
+  String scheduledAt(String dateTime); // 'M/D HH:mm 에 전송 예약됨' / 'Scheduled for M/D HH:mm' / 'M/D HH:mm に送信予約済み'
+
   // 게시글 파일
   String get videoProcessingFailed;
   String get fileSizeExceeded;
@@ -895,6 +923,8 @@ abstract class _AppStrings {
   String get memoSourceChat;
   String get memoSourceBoard;
   String get memoSourceDirect;
+  String get memoGoToChat;
+  String get memoGoToBoard;
   String get shareMessage;
   String get reportMessage;
   String get reportPost;
@@ -1267,6 +1297,17 @@ class _EnStrings extends _AppStrings {
   @override String get proPlanDesc => 'Pro plan description';  
   @override String get viewOnMap => 'View on map';
 
+  @override String get uploadFailed => 'Upload failed';
+  @override String get uploadingMessage => 'Sending...';
+  @override String get scheduledMessage => 'Scheduled Message';
+  @override String get scheduledMessageHint => 'Enter a message';
+  @override String get selectSendTime => 'Select send time';
+  @override String get scheduledMessageEmpty => 'Please enter a message';
+  @override String get scheduledTimeEmpty => 'Please select a send time';
+  @override String get scheduledTimeMin => 'Please set at least 1 minute in the future';
+  @override String get scheduledRegister => 'Schedule';
+  @override String scheduledAt(String dateTime) => 'Scheduled for $dateTime';
+
   // 게시글 파일
   @override String get videoProcessingFailed => 'Failed to process video';
   @override String get fileSizeExceeded => 'File size exceeds 50MB';
@@ -1442,6 +1483,8 @@ class _EnStrings extends _AppStrings {
   @override String get memoSourceChat => 'From chat';
   @override String get memoSourceBoard => 'From board';
   @override String get memoSourceDirect => 'Direct';
+  @override String get memoGoToChat => 'Go to Chat';
+  @override String get memoGoToBoard => 'Go to Post';
   @override String get shareMessage => 'Share';
   @override String get reportMessage => 'Report';
   @override String get reportPost => 'Report';
@@ -1790,6 +1833,17 @@ class _KoStrings extends _AppStrings {
   @override String get proPlanDesc => 'Pro 플랜 혜택';  
   @override String get viewOnMap => '지도 보기';
 
+  @override String get uploadFailed => '업로드 실패';
+  @override String get uploadingMessage => '전송 중...';
+  @override String get scheduledMessage => '예약 메시지';
+  @override String get scheduledMessageHint => '메시지를 입력하세요';
+  @override String get selectSendTime => '전송 시간 선택';
+  @override String get scheduledMessageEmpty => '메시지를 입력해주세요';
+  @override String get scheduledTimeEmpty => '전송 시간을 선택해주세요';
+  @override String get scheduledTimeMin => '현재 시간보다 최소 1분 이후로 설정해주세요';
+  @override String get scheduledRegister => '예약 등록';
+  @override String scheduledAt(String dateTime) => '$dateTime 에 전송 예약됨';
+
   // 게시글 파일
   @override String get videoProcessingFailed => '동영상 처리 실패';
   @override String get fileSizeExceeded => '파일 크기가 50MB를 초과합니다';
@@ -1965,6 +2019,8 @@ class _KoStrings extends _AppStrings {
   @override String get memoSourceChat => '채팅에서';
   @override String get memoSourceBoard => '게시판에서';
   @override String get memoSourceDirect => '직접 작성';
+  @override String get memoGoToChat => '채팅방으로 이동';
+  @override String get memoGoToBoard => '게시글로 이동';
   @override String get shareMessage => '공유하기';
   @override String get reportMessage => '신고하기';
   @override String get reportPost => '신고하기';
@@ -2313,6 +2369,17 @@ class _JaStrings extends _AppStrings {
   @override String get proPlanDesc => '大規模グループ向け';  
   @override String get viewOnMap => '地図で確認';
 
+  @override String get uploadFailed => 'アップロード失敗';
+  @override String get uploadingMessage => '送信中...';
+  @override String get scheduledMessage => '予約メッセージ';
+  @override String get scheduledMessageHint => 'メッセージを入力してください';
+  @override String get selectSendTime => '送信時間選択';
+  @override String get scheduledMessageEmpty => 'メッセージを入力してください';
+  @override String get scheduledTimeEmpty => '送信時間を選択してください';
+  @override String get scheduledTimeMin => '現在時間より最低1分後に設定してください';
+  @override String get scheduledRegister => '予約登録';
+  @override String scheduledAt(String dateTime) => '$dateTime に送信予約済み';
+
   // 게시글 파일
   @override String get videoProcessingFailed => '動画の処理に失敗しました';
   @override String get fileSizeExceeded => 'ファイルサイズが50MBを超えています';
@@ -2488,6 +2555,8 @@ class _JaStrings extends _AppStrings {
   @override String get memoSourceChat => 'チャットから';
   @override String get memoSourceBoard => '掲示板から';
   @override String get memoSourceDirect => '直接作成';
+  @override String get memoGoToChat => 'チャットルームへ移動';
+  @override String get memoGoToBoard => '投稿へ移動';
   @override String get shareMessage => '共有';
   @override String get reportMessage => '通報する';
   @override String get reportPost => '通報する';
