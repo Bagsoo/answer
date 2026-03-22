@@ -32,6 +32,9 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  google_sign_in: ^6.2.2
+  sign_in_with_apple: ^6.1.4
+  intl_phone_field: ^3.2.0
   shared_preferences: ^2.2.0
   table_calendar: ^3.1.2
   flutter_local_notifications: ^17.0.0
@@ -66,6 +69,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.13.1
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -74,6 +78,12 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
 
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/answer_icon.png"
+  min_sdk_android: 21
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -81,6 +91,7 @@ dev_dependencies:
 flutter:
   assets:
     - .env
+    - assets/images/answer_logo.png
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

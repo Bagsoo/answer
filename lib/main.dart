@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'services/chat_service.dart';
@@ -24,16 +25,28 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // ── Firebase 먼저 초기화 (다른 서비스가 Firebase에 의존하므로 반드시 먼저) ──
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)
-      .catchError((e) {
-    debugPrint('Firebase init error: $e');
-  });
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)
+        .catchError((e) {
+      debugPrint('Firebase init error: $e');
+    });
+  } else {
+    Firebase.app();
+  }
+
+  // ── Firestore 오프라인 캐시 설정 ────────────────────────────────────────────
+  // - 오프라인에서도 마지막 캐시 데이터 표시
+  // - 네트워크 재연결 시 자동 동기화
+  // - 쿼리 결과가 캐시에서 먼저 오고 Firebase에서 최신화 (읽기 비용 절감)
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+  );
 
   // ── Firebase 완료 후 나머지 병렬 초기화 ────────────────────────────────────
-  await Future.wait<void>([
-    dotenv.load(fileName: '.env'),
-    NotificationService().init(),
-  ]);
+  // dotenv는 await, NotificationService는 네트워크 의존이므로 fire-and-forget
+  await dotenv.load(fileName: '.env');
+  NotificationService().init(); // await 없이 — 네트워크 없어도 앱 시작 블로킹 안 함
 
   runApp(
     MultiProvider(

@@ -15,7 +15,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.messenger"
+    namespace = "com.answer.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -31,7 +31,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.messenger"
+        applicationId = "com.answer.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode.toInt()

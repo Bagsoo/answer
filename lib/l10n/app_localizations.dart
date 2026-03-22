@@ -198,6 +198,31 @@ class AppLocalizations {
   String get scheduledRegister => _s.scheduledRegister;
   String scheduledAt(String dateTime) => _s.scheduledAt(dateTime);
 
+  // ── 로그인 화면 ──
+  String get loginTitle => _s.loginTitle;
+  String get loginWithGoogle => _s.loginWithGoogle;
+  String get loginWithApple => _s.loginWithApple;
+  String get loginOr => _s.loginOr;
+  String get loginPhoneLabel => _s.loginPhoneLabel;
+  String get loginPhoneHint => _s.loginPhoneHint;
+  String get loginSendSms => _s.loginSendSms;
+  String get loginOtpLabel => _s.loginOtpLabel;
+  String get loginVerify => _s.loginVerify;
+  String get loginBack => _s.loginBack;
+  String get loginGoogleFailed => _s.loginGoogleFailed;
+  String get loginInvalidOtp => _s.loginInvalidOtp;
+  String get loginPhoneError => _s.loginPhoneError;
+
+  // ── 회원가입 화면 ──
+  String get registerTitle => _s.registerTitle;
+  String get registerWelcome => _s.registerWelcome;
+  String get registerSubtitle => _s.registerSubtitle;
+  String get registerNameLabel => _s.registerNameLabel;
+  String get registerNameEmpty => _s.registerNameEmpty;
+  String get registerTimezone => _s.registerTimezone;
+  String get registerComplete => _s.registerComplete;
+  String get registerFailed => _s.registerFailed;
+
   // ── 게시판 파일 작성 ──────────────────────────────────────────────────────────────
   String get videoProcessingFailed => _s.videoProcessingFailed;
   String get fileSizeExceeded => _s.fileSizeExceeded;
@@ -736,6 +761,31 @@ abstract class _AppStrings {
   String get plusPlanDesc;
   String get proPlanDesc;
   String get viewOnMap;
+
+  // ── 로그인 화면 ──
+  String get loginTitle;           // 'Welcome' / '환영합니다' / 'ようこそ'
+  String get loginWithGoogle;      // 'Continue with Google' / 'Google로 계속' / 'Googleで続ける'
+  String get loginWithApple;       // 'Continue with Apple' / 'Apple로 계속' / 'Appleで続ける'
+  String get loginOr;              // 'or' / '또는' / 'または'
+  String get loginPhoneLabel;      // 'Phone Number' / '전화번호' / '電話番号'
+  String get loginPhoneHint;       // '+82 10 1234 5678' (공통)
+  String get loginSendSms;         // 'Send SMS' / 'SMS 전송' / 'SMSを送信'
+  String get loginOtpLabel;        // '6-Digit OTP' / '6자리 인증번호' / '6桁の認証番号'
+  String get loginVerify;          // 'Verify & Login' / '인증 및 로그인' / '認証してログイン'
+  String get loginBack;            // '← Back' / '← 뒤로' / '← 戻る'
+  String get loginGoogleFailed;    // 'Google sign in failed. Please try again.' / 'Google 로그인 실패. 다시 시도해주세요.' / 'Googleログインに失敗しました。'
+  String get loginInvalidOtp;      // 'Invalid OTP Code.' / '잘못된 인증번호입니다.' / '無効な認証番号です。'
+  String get loginPhoneError;      // 'Please enter a valid number with country code (e.g. +82...)' / ...
+
+  // ── 회원가입 화면 ──
+  String get registerTitle;        // 'Complete Profile' / '프로필 완성' / 'プロフィール設定'
+  String get registerWelcome;      // 'Welcome!' / '환영합니다!' / 'ようこそ！'
+  String get registerSubtitle;     // 'Please provide your details to finish signing up.' / '가입 완료를 위해 정보를 입력해주세요.' / '登録を完了するために情報を入力してください。'
+  String get registerNameLabel;    // 'Full Name' / '이름' / '名前'
+  String get registerNameEmpty;    // 'Please enter your name.' / '이름을 입력해주세요.' / '名前を入力してください。'
+  String get registerTimezone;     // 'Timezone' / '시간대' / 'タイムゾーン'
+  String get registerComplete;     // 'Complete Registration' / '가입 완료' / '登録を完了する'
+  String get registerFailed;       // 'Registration failed. Please try again.' / '회원가입 실패. 다시 시도해주세요.' / '登録に失敗しました。'
 
   // 업로딩 상태
   String get uploadFailed;        // '실패' / 'Failed' / '失敗'
@@ -1297,6 +1347,31 @@ class _EnStrings extends _AppStrings {
   @override String get proPlanDesc => 'Pro plan description';  
   @override String get viewOnMap => 'View on map';
 
+  // ── 로그인 화면 ──
+  @override String get loginTitle => 'Welcome';
+  @override String get loginWithGoogle => 'Continue with Google';
+  @override String get loginWithApple => 'Continue with Apple';
+  @override String get loginOr => 'or';
+  @override String get loginPhoneLabel => 'Phone Number';
+  @override String get loginPhoneHint => '+1 555 123-4567';
+  @override String get loginSendSms => 'Send SMS';
+  @override String get loginOtpLabel => '6-Digit OTP';
+  @override String get loginVerify => 'Verify & Login';
+  @override String get loginBack => '← Back';
+  @override String get loginGoogleFailed => 'Google sign in failed. Please try again.';
+  @override String get loginInvalidOtp => 'Invalid OTP Code.';
+  @override String get loginPhoneError => 'Please enter a valid number with country code (e.g. +82...)';
+
+  // ── 회원가입 화면 ──
+  @override String get registerTitle => 'Complete Profile';
+  @override String get registerWelcome => 'Welcome!';
+  @override String get registerSubtitle => 'Please provide your details to finish signing up.';
+  @override String get registerNameLabel => 'Full Name';
+  @override String get registerNameEmpty => 'Please enter your name.';
+  @override String get registerTimezone => 'Timezone';
+  @override String get registerComplete => 'Complete Registration';
+  @override String get registerFailed => 'Registration failed. Please try again.';
+
   @override String get uploadFailed => 'Upload failed';
   @override String get uploadingMessage => 'Sending...';
   @override String get scheduledMessage => 'Scheduled Message';
@@ -1833,6 +1908,31 @@ class _KoStrings extends _AppStrings {
   @override String get proPlanDesc => 'Pro 플랜 혜택';  
   @override String get viewOnMap => '지도 보기';
 
+  // ── 로그인 화면 ──
+  @override String get loginTitle => '환영합니다';
+  @override String get loginWithGoogle => 'Google로 계속';
+  @override String get loginWithApple => 'Apple로 계속';
+  @override String get loginOr => '또는';
+  @override String get loginPhoneLabel => '전화번호';
+  @override String get loginPhoneHint => '+82 10 1234 5678';
+  @override String get loginSendSms => 'SMS 전송';
+  @override String get loginOtpLabel => '6자리 인증번호';
+  @override String get loginVerify => '인증 및 로그인';
+  @override String get loginBack => '← 뒤로';
+  @override String get loginGoogleFailed => 'Google 로그인 실패. 다시 시도해주세요.';
+  @override String get loginInvalidOtp => '잘못된 인증번호입니다.';
+  @override String get loginPhoneError => '국가번호를 포함한 유효한 번호를 입력해주세요 (예: +82...)';
+
+  // ── 회원가입 화면 ──
+  @override String get registerTitle => '프로필 완성';
+  @override String get registerWelcome => '환영합니다!';
+  @override String get registerSubtitle => '가입 완료를 위해 정보를 입력해주세요.';
+  @override String get registerNameLabel => '이름';
+  @override String get registerNameEmpty => '이름을 입력해주세요.';
+  @override String get registerTimezone => '시간대';
+  @override String get registerComplete => '가입 완료';
+  @override String get registerFailed => '회원가입 실패. 다시 시도해주세요.';
+
   @override String get uploadFailed => '업로드 실패';
   @override String get uploadingMessage => '전송 중...';
   @override String get scheduledMessage => '예약 메시지';
@@ -2368,6 +2468,31 @@ class _JaStrings extends _AppStrings {
   @override String get plusPlanDesc => '成長中のコミュニティに';
   @override String get proPlanDesc => '大規模グループ向け';  
   @override String get viewOnMap => '地図で確認';
+
+  // ── 로그인 화면 ──
+  @override String get loginTitle => 'ようこそ';
+  @override String get loginWithGoogle => 'Googleで続ける';
+  @override String get loginWithApple => 'Appleで続ける';
+  @override String get loginOr => 'または';
+  @override String get loginPhoneLabel => '電話番号';
+  @override String get loginPhoneHint => '+81 90 1234 5678';
+  @override String get loginSendSms => 'SMSを送信';
+  @override String get loginOtpLabel => '6桁の認証番号';
+  @override String get loginVerify => '認証してログイン';
+  @override String get loginBack => '← 戻る';
+  @override String get loginGoogleFailed => 'Googleログインに失敗しました。';
+  @override String get loginInvalidOtp => '無効な認証番号です。';
+  @override String get loginPhoneError => '国番号を含む有効な番号を入力してください (例: +82...)';
+
+  // ── 회원가입 화면 ──
+  @override String get registerTitle => 'プロフィール設定';
+  @override String get registerWelcome => 'ようこそ！';
+  @override String get registerSubtitle => '登録を完了するために情報を入力してください。';
+  @override String get registerNameLabel => '名前';
+  @override String get registerNameEmpty => '名前を入力してください。';
+  @override String get registerTimezone => 'タイムゾーン';
+  @override String get registerComplete => '登録を完了する';
+  @override String get registerFailed => '登録に失敗しました。';
 
   @override String get uploadFailed => 'アップロード失敗';
   @override String get uploadingMessage => '送信中...';

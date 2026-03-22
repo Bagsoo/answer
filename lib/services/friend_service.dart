@@ -1,12 +1,39 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FriendService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  static const _keyFriendCount = 'friend_count';
+
   String get currentUserId => _auth.currentUser?.uid ?? '';
+
+  // ── 친구 수 캐시 ───────────────────────────────────────────────────────────
+  /// 앱 시작 시 캐시된 친구 수 즉시 반환 (없으면 -1)
+  static Future<int> getCachedFriendCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_keyFriendCount) ?? -1;
+  }
+
+  static Future<void> _saveFriendCount(int count) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_keyFriendCount, count);
+  }
+
+  static Future<void> _incrementFriendCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    final current = prefs.getInt(_keyFriendCount) ?? 0;
+    await prefs.setInt(_keyFriendCount, current + 1);
+  }
+
+  static Future<void> _decrementFriendCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    final current = prefs.getInt(_keyFriendCount) ?? 0;
+    if (current > 0) await prefs.setInt(_keyFriendCount, current - 1);
+  }
 
   // ── 전화번호로 유저 검색 ────────────────────────────────────────────────────
   Future<Map<String, dynamic>?> searchByPhone(String phoneNumber) async {
@@ -38,15 +65,14 @@ class FriendService {
   }
 
   // ── 친구 추가 ─────────────────────────────────────────────────────────────
-  // profile_image 파라미터 추가 — 양쪽 friends 서브컬렉션에 저장
   Future<bool> addFriend(
     String friendUid,
     String friendName, {
     required String myName,
     String myPhoneNumber = '',
-    String myProfileImage = '',       // ← 추가: 내 프로필 사진
+    String myProfileImage = '',
     String friendPhoneNumber = '',
-    String friendProfileImage = '',   // ← 추가: 상대방 프로필 사진
+    String friendProfileImage = '',
   }) async {
     if (currentUserId.isEmpty) return false;
     try {
@@ -60,7 +86,6 @@ class FriendService {
 
       final batch = _db.batch();
 
-      // 내 friends에 상대방 저장 (상대방 프로필 사진 포함)
       batch.set(
         _db
             .collection('users')
@@ -71,12 +96,11 @@ class FriendService {
           'uid': friendUid,
           'display_name': friendName,
           'phone_number': friendPhoneNumber,
-          'profile_image': friendProfileImage, // ← 추가
+          'profile_image': friendProfileImage,
           'added_at': FieldValue.serverTimestamp(),
         },
       );
 
-      // 상대방 friends에 나 저장 (내 프로필 사진 포함)
       batch.set(
         _db
             .collection('users')
@@ -87,12 +111,15 @@ class FriendService {
           'uid': currentUserId,
           'display_name': myName,
           'phone_number': myPhoneNumber,
-          'profile_image': myProfileImage, // ← 추가
+          'profile_image': myProfileImage,
           'added_at': FieldValue.serverTimestamp(),
         },
       );
 
       await batch.commit();
+
+      // 친구 수 캐시 +1
+      await _incrementFriendCount();
       return true;
     } catch (e) {
       debugPrint('addFriend error: $e');
@@ -118,6 +145,9 @@ class FriendService {
           .doc(currentUserId),
     );
     await batch.commit();
+
+    // 친구 수 캐시 -1
+    await _decrementFriendCount();
   }
 
   // ── 친구 목록 스트림 ──────────────────────────────────────────────────────
@@ -129,11 +159,17 @@ class FriendService {
         .collection('friends')
         .orderBy('added_at', descending: false)
         .snapshots()
-        .map((snap) => snap.docs.map((doc) {
-              final data = Map<String, dynamic>.from(doc.data());
-              data['uid'] = doc.id;
-              return data;
-            }).toList());
+        .map((snap) {
+      final list = snap.docs.map((doc) {
+        final data = Map<String, dynamic>.from(doc.data());
+        data['uid'] = doc.id;
+        return data;
+      }).toList();
+
+      // 스트림에서 실제 개수 확인될 때마다 캐시 동기화
+      _saveFriendCount(list.length);
+      return list;
+    });
   }
 
   // ── 친구 여부 확인 ────────────────────────────────────────────────────────
@@ -162,9 +198,7 @@ class FriendService {
         .limit(1)
         .get();
 
-    if (existing.docs.isNotEmpty) {
-      return existing.docs.first.id;
-    }
+    if (existing.docs.isNotEmpty) return existing.docs.first.id;
 
     final batch = _db.batch();
     final roomRef = _db.collection('chat_rooms').doc();

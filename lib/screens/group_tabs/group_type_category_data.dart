@@ -227,4 +227,16 @@ class GroupTypeCategoryData {
     }
     return null;
   }
+
+  static String localizeType(String key, AppLocalizations l) {
+    switch (key) {
+      case 'company':     return l.groupTypeCompany;
+      case 'club':        return l.groupTypeClub;
+      case 'small_group': return l.groupTypeSmall;
+      case 'academy':     return l.groupTypeAcademy;
+      case 'school_class': return l.groupTypeClass;
+      case 'hobby_club':  return l.groupTypeHobby;
+      default:            return key;
+    }
+  }
 }

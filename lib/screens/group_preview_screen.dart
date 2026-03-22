@@ -5,6 +5,7 @@ import '../services/group_service.dart';
 import '../providers/user_provider.dart';
 import '../l10n/app_localizations.dart';
 import 'group_detail_screen.dart';
+import 'group_tabs/group_type_category_data.dart';
 
 class GroupPreviewScreen extends StatefulWidget {
   final Map<String, dynamic> group;
@@ -81,7 +82,7 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
+    final l = AppLocalizations.of(context);    
     final colorScheme = Theme.of(context).colorScheme;
 
     final groupId = group['id'] as String? ?? '';
@@ -96,7 +97,8 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
     final profileImageUrl = group['group_profile_image'] as String? ?? '';
     final hasImage = profileImageUrl.isNotEmpty;
     final plan = group['plan'] as String? ?? 'free';
-
+    final typeLabel = GroupTypeCategoryData.localizeType(type, l);
+    final categoryLabel = GroupTypeCategoryData.localizeKey(category, l);
     return Scaffold(
       appBar: AppBar(
         title: Text(name),
@@ -194,11 +196,11 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
               child: Column(
                 children: [
                   _InfoRow(
-                      label: l.type, value: type, colorScheme: colorScheme),
+                      label: l.type, value: typeLabel, colorScheme: colorScheme),
                   const SizedBox(height: 8),
                   _InfoRow(
                       label: l.category,
-                      value: category,
+                      value: categoryLabel,
                       colorScheme: colorScheme),
                   const SizedBox(height: 8),
                   _InfoRow(
