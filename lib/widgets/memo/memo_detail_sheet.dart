@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/memo_service.dart';
-import '../../widgets/post/post_attachment_widget.dart';
+import '../../widgets/post/block_viewer.dart';
 import 'memo_form_sheet.dart';
 import 'memo_navigator.dart';
 
@@ -43,7 +43,7 @@ class MemoDetailSheet extends StatelessWidget {
 
   void _openEditSheet(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    Navigator.pop(context); // 상세 시트 닫기
+    Navigator.pop(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -64,11 +64,8 @@ class MemoDetailSheet extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
     final source = data['source'] as String? ?? 'direct';
-    final content = data['content'] as String? ?? '';
     final sourceColor = _sourceColor(colorScheme);
-    final attachments = _attachments;
 
-    // chat/board 전용 메타 정보
     final authorName = source == 'chat'
         ? (data['sender_name'] as String? ?? '')
         : (data['author_name'] as String? ?? '');
@@ -83,6 +80,8 @@ class MemoDetailSheet extends StatelessWidget {
           }()
         : '';
 
+    final blocks = MemoService.blocksFromMemo(data);
+
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       minChildSize: 0.4,
@@ -91,17 +90,15 @@ class MemoDetailSheet extends StatelessWidget {
       builder: (_, scrollCtrl) => Column(children: [
         Container(
           margin: const EdgeInsets.only(top: 12, bottom: 8),
-          width: 36,
-          height: 4,
+          width: 36, height: 4,
           decoration: BoxDecoration(
-              color: colorScheme.onSurface.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(2)),
+            color: colorScheme.onSurface.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(2),
+          ),
         ),
-        // 상단 액션 바 (출처 정보 + 이동/편집 버튼)
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 8, 4),
           child: Row(children: [
-            // direct: 빈 공간, chat/board: 출처 레이블
             Expanded(
               child: source == 'direct'
                   ? Text(l.memoSourceDirect,
@@ -115,7 +112,6 @@ class MemoDetailSheet extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis),
             ),
-            // chat/board만 원본 이동 버튼 표시
             if (source != 'direct')
               TextButton.icon(
                 onPressed: () => _navigateToSource(context),
@@ -132,7 +128,6 @@ class MemoDetailSheet extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 4)),
               ),
-            // 모든 source 편집 버튼
             IconButton(
               icon: Icon(Icons.edit_outlined,
                   size: 18, color: colorScheme.primary),
@@ -141,7 +136,6 @@ class MemoDetailSheet extends StatelessWidget {
             ),
           ]),
         ),
-        // chat/board만 작성자·날짜 행 표시
         if (source != 'direct') ...[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -163,27 +157,14 @@ class MemoDetailSheet extends StatelessWidget {
                       color: colorScheme.onSurface.withOpacity(0.6))),
             ]),
           ),
+          const SizedBox(height: 4),
         ],
-        const Divider(height: 20),
+        const Divider(height: 16),
         Expanded(
           child: SingleChildScrollView(
             controller: scrollCtrl,
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (content.isNotEmpty)
-                  Text(content,
-                      style: const TextStyle(fontSize: 15, height: 1.6)),
-                if (attachments.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  PostAttachmentsView(
-                    attachments: attachments,
-                    colorScheme: colorScheme,
-                  ),
-                ],
-              ],
-            ),
+            child: BlockViewer(blocks: blocks),
           ),
         ),
       ]),

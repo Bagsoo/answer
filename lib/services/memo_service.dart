@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../models/post_block.dart';
 
 class MemoService {
   final _db = FirebaseFirestore.instance;
@@ -13,16 +14,20 @@ class MemoService {
   Stream<QuerySnapshot> memosStream() =>
       _memos.orderBy('updated_at', descending: true).snapshots();
 
-  // ── 직접 작성 메모 저장/수정 (첨부파일 포함) ───────────────────────────────
+  // ── 직접 작성 메모 저장/수정 (블록 구조) ───────────────────────────────────
   Future<void> saveMemo({
     String? memoId,
     required String content,
-    List<Map<String, dynamic>> attachments = const [],
+    required List<PostBlock> blocks,
+    List<Map<String, dynamic>> attachments = const [], // 하위 호환용
   }) async {
     final now = FieldValue.serverTimestamp();
+    final blocksJson = blocks.map((b) => b.toJson()).toList();
+
     if (memoId != null) {
       await _memos.doc(memoId).update({
         'content': content,
+        'blocks': blocksJson,
         'attachments': attachments,
         'updated_at': now,
       });
@@ -30,6 +35,7 @@ class MemoService {
       await _memos.add({
         'content': content,
         'source': 'direct',
+        'blocks': blocksJson,
         'attachments': attachments,
         'created_at': now,
         'updated_at': now,
@@ -37,7 +43,7 @@ class MemoService {
     }
   }
 
-  // ── 채팅 메시지 → 메모 (첨부파일 포함) ───────────────────────────────────
+  // ── 채팅 메시지 → 메모 ────────────────────────────────────────────────────
   Future<void> memoFromChat({
     required String content,
     required String groupId,
@@ -47,9 +53,13 @@ class MemoService {
     required String messageId,
     required String senderName,
     required Timestamp originalSentAt,
-    List<Map<String, dynamic>> attachments = const [],  // ← 추가
+    List<Map<String, dynamic>> attachments = const [],
   }) async {
     final now = FieldValue.serverTimestamp();
+
+    // attachments → blocks 변환
+    final blocks = _attachmentsToBlocks(content, attachments);
+
     await _memos.add({
       'content': content,
       'source': 'chat',
@@ -60,7 +70,8 @@ class MemoService {
       'message_id': messageId,
       'sender_name': senderName,
       'original_sent_at': originalSentAt,
-      'attachments': attachments,   // ← 추가
+      'attachments': attachments,
+      'blocks': blocks.map((b) => b.toJson()).toList(),
       'created_at': now,
       'updated_at': now,
     });
@@ -80,6 +91,9 @@ class MemoService {
     List<Map<String, dynamic>> attachments = const [],
   }) async {
     final now = FieldValue.serverTimestamp();
+
+    final blocks = _attachmentsToBlocks(content, attachments);
+
     await _memos.add({
       'content': content,
       'source': 'board',
@@ -91,6 +105,7 @@ class MemoService {
       'post_title': postTitle,
       'author_name': authorName,
       'attachments': attachments,
+      'blocks': blocks.map((b) => b.toJson()).toList(),
       'original_created_at': originalCreatedAt,
       'created_at': now,
       'updated_at': now,
@@ -100,5 +115,66 @@ class MemoService {
   // ── 삭제 ──────────────────────────────────────────────────────────────────
   Future<void> deleteMemo(String memoId) async {
     await _memos.doc(memoId).delete();
+  }
+
+  // ── Firestore 문서 → PostBlock 리스트 변환 (하위 호환) ────────────────────
+  static List<PostBlock> blocksFromMemo(Map<String, dynamic> data) {
+    // 새 포맷: blocks 필드 우선
+    final rawBlocks = data['blocks'] as List?;
+    if (rawBlocks != null && rawBlocks.isNotEmpty) {
+      return rawBlocks
+          .map((b) => PostBlock.fromJson(Map<String, dynamic>.from(b as Map)))
+          .toList();
+    }
+
+    // 구 포맷 하위 호환: content + attachments → 블록 변환
+    final content = data['content'] as String? ?? '';
+    final attachments = List<Map<String, dynamic>>.from(
+        (data['attachments'] as List? ?? [])
+            .map((e) => Map<String, dynamic>.from(e as Map)));
+    return _attachmentsToBlocks(content, attachments);
+  }
+
+  // ── 내부 헬퍼: content + attachments → PostBlock 리스트 ──────────────────
+  static List<PostBlock> _attachmentsToBlocks(
+      String content, List<Map<String, dynamic>> attachments) {
+    final blocks = <PostBlock>[];
+    if (content.isNotEmpty) blocks.add(PostBlock.text(content));
+
+    for (final att in attachments) {
+      final type = att['type'] as String? ?? 'file';
+      switch (type) {
+        case 'image':
+          blocks.add(PostBlock(type: BlockType.image, data: {
+            'url': att['url'],
+            'name': att['name'] ?? 'image',
+            'size': att['size'] ?? 0,
+          }));
+        case 'video':
+          blocks.add(PostBlock(type: BlockType.video, data: {
+            'url': att['url'],
+            'thumbnail_url': att['thumbnail_url'] ?? '',
+            'name': att['name'] ?? 'video',
+            'size': att['size'] ?? 0,
+          }));
+        case 'audio':
+          blocks.add(PostBlock(type: BlockType.audio, data: {
+            'url': att['url'],
+            'name': att['name'] ?? 'audio',
+            'size': att['size'] ?? 0,
+            'mime_type': att['mime_type'] ?? 'audio/mpeg',
+          }));
+        default:
+          blocks.add(PostBlock(type: BlockType.file, data: {
+            'url': att['url'],
+            'name': att['name'] ?? 'file',
+            'size': att['size'] ?? 0,
+            'mime_type': att['mime_type'] ?? 'application/octet-stream',
+          }));
+      }
+    }
+
+    if (blocks.isEmpty) blocks.add(PostBlock.text());
+    return blocks;
   }
 }

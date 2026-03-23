@@ -189,6 +189,7 @@ class AppLocalizations {
 
   String get uploadFailed => _s.uploadFailed;
   String get uploadingMessage => _s.uploadingMessage;
+  String get originalMessage => _s.originalMessage;
   String get scheduledMessage => _s.scheduledMessage;
   String get scheduledMessageHint => _s.scheduledMessageHint;
   String get selectSendTime => _s.selectSendTime;
@@ -197,6 +198,11 @@ class AppLocalizations {
   String get scheduledTimeMin => _s.scheduledTimeMin;
   String get scheduledRegister => _s.scheduledRegister;
   String scheduledAt(String dateTime) => _s.scheduledAt(dateTime);
+
+  // ── 게시판 파일 작성 ──────────────────────────────────────────────────────────────
+  String get attachPhoto => _s.attachPhoto;
+  String get attachVideo => _s.attachVideo;
+  String get attachAudio => _s.attachAudio;  
 
   // ── 로그인 화면 ──
   String get loginTitle => _s.loginTitle;
@@ -762,6 +768,11 @@ abstract class _AppStrings {
   String get proPlanDesc;
   String get viewOnMap;
 
+  // ── 게시판 작성 ──
+  String get attachPhoto;
+  String get attachVideo;
+  String get attachAudio;  
+
   // ── 로그인 화면 ──
   String get loginTitle;           // 'Welcome' / '환영합니다' / 'ようこそ'
   String get loginWithGoogle;      // 'Continue with Google' / 'Google로 계속' / 'Googleで続ける'
@@ -790,6 +801,7 @@ abstract class _AppStrings {
   // 업로딩 상태
   String get uploadFailed;        // '실패' / 'Failed' / '失敗'
   String get uploadingMessage;    // '전송 중...' / 'Sending...' / '送信中...'
+  String get originalMessage;     // '원본 메시지' / 'Original Message' / '元のメッセージ'
 
   // 예약 메시지
   String get scheduledMessage;         // '예약 메시지' / 'Scheduled Message' / '予約メッセージ'
@@ -1347,6 +1359,11 @@ class _EnStrings extends _AppStrings {
   @override String get proPlanDesc => 'Pro plan description';  
   @override String get viewOnMap => 'View on map';
 
+  // ── 게시판 작성 ──
+  @override String get attachPhoto => 'Photo';
+  @override String get attachVideo => 'Video';
+  @override String get attachAudio => 'Audio';  
+
   // ── 로그인 화면 ──
   @override String get loginTitle => 'Welcome';
   @override String get loginWithGoogle => 'Continue with Google';
@@ -1374,6 +1391,7 @@ class _EnStrings extends _AppStrings {
 
   @override String get uploadFailed => 'Upload failed';
   @override String get uploadingMessage => 'Sending...';
+  @override String get originalMessage => 'Original Message';
   @override String get scheduledMessage => 'Scheduled Message';
   @override String get scheduledMessageHint => 'Enter a message';
   @override String get selectSendTime => 'Select send time';
@@ -1908,6 +1926,11 @@ class _KoStrings extends _AppStrings {
   @override String get proPlanDesc => 'Pro 플랜 혜택';  
   @override String get viewOnMap => '지도 보기';
 
+  // ── 게시판 작성 ──
+  @override String get attachPhoto => '사진';
+  @override String get attachVideo => '동영상';
+  @override String get attachAudio => '오디오';  
+
   // ── 로그인 화면 ──
   @override String get loginTitle => '환영합니다';
   @override String get loginWithGoogle => 'Google로 계속';
@@ -1935,6 +1958,7 @@ class _KoStrings extends _AppStrings {
 
   @override String get uploadFailed => '업로드 실패';
   @override String get uploadingMessage => '전송 중...';
+  @override String get originalMessage => '원본 메시지';
   @override String get scheduledMessage => '예약 메시지';
   @override String get scheduledMessageHint => '메시지를 입력하세요';
   @override String get selectSendTime => '전송 시간 선택';
@@ -2469,6 +2493,11 @@ class _JaStrings extends _AppStrings {
   @override String get proPlanDesc => '大規模グループ向け';  
   @override String get viewOnMap => '地図で確認';
 
+  // ── 게시판 작성 ──
+  @override String get attachPhoto => '写真';
+  @override String get attachVideo => '動画';
+  @override String get attachAudio => '音声';  
+
   // ── 로그인 화면 ──
   @override String get loginTitle => 'ようこそ';
   @override String get loginWithGoogle => 'Googleで続ける';
@@ -2496,6 +2525,7 @@ class _JaStrings extends _AppStrings {
 
   @override String get uploadFailed => 'アップロード失敗';
   @override String get uploadingMessage => '送信中...';
+  @override String get originalMessage => '元のメッセージ';
   @override String get scheduledMessage => '予約メッセージ';
   @override String get scheduledMessageHint => 'メッセージを入力してください';
   @override String get selectSendTime => '送信時間選択';
