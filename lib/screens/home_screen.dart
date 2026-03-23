@@ -11,6 +11,7 @@ import 'friends_screen.dart';
 import 'memo_screen.dart';
 import 'profile_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/services.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -48,8 +49,14 @@ class _HomeScreenState extends State<HomeScreen> {
       GroupListScreen(),
     ];
 
-    return Scaffold(
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        const MethodChannel('com.answer.messenger/background').invokeMethod('moveToBackground');
+      },
+      child: Scaffold(
+        appBar: AppBar(
         leading: Padding(
           padding: const EdgeInsets.all(8.0),
           child: GestureDetector(
@@ -116,7 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-    );
+    ));
   }
 
   String _getAppBarTitle(AppLocalizations l, int index) {

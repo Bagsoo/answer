@@ -52,6 +52,7 @@ class MemoDetailSheet extends StatelessWidget {
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => MemoFormSheet(
         memoId: memoId,
+        initialTitle: data['title'] as String? ?? '', 
         initialContent: data['content'] as String? ?? '',
         initialAttachments: _attachments,
         service: service,

@@ -394,6 +394,8 @@ class AppLocalizations {
   String get deleteMemoConfirm => _s.deleteMemoConfirm;
   String get memoSaved => _s.memoSaved;
   String get memoDeleted => _s.memoDeleted;
+  String get memoTitle => _s.memoTitle;
+  String get memoTitleHint => _s.memoTitleHint;
   String get memoHint => _s.memoHint;
   String get memoSourceChat => _s.memoSourceChat;
   String get memoSourceBoard => _s.memoSourceBoard;
@@ -981,6 +983,8 @@ abstract class _AppStrings {
   String get deleteMemoConfirm;
   String get memoSaved;
   String get memoDeleted;
+  String get memoTitle;
+  String get memoTitleHint;
   String get memoHint;
   String get memoSourceChat;
   String get memoSourceBoard;
@@ -1572,6 +1576,8 @@ class _EnStrings extends _AppStrings {
   @override String get deleteMemoConfirm => 'Delete this memo?';
   @override String get memoSaved => 'Memo saved';
   @override String get memoDeleted => 'Memo deleted';
+  @override String get memoTitle => 'Memo Title';
+  @override String get memoTitleHint => 'Enter memo title...(optional)';
   @override String get memoHint => 'Write anything...';
   @override String get memoSourceChat => 'From chat';
   @override String get memoSourceBoard => 'From board';
@@ -2139,6 +2145,8 @@ class _KoStrings extends _AppStrings {
   @override String get deleteMemoConfirm => '이 메모를 삭제할까요?';
   @override String get memoSaved => '메모가 저장되었습니다';
   @override String get memoDeleted => '메모가 삭제되었습니다';
+  @override String get memoTitle => '메모 제목';
+  @override String get memoTitleHint => '메모 제목을 입력하세요...(선택)';
   @override String get memoHint => '자유롭게 작성하세요...';
   @override String get memoSourceChat => '채팅에서';
   @override String get memoSourceBoard => '게시판에서';
@@ -2706,6 +2714,8 @@ class _JaStrings extends _AppStrings {
   @override String get deleteMemoConfirm => 'このメモを削除しますか？';
   @override String get memoSaved => 'メモを保存しました';
   @override String get memoDeleted => 'メモを削除しました';
+  @override String get memoTitle => 'メモのタイトル';
+  @override String get memoTitleHint => 'メモのタイトルを入力してください...(任意)';
   @override String get memoHint => '自由に書いてください...';
   @override String get memoSourceChat => 'チャットから';
   @override String get memoSourceBoard => '掲示板から';

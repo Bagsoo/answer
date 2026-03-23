@@ -14,28 +14,39 @@ class MemoService {
   Stream<QuerySnapshot> memosStream() =>
       _memos.orderBy('updated_at', descending: true).snapshots();
 
-  // ── 직접 작성 메모 저장/수정 (블록 구조) ───────────────────────────────────
+  // ── 직접 작성 메모 저장/수정 (제목 + 블록 구조) ──────────────────────────
   Future<void> saveMemo({
     String? memoId,
+    required String title,       // ← 제목 추가
     required String content,
     required List<PostBlock> blocks,
-    List<Map<String, dynamic>> attachments = const [], // 하위 호환용
+    List<Map<String, dynamic>> attachments = const [],
   }) async {
     final now = FieldValue.serverTimestamp();
     final blocksJson = blocks.map((b) => b.toJson()).toList();
 
+    // 미디어 블록 요약 (타일 미리보기용)
+    final mediaTypes = blocks
+        .where((b) => !b.isText)
+        .map((b) => b.type.name)
+        .toList();
+
     if (memoId != null) {
       await _memos.doc(memoId).update({
+        'title': title,
         'content': content,
         'blocks': blocksJson,
+        'media_types': mediaTypes,   // ← 미리보기용
         'attachments': attachments,
         'updated_at': now,
       });
     } else {
       await _memos.add({
+        'title': title,
         'content': content,
         'source': 'direct',
         'blocks': blocksJson,
+        'media_types': mediaTypes,
         'attachments': attachments,
         'created_at': now,
         'updated_at': now,
@@ -56,9 +67,11 @@ class MemoService {
     List<Map<String, dynamic>> attachments = const [],
   }) async {
     final now = FieldValue.serverTimestamp();
-
-    // attachments → blocks 변환
     final blocks = _attachmentsToBlocks(content, attachments);
+    final mediaTypes = blocks
+        .where((b) => !b.isText)
+        .map((b) => b.type.name)
+        .toList();
 
     await _memos.add({
       'content': content,
@@ -72,6 +85,7 @@ class MemoService {
       'original_sent_at': originalSentAt,
       'attachments': attachments,
       'blocks': blocks.map((b) => b.toJson()).toList(),
+      'media_types': mediaTypes,
       'created_at': now,
       'updated_at': now,
     });
@@ -91,8 +105,11 @@ class MemoService {
     List<Map<String, dynamic>> attachments = const [],
   }) async {
     final now = FieldValue.serverTimestamp();
-
     final blocks = _attachmentsToBlocks(content, attachments);
+    final mediaTypes = blocks
+        .where((b) => !b.isText)
+        .map((b) => b.type.name)
+        .toList();
 
     await _memos.add({
       'content': content,
@@ -106,6 +123,7 @@ class MemoService {
       'author_name': authorName,
       'attachments': attachments,
       'blocks': blocks.map((b) => b.toJson()).toList(),
+      'media_types': mediaTypes,
       'original_created_at': originalCreatedAt,
       'created_at': now,
       'updated_at': now,
@@ -117,17 +135,14 @@ class MemoService {
     await _memos.doc(memoId).delete();
   }
 
-  // ── Firestore 문서 → PostBlock 리스트 변환 (하위 호환) ────────────────────
+  // ── Firestore 문서 → PostBlock 리스트 (하위 호환) ────────────────────────
   static List<PostBlock> blocksFromMemo(Map<String, dynamic> data) {
-    // 새 포맷: blocks 필드 우선
     final rawBlocks = data['blocks'] as List?;
     if (rawBlocks != null && rawBlocks.isNotEmpty) {
       return rawBlocks
           .map((b) => PostBlock.fromJson(Map<String, dynamic>.from(b as Map)))
           .toList();
     }
-
-    // 구 포맷 하위 호환: content + attachments → 블록 변환
     final content = data['content'] as String? ?? '';
     final attachments = List<Map<String, dynamic>>.from(
         (data['attachments'] as List? ?? [])
@@ -135,45 +150,36 @@ class MemoService {
     return _attachmentsToBlocks(content, attachments);
   }
 
-  // ── 내부 헬퍼: content + attachments → PostBlock 리스트 ──────────────────
   static List<PostBlock> _attachmentsToBlocks(
       String content, List<Map<String, dynamic>> attachments) {
     final blocks = <PostBlock>[];
     if (content.isNotEmpty) blocks.add(PostBlock.text(content));
-
     for (final att in attachments) {
       final type = att['type'] as String? ?? 'file';
       switch (type) {
         case 'image':
           blocks.add(PostBlock(type: BlockType.image, data: {
-            'url': att['url'],
-            'name': att['name'] ?? 'image',
+            'url': att['url'], 'name': att['name'] ?? 'image',
             'size': att['size'] ?? 0,
           }));
         case 'video':
           blocks.add(PostBlock(type: BlockType.video, data: {
-            'url': att['url'],
-            'thumbnail_url': att['thumbnail_url'] ?? '',
-            'name': att['name'] ?? 'video',
-            'size': att['size'] ?? 0,
+            'url': att['url'], 'thumbnail_url': att['thumbnail_url'] ?? '',
+            'name': att['name'] ?? 'video', 'size': att['size'] ?? 0,
           }));
         case 'audio':
           blocks.add(PostBlock(type: BlockType.audio, data: {
-            'url': att['url'],
-            'name': att['name'] ?? 'audio',
-            'size': att['size'] ?? 0,
-            'mime_type': att['mime_type'] ?? 'audio/mpeg',
+            'url': att['url'], 'name': att['name'] ?? 'audio',
+            'size': att['size'] ?? 0, 'mime_type': att['mime_type'] ?? 'audio/mpeg',
           }));
         default:
           blocks.add(PostBlock(type: BlockType.file, data: {
-            'url': att['url'],
-            'name': att['name'] ?? 'file',
+            'url': att['url'], 'name': att['name'] ?? 'file',
             'size': att['size'] ?? 0,
             'mime_type': att['mime_type'] ?? 'application/octet-stream',
           }));
       }
     }
-
     if (blocks.isEmpty) blocks.add(PostBlock.text());
     return blocks;
   }
