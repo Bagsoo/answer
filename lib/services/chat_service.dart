@@ -35,6 +35,24 @@ class ChatService {
     });
   }
 
+  // ── 전체 읽지 않은 메시지 수 스트림 ──────────────────────────────────────
+  Stream<int> totalUnreadStream() {
+    if (currentUserId.isEmpty) return Stream.value(0);
+    return _db
+        .collection('chat_rooms')
+        .where('member_ids', arrayContains: currentUserId)
+        .snapshots()
+        .map((snapshot) {
+      int total = 0;
+      for (final doc in snapshot.docs) {
+        final unreadCounts =
+            doc.data()['unread_counts'] as Map<String, dynamic>? ?? {};
+        total += (unreadCounts[currentUserId] as int? ?? 0);
+      }
+      return total;
+    });
+  }
+
   // ── 메시지 스트림 (최신 30개) ──────────────────────────────────────────────
   Stream<QuerySnapshot> getMessages(String roomId) {
     return _db
@@ -72,9 +90,7 @@ class ChatService {
         .snapshots();
   }
 
-  // ── 메시지 ID 미리 생성 (Storage 업로드 전 호출) ───────────────────────────
-  // StorageService에서 messageId 기반 파일명을 쓰기 위해
-  // 실제 쓰기 없이 doc ref의 ID만 반환
+  // ── 메시지 ID 미리 생성 ───────────────────────────────────────────────────
   String generateMessageId(String roomId) {
     return _db
         .collection('chat_rooms')
@@ -146,19 +162,17 @@ class ChatService {
     await batch.commit();
   }
 
-  // ── 이미지 메시지 전송 (여러 장 지원) ─────────────────────────────────────
-  // 흐름: generateMessageId → StorageService.uploadChatImages → sendImageMessage
+  // ── 이미지 메시지 전송 ─────────────────────────────────────────────────────
   Future<void> sendImageMessage(
     String roomId, {
-    required String messageId,       // generateMessageId()로 미리 생성한 ID
-    required List<String> imageUrls, // 업로드 완료된 URL 목록
+    required String messageId,
+    required List<String> imageUrls,
     required String senderName,
     String? senderPhotoUrl,
   }) async {
     final unreadUpdate = await _buildUnreadUpdate(roomId);
     final batch = _db.batch();
 
-    // 미리 생성한 ID로 doc 직접 지정
     final msgRef = _db
         .collection('chat_rooms')
         .doc(roomId)
@@ -171,7 +185,7 @@ class ChatService {
       'sender_photo_url': senderPhotoUrl ?? '',
       'text': '',
       'type': 'image',
-      'image_urls': imageUrls,       // 여러 장 → List로 저장
+      'image_urls': imageUrls,
       'is_system': false,
       'created_at': FieldValue.serverTimestamp(),
     });
@@ -190,10 +204,9 @@ class ChatService {
   }
 
   // ── 동영상 메시지 전송 ─────────────────────────────────────────────────────
-  // 흐름: generateMessageId → StorageService.uploadChatVideo → sendVideoMessage
   Future<void> sendVideoMessage(
     String roomId, {
-    required String messageId,       // generateMessageId()로 미리 생성한 ID
+    required String messageId,
     required String videoUrl,
     required String thumbnailUrl,
     required String senderName,

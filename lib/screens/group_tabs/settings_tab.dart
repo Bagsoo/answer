@@ -16,6 +16,8 @@ import '../../widgets/group_settings/board_management_screen.dart';
 import '../../widgets/group_settings/board_form_screen.dart';
 import '../../widgets/group_settings/banned_members_screen.dart';
 
+import './group_type_category_data.dart';
+
 class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key});
 
@@ -163,7 +165,7 @@ class _SettingsTabState extends State<SettingsTab> {
           leading: Icon(Icons.info_outline, color: colorScheme.primary), // 아이콘을 통합된 느낌으로 변경
           title: Text(l.groupType), // '그룹 정보' 혹은 '유형 및 카테고리'
           subtitle: Text(
-            '${_typeLabel(currentType, l)}  •  ${currentCategory.isEmpty ? '-' : currentCategory}',
+            '${_typeLabel(currentType, l)}  •  ${currentCategory.isEmpty ? '-' : GroupTypeCategoryData.localizeKey(currentCategory, l)}',
             style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7)),
           ),
           trailing: canEdit
