@@ -199,6 +199,23 @@ class AppLocalizations {
   String get scheduledRegister => _s.scheduledRegister;
   String scheduledAt(String dateTime) => _s.scheduledAt(dateTime);
 
+  // ── 그룹 추천 ──────────────────────────────────────────────────────────────
+  String get recommended => _s.recommended;
+  String get noRecommendations => _s.noRecommendations;
+  String get betterRecommendations => _s.betterRecommendations;
+  String get setActivityLocation => _s.setActivityLocation;
+  String get setInterests => _s.setInterests;
+  String get goToProfile => _s.goToProfile;
+  String get activityLocation => _s.activityLocation;
+  String get activityLocationDesc  => _s.activityLocationDesc;
+  String get noLocationSet => _s.noLocationSet;
+  String get myInterests => _s.myInterests;
+  String get noInterestsSet => _s.noInterestsSet;
+  String get selectInterests => _s.selectInterests;
+  String get selectLocation => _s.selectLocation;
+  String get searchLocationHint => _s.searchLocationHint;
+  String get useCurrentLocation => _s.useCurrentLocation;
+
   // ── 게시판 파일 작성 ──────────────────────────────────────────────────────────────
   String get attachPhoto => _s.attachPhoto;
   String get attachVideo => _s.attachVideo;
@@ -769,6 +786,23 @@ abstract class _AppStrings {
   String get plusPlanDesc;
   String get proPlanDesc;
   String get viewOnMap;
+
+  // ── 그룹 추천 ──
+  String get recommended;
+  String get noRecommendations;
+  String get betterRecommendations;
+  String get setActivityLocation;
+  String get setInterests;
+  String get goToProfile;
+  String get activityLocation;
+  String get activityLocationDesc;
+  String get noLocationSet;
+  String get myInterests;
+  String get noInterestsSet;
+  String get selectInterests;
+  String get selectLocation;
+  String get searchLocationHint;
+  String get useCurrentLocation;
 
   // ── 게시판 작성 ──
   String get attachPhoto;
@@ -1363,6 +1397,23 @@ class _EnStrings extends _AppStrings {
   @override String get proPlanDesc => 'Pro plan description';  
   @override String get viewOnMap => 'View on map';
 
+  // ── 그룹 추천 ──
+  @override String get recommended => 'Recommended';
+  @override String get noRecommendations => 'No recommendations';
+  @override String get betterRecommendations => 'For better recommendations';
+  @override String get setActivityLocation => 'Set activity location';
+  @override String get setInterests => 'Set your interests';
+  @override String get goToProfile => 'Set in profile';
+  @override String get activityLocation => 'Activity location';
+  @override String get activityLocationDesc => 'Select your home, office, or frequent activity area';
+  @override String get noLocationSet => 'Not set';
+  @override String get myInterests => 'My interests';
+  @override String get noInterestsSet => 'No interests set';
+  @override String get selectInterests => 'Select interests';
+  @override String get selectLocation => 'Select location';
+  @override String get searchLocationHint => 'Search place, station, or address';
+  @override String get useCurrentLocation => 'Use current location';
+
   // ── 게시판 작성 ──
   @override String get attachPhoto => 'Photo';
   @override String get attachVideo => 'Video';
@@ -1932,6 +1983,23 @@ class _KoStrings extends _AppStrings {
   @override String get proPlanDesc => 'Pro 플랜 혜택';  
   @override String get viewOnMap => '지도 보기';
 
+  // ── 그룹 추천 ──
+  @override String get recommended => '추천';
+  @override String get noRecommendations => '추천 그룹이 없어요';
+  @override String get betterRecommendations => '더 정확한 추천을 위해';
+  @override String get setActivityLocation => '활동 지역을 설정해주세요';
+  @override String get setInterests => '관심사를 설정해주세요';
+  @override String get goToProfile => '프로필에서 설정하기';
+  @override String get activityLocation => '활동 지역';
+  @override String get activityLocationDesc => '집, 회사, 또는 자주 활동하는 지역을 선택하세요';
+  @override String get noLocationSet => '위치 미설정';
+  @override String get myInterests => '관심사';
+  @override String get noInterestsSet => '관심사가 없어요. 편집을 눌러 추가해주세요';
+  @override String get selectInterests => '관심사 선택';
+  @override String get selectLocation => '위치 선택';
+  @override String get searchLocationHint => '장소, 지하철역, 주소 검색';
+  @override String get useCurrentLocation => '현재 위치 적용';
+
   // ── 게시판 작성 ──
   @override String get attachPhoto => '사진';
   @override String get attachVideo => '동영상';
@@ -2500,6 +2568,23 @@ class _JaStrings extends _AppStrings {
   @override String get plusPlanDesc => '成長中のコミュニティに';
   @override String get proPlanDesc => '大規模グループ向け';  
   @override String get viewOnMap => '地図で確認';
+
+  // ── 그룹 추천 ──
+  @override String get recommended => 'おすすめ';
+  @override String get noRecommendations => 'おすすめがありません';
+  @override String get betterRecommendations => 'より良いおすすめのために';
+  @override String get setActivityLocation => '活動エリアを設定してください';
+  @override String get setInterests => '興味・関心を設定してください';
+  @override String get goToProfile => 'プロフィールで設定する';
+  @override String get activityLocation => ' 活動エリア';
+  @override String get activityLocationDesc => '自宅、職場、または主な活動エリアを選択してください';
+  @override String get noLocationSet => '未設定';
+  @override String get myInterests => ' 興味・関心';
+  @override String get noInterestsSet => '興味・関心が設定されていません';
+  @override String get selectInterests => '興味・関心を選択';
+  @override String get selectLocation => '場所を選択';
+  @override String get searchLocationHint => '場所、駅、住所を検索';
+  @override String get useCurrentLocation => ' 現在地を使用';
 
   // ── 게시판 작성 ──
   @override String get attachPhoto => '写真';

@@ -66,6 +66,8 @@ GoogleService-Info.plist
 # 보안 및 환경 변수
 .env
 *.env.*
+ios/Flutter/Debug.xcconfig
+firebase.json
 
 # OS 관련
 Thumbs.db
