@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import '../../l10n/app_localizations.dart';
+import 'dart:io';
 
 /// 위치 선택 결과
 class LocationResult {
@@ -66,7 +67,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
           'input': input,
           'key': widget.googleApiKey,
           'language': widget.languageCode,
-          'types': 'geocode|establishment|transit_station',
+          // 'types': 'geocode|establishment|transit_station',
         },
       );
 
@@ -170,10 +171,16 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       }
 
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 10),
-        ),
+        locationSettings: Platform.isAndroid
+            ? AndroidSettings(
+                accuracy: LocationAccuracy.medium,
+                timeLimit: const Duration(seconds: 30),
+              )
+            : AppleSettings(
+                accuracy: LocationAccuracy.medium,
+                timeLimit: const Duration(seconds: 30),
+                activityType: ActivityType.other,
+              ),
       );
 
       if (!mounted) return;
@@ -194,6 +201,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       }
     } catch (e) {
       if (mounted) {
+        debugPrint('현재위치 에러: $e');
         setState(() {
           _errorMsg = '위치를 가져오지 못했어요. 다시 시도해주세요.';
           _loadingCurrentLocation = false;
