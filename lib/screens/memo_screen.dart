@@ -21,11 +21,19 @@ class _MemoScreenState extends State<MemoScreen> {
   SharedPreferences? _prefs;
   List<_CachedMemo> _cachedMemos = [];
   bool _cacheLoaded = false;
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _loadCache();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   // ── 캐시 즉시 로드 ────────────────────────────────────────────────────────
@@ -146,51 +154,91 @@ class _MemoScreenState extends State<MemoScreen> {
     }
 
     return Scaffold(
-      body: StreamBuilder<QuerySnapshot>(
-        stream: service.memosStream(),
-        builder: (context, snap) {
-          final docs = snap.data?.docs;
-
-          // Firebase 응답 오면 캐시 갱신
-          if (docs != null) {
-            _saveCache(docs);
-          }
-
-          // 표시할 데이터 결정: Firebase 우선, 없으면 캐시
-          final List<_MemoItem> items;
-          if (docs != null) {
-            items = docs.map((d) => _MemoItem.fromFirestore(d)).toList();
-          } else if (_cachedMemos.isNotEmpty) {
-            items = _cachedMemos.map((c) => _MemoItem.fromCache(c)).toList();
-          } else if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else {
-            items = [];
-          }
-
-          if (items.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.note_outlined,
-                      size: 64, color: cs.onSurface.withOpacity(0.2)),
-                  const SizedBox(height: 16),
-                  Text(l.noMemos,
-                      style: TextStyle(color: cs.onSurface.withOpacity(0.4))),
-                ],
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: (val) => setState(() => _searchQuery = val),
+              decoration: InputDecoration(
+                hintText: '${l.search} (제목, 내용)',
+                hintStyle: TextStyle(color: cs.onSurface.withOpacity(0.5)),
+                prefixIcon: Icon(Icons.search, color: cs.onSurface.withOpacity(0.5)),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: cs.surfaceContainerHighest.withOpacity(0.3),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
               ),
-            );
-          }
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: service.memosStream(),
+              builder: (context, snap) {
+                final docs = snap.data?.docs;
 
-          // 직접 메모 / 그룹 메모 분리
-          final directItems = items
+                // Firebase 응답 오면 캐시 갱신
+                if (docs != null) {
+                  _saveCache(docs);
+                }
+
+                // 표시할 데이터 결정: Firebase 우선, 없으면 캐시
+                final List<_MemoItem> items;
+                if (docs != null) {
+                  items = docs.map((d) => _MemoItem.fromFirestore(d)).toList();
+                } else if (_cachedMemos.isNotEmpty) {
+                  items = _cachedMemos.map((c) => _MemoItem.fromCache(c)).toList();
+                } else if (snap.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else {
+                  items = [];
+                }
+
+                final query = _searchQuery.toLowerCase().trim();
+                final filteredItems = query.isEmpty 
+                    ? items 
+                    : items.where((i) {
+                        final title = (i.data['title']?.toString() ?? '').toLowerCase();
+                        final content = (i.data['content']?.toString() ?? '').toLowerCase();
+                        return title.contains(query) || content.contains(query);
+                      }).toList();
+
+                if (filteredItems.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(query.isEmpty ? Icons.note_outlined : Icons.search_off,
+                            size: 64, color: cs.onSurface.withOpacity(0.2)),
+                        const SizedBox(height: 16),
+                        Text(query.isEmpty ? l.noMemos : l.noSearchResults,
+                            style: TextStyle(color: cs.onSurface.withOpacity(0.4))),
+                      ],
+                    ),
+                  );
+                }
+
+                // 직접 메모 / 그룹 메모 분리
+                final directItems = filteredItems
               .where((i) => i.source == 'direct')
               .toList();
 
-          final Map<String, GroupMemoGroup> groupMap = {};
-          for (final item in items) {
-            if (item.source == 'direct') continue;
+                final Map<String, GroupMemoGroup> groupMap = {};
+                for (final item in filteredItems) {
+                  if (item.source == 'direct') continue;
             final groupId = item.groupId.isNotEmpty ? item.groupId : '__unknown__';
             final groupName = item.groupName.isNotEmpty ? item.groupName : l.unknown;
             groupMap.putIfAbsent(
@@ -216,9 +264,12 @@ class _MemoScreenState extends State<MemoScreen> {
                     service: service,
                     prefs: _prefs!,
                   )),
-            ],
-          );
-        },
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showNewMemoSheet(context, service),
