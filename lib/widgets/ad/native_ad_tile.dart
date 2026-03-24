@@ -21,15 +21,10 @@ class _NativeAdTileState extends State<NativeAdTile> {
       _ctrl = AdController();
       _ctrl.addListener(_onChanged);
       
-      final isAndroid = Theme.of(context).platform == TargetPlatform.android;
-      if (isAndroid) {
-        _ctrl.load(
-          factoryId: 'listTile',
-          customOptions: {'adLabel': AppLocalizations.of(context).adLabel},
-        );
-      } else {
-        _ctrl.load(templateStyle: _buildTemplateStyle(context));
-      }
+      _ctrl.load(
+        factoryId: 'listTile',
+        customOptions: {'adLabel': AppLocalizations.of(context).adLabel},
+      );
     }
   }
 
@@ -90,44 +85,9 @@ class _AdWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isAndroid = Theme.of(context).platform == TargetPlatform.android;
-    final l = AppLocalizations.of(context);
-    final cs = Theme.of(context).colorScheme;
-    
-    // 안드로이드는 커스텀 네이티브 뷰(딱 72 높이)를 사용하므로 오버레이 뱃지를 그리지 않음
-    if (isAndroid) {
-      return SizedBox(
-        height: 72,
-        child: AdWidget(ad: ad),
-      );
-    }
-
-    // iOS 등 커스텀 뷰 미지원 플랫폼(현재까지)은 기존처럼 템플릿 사용 + 뱃지 오버레이
-    return Stack(
-      children: [
-        ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 72, maxHeight: 120),
-          child: AdWidget(ad: ad),
-        ),
-        Positioned(
-          top: 6, right: 12,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              l.adLabel,
-              style: TextStyle(
-                fontSize: 10,
-                color: cs.onSurface.withOpacity(0.5),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ),
-      ],
+    return SizedBox(
+      height: 72,
+      child: AdWidget(ad: ad),
     );
   }
 }
