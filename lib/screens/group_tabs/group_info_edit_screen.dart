@@ -221,7 +221,7 @@ class _GroupInfoEditScreenState extends State<GroupInfoEditScreen> {
                     children: [
                       Text(typeLabel(_selectedType),
                           style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Text(_selectedCategory,
+                      Text(GroupTypeCategoryData.localizeKey(_selectedCategory, l),
                           style: TextStyle(
                               fontSize: 13,
                               color: colorScheme.onSurface.withOpacity(0.6))),

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/group_provider.dart';
 import '../../services/group_service.dart';
@@ -15,6 +16,7 @@ import '../../widgets/group_settings/tag_management_sheet.dart';
 import '../../widgets/group_settings/board_management_screen.dart';
 import '../../widgets/group_settings/board_form_screen.dart';
 import '../../widgets/group_settings/banned_members_screen.dart';
+import '../../widgets/common/location_picker_sheet.dart';
 
 import './group_type_category_data.dart';
 
@@ -115,6 +117,7 @@ class _SettingsTabState extends State<SettingsTab> {
     final currentType = gp.type;
     final currentCategory = gp.category;
     final currentName = gp.name;
+    final currentLocationName = gp.currentLocationName;
 
     return ListView(
       children: [
@@ -160,6 +163,26 @@ class _SettingsTabState extends State<SettingsTab> {
                 : null,
           ),
 
+        // 그룹 위치
+        ListTile(
+          leading: Icon(Icons.place_outlined, color: colorScheme.primary),
+          title: Text(l.groupLocation),
+          subtitle: Text(
+            currentLocationName.isEmpty ? l.noLocationSet : currentLocationName,
+            style: TextStyle(
+              color: currentLocationName.isEmpty
+                  ? colorScheme.onSurface.withOpacity(0.35)
+                  : colorScheme.onSurface.withOpacity(0.7),
+            ),
+          ),
+          trailing: canEdit
+              ? Icon(Icons.chevron_right,
+                  color: colorScheme.onSurface.withOpacity(0.4))
+              : null,
+          onTap: canEdit
+              ? () => _pickGroupLocation(context, l, groupId)
+              : null,
+        ),
         // ── 유형 & 카테고리 ──────────────────────────────────────────────────
         ListTile(
           leading: Icon(Icons.info_outline, color: colorScheme.primary), // 아이콘을 통합된 느낌으로 변경
@@ -679,6 +702,46 @@ class _SettingsTabState extends State<SettingsTab> {
         colorScheme: colorScheme,
       ),
     );
+  }
+
+Future<void> _pickGroupLocation(
+    BuildContext context, AppLocalizations l, String groupId) async {
+  final apiKey = dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
+  final gp = context.read<GroupProvider>();
+ 
+  final result = await showModalBottomSheet<LocationResult>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (_) => LocationPickerSheet(
+      googleApiKey: apiKey,
+      languageCode: Localizations.localeOf(context).languageCode,
+      showCurrentLocation: false,  // 그룹은 현재위치 없음
+      showGroupHint: true,
+      initialLocation: (gp.locationLat != null && gp.locationLng != null)
+          ? LocationResult(
+              latitude: gp.locationLat!,
+              longitude: gp.locationLng!,
+              name: gp.locationName,
+            )
+          : null,
+    ),
+  );
+ 
+  if (result != null && context.mounted) {
+      await context.read<GroupService>().updateGroupLocation(
+        groupId: groupId,
+        lat: result.latitude,
+        lng: result.longitude,
+        locationName: result.name,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(l.locationSaved)));
+      }
+    }
   }
 }
 

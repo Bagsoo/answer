@@ -6,6 +6,8 @@ import '../providers/user_provider.dart';
 import '../l10n/app_localizations.dart';
 import 'group_detail_screen.dart';
 import 'group_tabs/group_type_category_data.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../widgets/common/location_picker_sheet.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   const CreateGroupScreen({super.key});
@@ -27,6 +29,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   // Step 3
   final TextEditingController _nameController = TextEditingController();
   bool _requireApproval = true;
+  double? _locationLat;
+  double? _locationLng;
+  String _locationName = '';
 
   // Step 4
   String _plan = 'free';
@@ -100,6 +105,10 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       displayName: displayName,
       memberLimit: 50, // 기본값 고정, 설정 탭에서 조정 가능
       plan: _plan,
+      location: (_locationLat != null && _locationLng != null)
+          ? GeoPoint(_locationLat!, _locationLng!)
+          : null,
+      locationName: _locationName,
     );
 
     if (!mounted) return;
@@ -410,6 +419,58 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           ),
           const SizedBox(height: 28),
 
+          // ── 그룹 위치 ─────────────────────────────────
+          Text(l.groupLocation, style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: () => _pickGroupLocation(l),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                border: Border.all(color: colorScheme.outline.withOpacity(0.4)),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(children: [
+                Icon(Icons.place_outlined, color: colorScheme.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _locationName.isNotEmpty ? _locationName : l.selectGroupLocation,
+                    style: TextStyle(
+                      color: _locationName.isNotEmpty
+                          ? colorScheme.onSurface
+                          : colorScheme.onSurface.withOpacity(0.4),
+                    ),
+                  ),
+                ),
+                if (_locationName.isNotEmpty)
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      _locationLat = null;
+                      _locationLng = null;
+                      _locationName = '';
+                    }),
+                    child: Icon(Icons.clear,
+                        size: 18, color: colorScheme.onSurface.withOpacity(0.4)),
+                  )
+                else
+                  Icon(Icons.chevron_right,
+                      color: colorScheme.onSurface.withOpacity(0.4)),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            l.groupLocationHint,
+            style: TextStyle(
+              fontSize: 12,
+              color: colorScheme.onSurface.withOpacity(0.5),
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 20),
+
           // 가입 승인
           Text(l.joinSettings,
               style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -590,6 +651,33 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         );
       },
     );
+  }
+
+  Future<void> _pickGroupLocation(AppLocalizations l) async {
+    final apiKey = dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
+    final locale = context.read<UserProvider>().locale;
+  
+    final result = await showModalBottomSheet<LocationResult>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => LocationPickerSheet(
+        googleApiKey: apiKey,
+        languageCode: locale,
+        showCurrentLocation: false,  // 그룹은 현재위치 버튼 없음
+        showGroupHint: true,         // 그룹 안내 문구 표시
+      ),
+    );
+  
+    if (result != null && mounted) {
+      setState(() {
+        _locationLat = result.latitude;
+        _locationLng = result.longitude;
+        _locationName = result.name;
+      });
+    }
   }
 }
 

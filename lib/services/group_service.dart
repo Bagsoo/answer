@@ -16,10 +16,12 @@ class GroupService {
     required String category,
     required bool requireApproval,
     required String displayName,
-    String profileImage = '',   // ← 추가
+    String profileImage = '',
     int memberLimit = 50,
     String plan = 'free',
     bool allowPlanUpgrade = true,
+    GeoPoint? location,
+    String locationName = '',
   }) async {
     if (currentUserId.isEmpty) return null;
 
@@ -972,5 +974,17 @@ class GroupService {
         .doc(uid)
         .get();
     return doc.exists;
+  }
+
+  Future<void> updateGroupLocation({
+    required String groupId,
+    required double lat,
+    required double lng,
+    required String locationName,
+  }) async {
+    await _db.collection('groups').doc(groupId).update({
+      'location': GeoPoint(lat, lng),
+      'location_name': locationName,
+    });
   }
 }

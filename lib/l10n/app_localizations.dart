@@ -199,6 +199,12 @@ class AppLocalizations {
   String get scheduledRegister => _s.scheduledRegister;
   String scheduledAt(String dateTime) => _s.scheduledAt(dateTime);
 
+  // ── 그룹 위치 ──
+  String get groupLocation => _s.groupLocation;
+  String get selectGroupLocation => _s.selectGroupLocation;
+  String get groupLocationHint => _s.groupLocationHint;
+  String get locationSaved => _s.locationSaved;
+
   // ── 그룹 추천 ──────────────────────────────────────────────────────────────
   String get recommended => _s.recommended;
   String get noRecommendations => _s.noRecommendations;
@@ -786,6 +792,12 @@ abstract class _AppStrings {
   String get plusPlanDesc;
   String get proPlanDesc;
   String get viewOnMap;
+
+  // ── 그룹 위치 ──
+  String get groupLocation;
+  String get selectGroupLocation;
+  String get groupLocationHint;
+  String get locationSaved;
 
   // ── 그룹 추천 ──
   String get recommended;
@@ -1397,6 +1409,12 @@ class _EnStrings extends _AppStrings {
   @override String get proPlanDesc => 'Pro plan description';  
   @override String get viewOnMap => 'View on map';
 
+  // ── 그룹 위치 ──
+  @override String get groupLocation => 'Group location';
+  @override String get selectGroupLocation => 'Select location (optional)';
+  @override String get groupLocationHint => 'If there is no fixed location, select a nearby subway station or landmark in your main activity area';
+  @override String get locationSaved => 'Location saved';
+
   // ── 그룹 추천 ──
   @override String get recommended => 'Recommended';
   @override String get noRecommendations => 'No recommendations';
@@ -1983,6 +2001,12 @@ class _KoStrings extends _AppStrings {
   @override String get proPlanDesc => 'Pro 플랜 혜택';  
   @override String get viewOnMap => '지도 보기';
 
+  // ── 그룹 위치 ──
+  @override String get groupLocation => '그룹 위치';
+  @override String get selectGroupLocation => '위치 선택(선택사항)';
+  @override String get groupLocationHint => '정해진 장소가 없다면 주요 활동 지역의 가까운 지하철역이나 랜드마크를 선택해주세요';
+  @override String get locationSaved => '위치가 저장되었어요';
+
   // ── 그룹 추천 ──
   @override String get recommended => '추천';
   @override String get noRecommendations => '추천 그룹이 없어요';
@@ -2568,6 +2592,12 @@ class _JaStrings extends _AppStrings {
   @override String get plusPlanDesc => '成長中のコミュニティに';
   @override String get proPlanDesc => '大規模グループ向け';  
   @override String get viewOnMap => '地図で確認';
+
+  // ── 그룹 위치 ──
+  @override String get groupLocation => 'グループの場所';
+  @override String get selectGroupLocation => '場所を選択（任意）';
+  @override String get groupLocationHint => ' 決まった場所がない場合は、主な活動エリアの最寄り駅やランドマークを選択してください';
+  @override String get locationSaved => '場所を保存しました';
 
   // ── 그룹 추천 ──
   @override String get recommended => 'おすすめ';

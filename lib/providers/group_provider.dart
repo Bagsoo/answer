@@ -30,6 +30,9 @@ class GroupProvider extends ChangeNotifier {
   List<String> likes = [];
   DateTime? createdAt;
 
+  GeoPoint? location;
+  String locationName = ''; 
+
   // ── 내 멤버 정보 ──────────────────────────────────────────────────────────
   String myRole = 'member';
   Map<String, dynamic> myPerms = {};
@@ -53,7 +56,7 @@ class GroupProvider extends ChangeNotifier {
       isOwner || myPerms['can_write_post'] == true;
 
   bool _loaded = false;
-  bool get loaded => _loaded;  
+  bool get loaded => _loaded;
 
   int get absoluteMaxLimit {
     switch (plan) {
@@ -91,6 +94,10 @@ class GroupProvider extends ChangeNotifier {
     }
   }
 
+  double? get locationLat => location?.latitude;
+  double? get locationLng => location?.longitude;
+  String get currentLocationName => locationName;
+
   StreamSubscription? _groupSub;
   StreamSubscription? _memberSub;
 
@@ -119,6 +126,8 @@ class GroupProvider extends ChangeNotifier {
       tags = List<String>.from(d['tags'] as List? ?? []);
       likes = List<String>.from(d['likes'] as List? ?? []);
       final ts = d['created_at'] as Timestamp?;
+      location = d['location'] as GeoPoint?;
+      locationName = d['location_name'] as String? ?? '';
       createdAt = ts?.toDate();
       _loaded = true;
       notifyListeners();
