@@ -199,6 +199,8 @@ class AppLocalizations {
   String get scheduledRegister => _s.scheduledRegister;
   String scheduledAt(String dateTime) => _s.scheduledAt(dateTime);
 
+  String get adLabel => _s.adLabel;
+
   // ── 그룹 위치 ──
   String get groupLocation => _s.groupLocation;
   String get selectGroupLocation => _s.selectGroupLocation;
@@ -611,6 +613,7 @@ class AppLocalizations {
 
 abstract class _AppStrings {
   const _AppStrings();
+  String get adLabel;
   String get navFriends;
   String get navChats;
   String get navGroups;
@@ -1228,6 +1231,7 @@ class AppLocalizationsDelegate
 class _EnStrings extends _AppStrings {
   const _EnStrings();
 
+  @override String get adLabel => 'Ad';
   @override String get navFriends => 'Friends';
   @override String get navChats => 'Chats';
   @override String get navGroups => 'Groups';
@@ -1820,6 +1824,7 @@ class _EnStrings extends _AppStrings {
 class _KoStrings extends _AppStrings {
   const _KoStrings();
 
+  @override String get adLabel => '광고';
   @override String get navFriends => '친구';
   @override String get navChats => '채팅';
   @override String get navGroups => '그룹';
@@ -2412,6 +2417,7 @@ class _KoStrings extends _AppStrings {
 class _JaStrings extends _AppStrings {
   const _JaStrings();
 
+  @override String get adLabel => '広告';
   @override String get navFriends => '友達';
   @override String get navChats => 'チャット';
   @override String get navGroups => 'グループ';

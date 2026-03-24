@@ -13,6 +13,7 @@ import 'create_group_screen.dart';
 import 'group_detail_screen.dart';
 import 'group_preview_screen.dart';
 import 'dart:convert';
+import '../utils/ad_interleaver.dart';
 
 class GroupListScreen extends StatefulWidget {
   const GroupListScreen({super.key});
@@ -264,12 +265,22 @@ class _GroupListScreenState extends State<GroupListScreen>
         ),
       );
     }
-    return ListView.separated(
+
+    final groupWidgets = _joinedGroups.indexed.map<Widget>((entry) {
+      final (i, g) = entry;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          JoinedGroupTile(group: g),
+          // 마지막 아이템 제외하고 Divider
+          if (i < _joinedGroups.length - 1) const Divider(height: 1),
+        ],
+      );
+    }).toList();
+
+    return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: _joinedGroups.length,
-      itemBuilder: (context, i) =>
-          JoinedGroupTile(group: _joinedGroups[i]),
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      children: interleaveAds(groupWidgets, keyPrefix: 'my_group_ad'),
     );
   }
 
@@ -284,9 +295,19 @@ class _GroupListScreenState extends State<GroupListScreen>
       return const Center(child: CircularProgressIndicator());
     }
 
-    // 위치/관심사 미설정 안내
     final hasLocation = userProvider.hasLocation;
     final hasInterests = userProvider.interests.isNotEmpty;
+
+    final recommendWidgets = _recommendedGroups.map<Widget>((group) {
+      final isJoined = joinedIds.contains(group['id'] as String? ?? '');
+      return _RecommendGroupTile(
+        group: group,
+        isAlreadyJoined: isJoined,
+        onJoinPressed: () => _onJoinPressed(group),
+        l: l,
+        cs: cs,
+      );
+    }).toList();
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -322,17 +343,7 @@ class _GroupListScreenState extends State<GroupListScreen>
               ),
             )
           else
-            ...(_recommendedGroups.map((group) {
-              final isJoined =
-                  joinedIds.contains(group['id'] as String? ?? '');
-              return _RecommendGroupTile(
-                group: group,
-                isAlreadyJoined: isJoined,
-                onJoinPressed: () => _onJoinPressed(group),
-                l: l,
-                cs: cs,
-              );
-            })),
+            ...interleaveAds(recommendWidgets, keyPrefix: 'recommend_ad'),
         ],
       ),
     );

@@ -20,6 +20,7 @@ import 'theme/app_theme.dart';
 import 'screens/auth_wrapper.dart';
 import 'firebase_options.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,6 +48,7 @@ void main() async {
   // dotenv는 await, NotificationService는 네트워크 의존이므로 fire-and-forget
   await dotenv.load(fileName: '.env');
   NotificationService().init(); // await 없이 — 네트워크 없어도 앱 시작 블로킹 안 함
+  MobileAds.instance.initialize();
 
   runApp(
     MultiProvider(

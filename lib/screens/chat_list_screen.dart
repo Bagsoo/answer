@@ -9,6 +9,7 @@ import '../l10n/app_localizations.dart';
 import '../widgets/chat/chat_tiles.dart';
 import '../widgets/chat/chats_section.dart';
 import 'chat_room_screen.dart';
+import '../utils/ad_interleaver.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -177,48 +178,46 @@ class _ChatListScreenState extends State<ChatListScreen> {
               if (bLatest == null) return -1;
               return bLatest.compareTo(aLatest);
             });
+          // 1) DM 위젯 리스트
+          final dmWidgets = dmRooms.map<Widget>((room) {
+            final type = room['type'] as String? ?? 'direct';
+            if (type == 'direct') {
+              return DmTile(room: room, colorScheme: colorScheme, myUid: _myUid);
+            }
+            return ChatTile(room: room, colorScheme: colorScheme, myUid: _myUid);
+          }).toList();
 
+          // 2) 그룹 위젯 리스트
+          final groupWidgets = sortedGroups.map<Widget>((entry) {
+            final roomsInGroup = entry.value;
+            final groupName = roomsInGroup.first['group_name'] as String? ?? l.unknown;
+            final groupId = entry.key;
+            final totalUnread = roomsInGroup.fold<int>(
+                0, (sum, r) => sum + ((r['unread_cnt'] as int?) ?? 0));
+
+            return GroupChatSection(
+              key: ValueKey(groupId),
+              groupId: groupId,
+              groupName: groupName,
+              rooms: roomsInGroup,
+              totalUnread: totalUnread,
+              colorScheme: colorScheme,
+              myUid: _myUid,
+              prefs: _prefs!,
+            );
+          }).toList();
+
+          // 3) 광고 삽입 후 ListView로 렌더링
           return ListView(
             children: [
-              ...dmRooms.map<Widget>((room) {
-                final type = room['type'] as String? ?? 'direct';
-                if (type == 'direct') {
-                  return DmTile(
-                    room: room,
-                    colorScheme: colorScheme,
-                    myUid: _myUid,
-                  );
-                }
-                return ChatTile(
-                  room: room,
-                  colorScheme: colorScheme,
-                  myUid: _myUid,
-                );
-              }),
+              ...interleaveAds(dmWidgets, keyPrefix: 'dm_ad'),
               if (dmRooms.isNotEmpty && sortedGroups.isNotEmpty)
                 Divider(
-                    height: 8,
-                    thickness: 8,
-                    color: colorScheme.surfaceContainerHighest),
-              ...sortedGroups.map<Widget>((entry) {
-                final roomsInGroup = entry.value;
-                final groupName =
-                    roomsInGroup.first['group_name'] as String? ?? l.unknown;
-                final groupId = entry.key;
-                final totalUnread = roomsInGroup.fold<int>(
-                    0, (sum, r) => sum + ((r['unread_cnt'] as int?) ?? 0));
-
-                return GroupChatSection(
-                  key: ValueKey(groupId),
-                  groupId: groupId,
-                  groupName: groupName,
-                  rooms: roomsInGroup,
-                  totalUnread: totalUnread,
-                  colorScheme: colorScheme,
-                  myUid: _myUid,
-                  prefs: _prefs!,
-                );
-              }),
+                  height: 8,
+                  thickness: 8,
+                  color: colorScheme.surfaceContainerHighest,
+                ),
+              ...interleaveAds(groupWidgets, keyPrefix: 'group_ad'),
             ],
           );
         },

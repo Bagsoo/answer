@@ -3,6 +3,7 @@ package com.answer.app
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugins.googlemobileads.GoogleMobileAdsPlugin
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.answer.messenger/background"
@@ -17,5 +18,14 @@ class MainActivity : FlutterActivity() {
                 result.notImplemented()
             }
         }
+        
+        GoogleMobileAdsPlugin.registerNativeAdFactory(
+            flutterEngine, "listTile", ListTileNativeAdFactory(context)
+        )
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        super.cleanUpFlutterEngine(flutterEngine)
+        GoogleMobileAdsPlugin.unregisterNativeAdFactory(flutterEngine, "listTile")
     }
 }
