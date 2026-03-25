@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 import 'registration_screen.dart';
+import '../services/notification_service.dart';
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
@@ -27,6 +28,10 @@ class AuthWrapper extends StatelessWidget {
       // 3. Logged in, but document doesn't exist -> Show Registration
       return const RegistrationScreen();
     } else {
+      // 로그인 완료 시 FCM 토큰 저장 (로그인 상태이므로 uid 있음)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        NotificationService().saveFcmTokenOnLogin();
+      });
       // 4. Logged in and registered -> Show Home
       return const HomeScreen();
     }

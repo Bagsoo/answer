@@ -99,6 +99,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   void initState() {
     super.initState();
     final chatService = context.read<ChatService>();
+    // 현재 방 등록
+    chatService.currentRoomId = widget.roomId;
+
     _messagesStream = chatService.getMessages(widget.roomId);
     _membersStream = chatService.getRoomMembers(widget.roomId);
     chatService.updateLastReadTime(widget.roomId);
@@ -122,6 +125,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     _searchController.dispose();
     _scrollController.dispose();
     context.read<ChatService>().updateLastReadTime(widget.roomId);
+
+    // 방 떠날 때 초기화
+    context.read<ChatService>().currentRoomId = null;
     super.dispose();
   }
 

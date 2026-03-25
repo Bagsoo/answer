@@ -37,6 +37,7 @@ class ChatsTab extends StatelessWidget {
         stream: FirebaseFirestore.instance
             .collection('chat_rooms')
             .where('ref_group_id', isEqualTo: groupId)
+            .where('member_ids', arrayContains: currentUserId)
             .orderBy('last_time', descending: true)
             .snapshots(),
         builder: (context, snapshot) {

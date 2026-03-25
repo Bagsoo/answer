@@ -6,11 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+import 'chat_service.dart';
 
 // 백그라운드 메시지 핸들러 (top-level 함수여야 함)
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // 백그라운드에서는 FCM이 자동으로 알림 표시
   debugPrint('Background FCM: ${message.messageId}');
 }
 
@@ -50,7 +50,6 @@ class NotificationService {
   Future<void> init() async {
     tz.initializeTimeZones();
 
-    // 1. 로컬 알림 플러그인 초기화
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const settings = InitializationSettings(android: android);
     await _plugin.initialize(
@@ -58,16 +57,15 @@ class NotificationService {
       onDidReceiveNotificationResponse: _onNotificationTap,
     );
 
-    // 2. Android 알림 채널 생성
     final androidPlugin = _plugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
     await androidPlugin?.createNotificationChannel(_chatChannel);
     await androidPlugin?.createNotificationChannel(_scheduleChannel);
     await androidPlugin?.createNotificationChannel(_joinRequestChannel);
     await androidPlugin?.createNotificationChannel(_marketingChannel);
     await androidPlugin?.requestNotificationsPermission();
 
-    // 3. FCM 권한 요청
     final settings2 = await _fcm.requestPermission(
       alert: true,
       badge: true,
@@ -75,19 +73,11 @@ class NotificationService {
     );
     debugPrint('FCM permission: ${settings2.authorizationStatus}');
 
-    // 4. 백그라운드 핸들러 등록
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-    // 5. 포그라운드 메시지 수신 처리
     FirebaseMessaging.onMessage.listen(_onForegroundMessage);
-
-    // 6. 앱이 백그라운드에서 열릴 때
     FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpenedApp);
 
-    // 7. FCM 토큰 저장
     await _saveFcmToken();
-
-    // 8. 토큰 갱신 시 자동 업데이트
     _fcm.onTokenRefresh.listen((token) => _saveToken(token));
   }
 
@@ -104,25 +94,27 @@ class NotificationService {
     if (uid == null) return;
 
     final platform = Platform.isAndroid ? 'android' : 'ios';
-    // 토큰을 doc ID로 사용해서 중복 저장 방지
     await _db
         .collection('users')
         .doc(uid)
         .collection('fcm_tokens')
-        .doc(token.substring(0, 20)) // 토큰 앞 20자를 ID로
+        .doc(token.substring(0, 20))
         .set({
       'token': token,
       'platform': platform,
       'updated_at': FieldValue.serverTimestamp(),
     });
+    // 토큰 저장 후 Cloud Function(onUserTokenChangedV2)이 자동으로
+    // 해당 유저가 속한 모든 chat_rooms / groups의 active_fcm_tokens를 갱신함
   }
 
-  // 로그아웃 시 토큰 삭제 호출
+  // 로그아웃 시 토큰 삭제
   Future<void> deleteFcmToken() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
     final token = await _fcm.getToken();
     if (token == null) return;
+    // Firestore 문서 삭제 → onUserTokenChangedV2가 active_fcm_tokens에서도 제거
     await _db
         .collection('users')
         .doc(uid)
@@ -137,6 +129,13 @@ class NotificationService {
     final notification = message.notification;
     final data = message.data;
     if (notification == null) return;
+
+    // 현재 보고 있는 채팅방이면 알림 무시
+    final chatService = ChatService();
+    if (data['type'] == 'chat' &&
+        data['roomId'] == chatService.currentRoomId) {
+      return;
+    }
 
     final channelId = _channelIdFromData(data);
 
@@ -157,37 +156,45 @@ class NotificationService {
   }
 
   void _onMessageOpenedApp(RemoteMessage message) {
-    // TODO: 딥링크 처리 (채팅방, 그룹 설정 등으로 이동)
+    // TODO: 딥링크 처리
     debugPrint('Opened from notification: ${message.data}');
   }
 
   void _onNotificationTap(NotificationResponse response) {
-    // 로컬 알림 탭 처리
     debugPrint('Notification tapped: ${response.payload}');
   }
 
   String _channelIdFromData(Map<String, dynamic> data) {
     switch (data['type']) {
-      case 'chat':         return 'chat_channel';
-      case 'join_request': return 'join_request_channel';
-      case 'schedule':     return 'schedule_channel';
-      case 'marketing':    return 'marketing_channel';
-      default:             return 'chat_channel';
+      case 'chat':
+        return 'chat_channel';
+      case 'join_request':
+        return 'join_request_channel';
+      case 'schedule':
+        return 'schedule_channel';
+      case 'marketing':
+        return 'marketing_channel';
+      default:
+        return 'chat_channel';
     }
   }
 
   String _channelNameFromId(String id) {
     switch (id) {
-      case 'chat_channel':         return '채팅 알림';
-      case 'join_request_channel': return '가입 요청 알림';
-      case 'schedule_channel':     return '일정 알림';
-      case 'marketing_channel':    return '마케팅 알림';
-      default:                     return '알림';
+      case 'chat_channel':
+        return '채팅 알림';
+      case 'join_request_channel':
+        return '가입 요청 알림';
+      case 'schedule_channel':
+        return '일정 알림';
+      case 'marketing_channel':
+        return '마케팅 알림';
+      default:
+        return '알림';
     }
   }
 
   String _payloadFromData(Map<String, dynamic> data) {
-    // 예: "chat|roomId", "group|groupId"
     final type = data['type'] ?? '';
     final id = data['roomId'] ?? data['groupId'] ?? '';
     return '$type|$id';
@@ -199,31 +206,33 @@ class NotificationService {
     if (uid == null) return _defaultSettings();
 
     final doc = await _db.collection('users').doc(uid).get();
-    final raw = doc.data()?['notification_settings'] as Map<String, dynamic>?;
+    final raw =
+        doc.data()?['notification_settings'] as Map<String, dynamic>?;
     if (raw == null) return _defaultSettings();
 
     return {
-      'chat_message':  raw['chat_message']  as bool? ?? true,
-      'join_request':  raw['join_request']  as bool? ?? true,
-      'new_schedule':  raw['new_schedule']  as bool? ?? true,
-      'marketing':     raw['marketing']     as bool? ?? false,
+      'chat_message': raw['chat_message'] as bool? ?? true,
+      'join_request': raw['join_request'] as bool? ?? true,
+      'new_schedule': raw['new_schedule'] as bool? ?? true,
+      'marketing': raw['marketing'] as bool? ?? false,
     };
   }
 
   Future<void> saveNotificationSettings(Map<String, bool> settings) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    await _db.collection('users').doc(uid).update({
-      'notification_settings': settings,
-    });
+    await _db
+        .collection('users')
+        .doc(uid)
+        .update({'notification_settings': settings});
   }
 
   Map<String, bool> _defaultSettings() => {
-    'chat_message': true,
-    'join_request': true,
-    'new_schedule': true,
-    'marketing':    false,
-  };
+        'chat_message': true,
+        'join_request': true,
+        'new_schedule': true,
+        'marketing': false,
+      };
 
   // ── 그룹 알림 ON/OFF ────────────────────────────────────────────────────────
   Future<bool> getGroupNotificationEnabled(String groupId) async {
@@ -238,7 +247,8 @@ class NotificationService {
     return doc.data()?['enabled'] as bool? ?? true;
   }
 
-  Future<void> setGroupNotificationEnabled(String groupId, bool enabled) async {
+  Future<void> setGroupNotificationEnabled(
+      String groupId, bool enabled) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
     await _db
@@ -250,6 +260,8 @@ class NotificationService {
   }
 
   // ── 채팅방 뮤트 ─────────────────────────────────────────────────────────────
+  // 뮤트 ON  → room_members에 기록 + active_fcm_tokens에서 내 토큰 제거
+  // 뮤트 OFF → room_members에 기록 + active_fcm_tokens에 내 토큰 다시 추가
   Future<bool> getChatRoomMuted(String roomId) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return false;
@@ -265,15 +277,44 @@ class NotificationService {
   Future<void> setChatRoomMuted(String roomId, bool muted) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    await _db
+
+    // 1. 내 FCM 토큰 목록 조회
+    final tokensSnap = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('fcm_tokens')
+        .get();
+    final myTokens = tokensSnap.docs.map((d) => d['token'] as String).toList();
+
+    // 2. room_members 뮤트 상태 + active_fcm_tokens 동시 업데이트
+    final WriteBatch batch = _db.batch();
+
+    final memberRef = _db
         .collection('chat_rooms')
         .doc(roomId)
         .collection('room_members')
-        .doc(uid)
-        .update({'notification_muted': muted});
+        .doc(uid);
+    batch.update(memberRef, {'notification_muted': muted});
+
+    if (myTokens.isNotEmpty) {
+      final roomRef = _db.collection('chat_rooms').doc(roomId);
+      if (muted) {
+        // 뮤트: 내 토큰을 active_fcm_tokens에서 제거
+        batch.update(roomRef, {
+          'active_fcm_tokens': FieldValue.arrayRemove(myTokens),
+        });
+      } else {
+        // 뮤트 해제: 내 토큰을 active_fcm_tokens에 다시 추가
+        batch.update(roomRef, {
+          'active_fcm_tokens': FieldValue.arrayUnion(myTokens),
+        });
+      }
+    }
+
+    await batch.commit();
   }
 
-  // ── 일정 로컬 알림 (기존 유지) ─────────────────────────────────────────────
+  // ── 일정 로컬 알림 ─────────────────────────────────────────────────────────
   Future<void> scheduleNotification({
     required int id,
     required String title,
@@ -290,7 +331,8 @@ class NotificationService {
       tz.TZDateTime.from(notifyTime, tz.local),
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'schedule_channel', '일정 알림',
+          'schedule_channel',
+          '일정 알림',
           channelDescription: '일정 시작 15분 전 알림',
           importance: Importance.high,
           priority: Priority.high,
@@ -304,6 +346,10 @@ class NotificationService {
 
   Future<void> cancelNotification(int id) async {
     await _plugin.cancel(id);
+  }
+
+  Future<void> saveFcmTokenOnLogin() async {
+    await _saveFcmToken();
   }
 
   static int notificationId(String scheduleId) =>

@@ -5,6 +5,9 @@ class ChatService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // 현재 보고 있는 채팅방 ID
+  String? currentRoomId;
+  
   String get currentUserId => _auth.currentUser?.uid ?? '';
 
   // ── 채팅방 목록 ────────────────────────────────────────────────────────────
