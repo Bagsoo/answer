@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/app_localizations.dart';
+import 'terms_screen.dart';
+import 'privacy_screen.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -15,6 +17,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   late TextEditingController _nameController;
   String _selectedTimezone = 'Asia/Seoul';
   bool _isLoading = false;
+  bool _termsAgreed = false;
+  bool _privacyAgreed = false;
 
   static const _locales = [
     {'code': 'ko', 'label': '한국어'},
@@ -35,7 +39,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   @override
   void initState() {
     super.initState();
-    // Google 로그인이면 displayName 자동 입력
     final authService = context.read<AuthService>();
     _nameController = TextEditingController(
       text: authService.pendingDisplayName ?? '',
@@ -66,6 +69,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       name: name,
       locale: localeCode,
       timezone: _selectedTimezone,
+      termsAgreed: _termsAgreed,
+      privacyAgreed: _privacyAgreed,
     );
 
     if (!success && mounted) {
@@ -81,6 +86,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     final l = AppLocalizations.of(context);
     final localeProvider = context.watch<LocaleProvider>();
     final currentLocale = localeProvider.locale.languageCode;
+    final canRegister = _termsAgreed && _privacyAgreed && !_isLoading;
 
     return Scaffold(
       appBar: AppBar(title: Text(l.registerTitle)),
@@ -148,13 +154,37 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               onChanged: (val) =>
                   setState(() => _selectedTimezone = val!),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 28),
+
+            // ── 약관 동의 ──────────────────────────────────────────────
+            _AgreementRow(
+              value: _termsAgreed,
+              onChanged: (v) => setState(() => _termsAgreed = v ?? false),
+              label: l.termsOfService,
+              onDetailTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TermsScreen()),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _AgreementRow(
+              value: _privacyAgreed,
+              onChanged: (v) =>
+                  setState(() => _privacyAgreed = v ?? false),
+              label: l.privacyPolicy,
+              onDetailTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PrivacyScreen()),
+              ),
+            ),
+            const SizedBox(height: 24),
 
             // ── 등록 버튼 ──────────────────────────────────────────────
             ElevatedButton(
-              onPressed: _isLoading ? null : _register,
+              onPressed: canRegister ? _register : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.amber,
+                disabledBackgroundColor: Colors.amber.withOpacity(0.4),
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               child: _isLoading
@@ -172,6 +202,57 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── 약관 동의 행 ───────────────────────────────────────────────────────────────
+class _AgreementRow extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool?> onChanged;
+  final String label;
+  final VoidCallback onDetailTap;
+
+  const _AgreementRow({
+    required this.value,
+    required this.onChanged,
+    required this.label,
+    required this.onDetailTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Row(
+      children: [
+        Checkbox(
+          value: value,
+          onChanged: onChanged,
+          activeColor: Colors.amber,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 13),
+          ),
+        ),
+        TextButton(
+          onPressed: onDetailTap,
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            foregroundColor: colorScheme.primary,
+          ),
+          child: Text(
+            l.viewDetails,
+            style: const TextStyle(fontSize: 12),
+          ),
+        ),
+      ],
     );
   }
 }

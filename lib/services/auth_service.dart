@@ -146,10 +146,20 @@ class AuthService extends ChangeNotifier {
     required String name,
     required String locale,
     required String timezone,
+    required bool termsAgreed,
+    required bool privacyAgreed,
   }) async {
     final user = currentUser;
     if (user == null) return false;
 
+    final providers = user.providerData.map((p) => p.providerId).toList();
+    final googleData = user.providerData
+        .where((p) => p.providerId == 'google.com')
+        .firstOrNull;
+    final appleData = user.providerData
+        .where((p) => p.providerId == 'apple.com')
+        .firstOrNull;
+    final now = FieldValue.serverTimestamp();
     try {
       await _db.collection('users').doc(user.uid).set({
         'phone_number': user.phoneNumber ?? '',
@@ -157,11 +167,27 @@ class AuthService extends ChangeNotifier {
         'locale': locale,
         'timezone': timezone,
         'total_unread': 0,
-        'created_at': FieldValue.serverTimestamp(),
-        'last_login': FieldValue.serverTimestamp(),
+        'created_at': now,
+        'last_login': now,
         // Google 로그인이면 Google 프로필 사진 자동 저장
         'profile_image': user.photoURL ?? '',
         'fcm_token': '',
+        'providers': providers,
+        'google_email': googleData?.email ?? '',
+        'apple_email': appleData?.email ?? '',
+        // 약관 동의 정보 추가
+        'agreements': {
+          'terms': {
+            'agreed': termsAgreed,
+            'agreed_at': termsAgreed ? now : null,
+            'version': '1.0',
+          },
+          'privacy': {
+            'agreed': privacyAgreed,
+            'agreed_at': privacyAgreed ? now : null,
+            'version': '1.0',
+          },
+        },
       });
 
       _isRegisteredUser = true;

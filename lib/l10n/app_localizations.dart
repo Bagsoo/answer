@@ -243,6 +243,8 @@ class AppLocalizations {
   String get loginGoogleFailed => _s.loginGoogleFailed;
   String get loginInvalidOtp => _s.loginInvalidOtp;
   String get loginPhoneError => _s.loginPhoneError;
+  String get loginAgreeToTerms => _s.loginAgreeToTerms;
+  String get goToRegister => _s.goToRegister;
 
   // ── 회원가입 화면 ──
   String get registerTitle => _s.registerTitle;
@@ -253,6 +255,9 @@ class AppLocalizations {
   String get registerTimezone => _s.registerTimezone;
   String get registerComplete => _s.registerComplete;
   String get registerFailed => _s.registerFailed;
+  String get termsOfService => _s.termsOfService;
+  String get privacyPolicy => _s.privacyPolicy;
+  String get viewDetails => _s.viewDetails;
 
   // ── 게시판 파일 작성 ──────────────────────────────────────────────────────────────
   String get videoProcessingFailed => _s.videoProcessingFailed;
@@ -289,7 +294,8 @@ class AppLocalizations {
   String get attachFile => _s.attachFile;
   String get attachContact => _s.attachContact;
   String get attachSchedule => _s.attachSchedule;
-  String get attachPoll => _s.attachPoll;  
+  String get attachPoll => _s.attachPoll;
+  String get attachLocation => _s.attachLocation; 
 
   // ── 플랜: Free ──────────────────────────────────────────────────────────────
   String get planFree => _s.planFree;
@@ -838,6 +844,8 @@ abstract class _AppStrings {
   String get loginGoogleFailed;    // 'Google sign in failed. Please try again.' / 'Google 로그인 실패. 다시 시도해주세요.' / 'Googleログインに失敗しました。'
   String get loginInvalidOtp;      // 'Invalid OTP Code.' / '잘못된 인증번호입니다.' / '無効な認証番号です。'
   String get loginPhoneError;      // 'Please enter a valid number with country code (e.g. +82...)' / ...
+  String get loginAgreeToTerms;    // 'By logging in, you agree to our Privacy Policy and Terms of Service.' / '로그인하면 개인정보처리방침과 이용약관에 동의하는 것으로 간주합니다.' / 'ログインすると、プライバシーポリシーと利用規約に同意したことになります。'
+  String get goToRegister;         // 'Go to Registration' / '회원가입으로 이동' / '登録画面へ'
 
   // ── 회원가입 화면 ──
   String get registerTitle;        // 'Complete Profile' / '프로필 완성' / 'プロフィール設定'
@@ -848,6 +856,9 @@ abstract class _AppStrings {
   String get registerTimezone;     // 'Timezone' / '시간대' / 'タイムゾーン'
   String get registerComplete;     // 'Complete Registration' / '가입 완료' / '登録を完了する'
   String get registerFailed;       // 'Registration failed. Please try again.' / '회원가입 실패. 다시 시도해주세요.' / '登録に失敗しました。'
+  String get termsOfService;       // 'Terms of Service' / '이용약관' / '利用規約'
+  String get privacyPolicy;        // 'Privacy Policy' / '개인정보처리방침' / 'プライバシーポリシー'
+  String get viewDetails;          // 'View Details' / '상세보기' / '詳細を見る'
 
   // 업로딩 상태
   String get uploadFailed;        // '실패' / 'Failed' / '失敗'
@@ -901,6 +912,7 @@ abstract class _AppStrings {
   String get attachSchedule;
   String get attachPoll;
   String get attachAiMinutes;
+  String get attachLocation;
 
   // Free
   String get planFree;
@@ -1455,6 +1467,8 @@ class _EnStrings extends _AppStrings {
   @override String get loginGoogleFailed => 'Google sign in failed. Please try again.';
   @override String get loginInvalidOtp => 'Invalid OTP Code.';
   @override String get loginPhoneError => 'Please enter a valid number with country code (e.g. +82...)';
+  @override String get loginAgreeToTerms => 'By logging in, you agree to our Privacy Policy and Terms of Service.';
+  @override String get goToRegister => 'Sign up';
 
   // ── 회원가입 화면 ──
   @override String get registerTitle => 'Complete Profile';
@@ -1465,6 +1479,9 @@ class _EnStrings extends _AppStrings {
   @override String get registerTimezone => 'Timezone';
   @override String get registerComplete => 'Complete Registration';
   @override String get registerFailed => 'Registration failed. Please try again.';
+  @override String get termsOfService => 'Terms of Service';
+  @override String get privacyPolicy => 'Privacy Policy';
+  @override String get viewDetails => 'View Details';
 
   @override String get uploadFailed => 'Upload failed';
   @override String get uploadingMessage => 'Sending...';
@@ -1514,6 +1531,7 @@ class _EnStrings extends _AppStrings {
   @override String get attachSchedule => 'Schedule';
   @override String get attachPoll => 'Poll';
   @override String get attachAiMinutes => 'AI Minutes';
+  @override String get attachLocation => 'Location Sharing';
 
   // Free
   @override String get planFree => 'Free';
@@ -2048,6 +2066,8 @@ class _KoStrings extends _AppStrings {
   @override String get loginGoogleFailed => 'Google 로그인 실패. 다시 시도해주세요.';
   @override String get loginInvalidOtp => '잘못된 인증번호입니다.';
   @override String get loginPhoneError => '국가번호를 포함한 유효한 번호를 입력해주세요 (예: +82...)';
+  @override String get loginAgreeToTerms => '로그인하면 개인정보처리방침과 이용약관에 동의하는 것으로 간주합니다.';
+  @override String get goToRegister => '회원가입으로 이동';
 
   // ── 회원가입 화면 ──
   @override String get registerTitle => '프로필 완성';
@@ -2058,6 +2078,9 @@ class _KoStrings extends _AppStrings {
   @override String get registerTimezone => '시간대';
   @override String get registerComplete => '가입 완료';
   @override String get registerFailed => '회원가입 실패. 다시 시도해주세요.';
+  @override String get termsOfService => '이용약관';
+  @override String get privacyPolicy => '개인정보처리방침';
+  @override String get viewDetails => '자세히 보기';
 
   @override String get uploadFailed => '업로드 실패';
   @override String get uploadingMessage => '전송 중...';
@@ -2107,6 +2130,7 @@ class _KoStrings extends _AppStrings {
   @override String get attachSchedule => '예약메세지';
   @override String get attachPoll => '투표';
   @override String get attachAiMinutes => 'AI 회의록';
+  @override String get attachLocation => '위치 공유';
 
   // Free
   @override String get planFree => '무료';
@@ -2641,6 +2665,8 @@ class _JaStrings extends _AppStrings {
   @override String get loginGoogleFailed => 'Googleログインに失敗しました。';
   @override String get loginInvalidOtp => '無効な認証番号です。';
   @override String get loginPhoneError => '国番号を含む有効な番号を入力してください (例: +82...)';
+  @override String get loginAgreeToTerms => 'ログインすると、プライバシーポリシーと利用規約に同意したことになります。';
+  @override String get goToRegister => '登録画面へ';
 
   // ── 회원가입 화면 ──
   @override String get registerTitle => 'プロフィール設定';
@@ -2651,6 +2677,9 @@ class _JaStrings extends _AppStrings {
   @override String get registerTimezone => 'タイムゾーン';
   @override String get registerComplete => '登録を完了する';
   @override String get registerFailed => '登録に失敗しました。';
+  @override String get termsOfService => '利用規約';
+  @override String get privacyPolicy => 'プライバシーポリシー';
+  @override String get viewDetails => '詳細を見る';
 
   @override String get uploadFailed => 'アップロード失敗';
   @override String get uploadingMessage => '送信中...';
@@ -2700,6 +2729,7 @@ class _JaStrings extends _AppStrings {
   @override String get attachSchedule => '予約送信';
   @override String get attachPoll => '投票';
   @override String get attachAiMinutes => 'AI議事録';
+  @override String get attachLocation => '位置共有';
 
   // Free
   @override String get planFree => '無料';

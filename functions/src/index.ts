@@ -7,23 +7,6 @@ import { setGlobalOptions } from "firebase-functions/v2";
 import * as admin from "firebase-admin";
 
 admin.initializeApp();
-
-console.log("[init] admin.app().options.projectId:", admin.app().options.projectId);
-console.log("[init] GCLOUD_PROJECT:", process.env.GCLOUD_PROJECT);
-console.log("[init] FIREBASE_CONFIG:", process.env.FIREBASE_CONFIG);
-void fetch(
-  "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email",
-  {
-    headers: {"Metadata-Flavor": "Google"},
-  }
-)
-  .then(async (res) => {
-    const email = await res.text();
-    console.log("[init] runtime service account:", email);
-  })
-  .catch((error: unknown) => {
-    console.log("[init] runtime service account lookup failed:", error);
-  });
 const db = admin.firestore();
 const messaging = admin.messaging();
 
@@ -57,22 +40,12 @@ async function sendChunked(
       tokens: chunk,
     });
 
-    // ← 추가
     response.responses.forEach((res, idx) => {
-      const error = res.error as
-        | ({code?: string; message?: string; details?: unknown; stack?: string})
-        | undefined;
-      console.log(
-        "[FCM response]",
-        JSON.stringify({
-          tokenPrefix: chunk[idx].substring(0, 20),
-          success: res.success,
-          messageId: res.messageId ?? "none",
-          errorCode: error?.code ?? "none",
-          errorMessage: error?.message ?? "none",
-          errorDetails: error?.details ?? null,
-          errorStack: error?.stack ?? null,
-        })
+      if (res.success) return;
+      console.error(
+        `[FCM response] token: ${chunk[idx].substring(0, 20)}, ` +
+          `error: ${res.error?.code ?? "unknown"}, ` +
+          `message: ${res.error?.message ?? "none"}`
       );
     });
 

@@ -4,6 +4,7 @@ import 'package:intl_phone_field/intl_phone_field.dart';
 import '../services/auth_service.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/app_localizations.dart';
+import 'registration_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -296,6 +297,37 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
                 ),
+
+              // ── 약관 동의 안내 문구 ──────────────────────────────────────
+              const SizedBox(height: 24),
+              Text(
+                l.loginAgreeToTerms,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade500,
+                  height: 1.5,
+                ),
+              ),
+
+              // ── 회원가입으로 이동 ────────────────────────────────────────
+              const SizedBox(height: 12),
+              Center(
+                child: TextButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const RegistrationScreen()),
+                  ),
+                  child: Text(
+                    l.goToRegister,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
             ],
           ),
         ),

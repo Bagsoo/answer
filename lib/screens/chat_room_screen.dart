@@ -1549,6 +1549,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           color: Colors.teal,
           onTap: () {}),
       AttachItem(
+          icon: Icons.share_location_outlined,
+          label: l.attachLocation,
+          color: Colors.cyan,
+          onTap: () {}),
+      AttachItem(
           icon: Icons.insert_drive_file_outlined,
           label: l.attachFile,
           color: Colors.brown,

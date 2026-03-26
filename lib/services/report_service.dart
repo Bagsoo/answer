@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:messenger/l10n/app_localizations.dart';
 
 enum ReportReason {
   spam,
@@ -16,23 +17,15 @@ class ReportService {
   String get _myUid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   // ── 신고 사유 레이블 ────────────────────────────────────────────────────────
-  static String reasonLabel(ReportReason reason, {String locale = 'ko'}) {
-    const ko = {
-      ReportReason.spam: '스팸/도배',
-      ReportReason.hateSpeech: '욕설/혐오',
-      ReportReason.obscene: '음란물',
-      ReportReason.fraud: '사기/허위정보',
-      ReportReason.other: '기타',
-    };
-    const en = {
-      ReportReason.spam: 'Spam',
-      ReportReason.hateSpeech: 'Hate Speech',
-      ReportReason.obscene: 'Obscene Content',
-      ReportReason.fraud: 'Fraud / Misinformation',
-      ReportReason.other: 'Other',
-    };
-    final map = locale.startsWith('ko') ? ko : en;
-    return map[reason] ?? reason.name;
+  static String reasonLabel(ReportReason reason, BuildContext context) {
+    final l = AppLocalizations.of(context);
+    switch (reason) {
+      case ReportReason.spam:       return l.reportReasonSpam;
+      case ReportReason.hateSpeech: return l.reportReasonHate;
+      case ReportReason.obscene:    return l.reportReasonObscene;
+      case ReportReason.fraud:      return l.reportReasonFraud;
+      case ReportReason.other:      return l.reportReasonOther;
+    }
   }
 
   // ── 메시지 신고 ─────────────────────────────────────────────────────────────
