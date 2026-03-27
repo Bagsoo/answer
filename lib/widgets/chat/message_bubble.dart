@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import 'location_message_bubble.dart';
 
 class MessageBubble extends StatefulWidget {
   final Map<String, dynamic> data;
@@ -307,6 +308,17 @@ class _MessageBubbleState extends State<MessageBubble>
     final colorScheme = widget.colorScheme;
 
     final type = widget.data['type'] as String? ?? 'text';
+
+    if (type == 'location') {
+      return LocationMessageBubble(
+        data: widget.data,
+        isMe: widget.isMe,
+        isContinuous: widget.isContinuous,
+        unreadCount: widget.unreadCount,
+        colorScheme: widget.colorScheme,
+      );
+    }
+
     final imageUrls =
         List<String>.from(widget.data['image_urls'] as List? ?? []);
     final videoUrl = widget.data['video_url'] as String? ?? '';

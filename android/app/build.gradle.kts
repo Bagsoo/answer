@@ -7,6 +7,17 @@ if (localPropertiesFile.exists()) {
     localPropertiesFile.inputStream().use { localProperties.load(it) }
 }
 
+val envProperties = Properties()
+val envFile = rootProject.file("../.env")
+if (envFile.exists()) {
+    envFile.inputStream().use { envProperties.load(it) }
+}
+
+val googleMapsApiKey =
+    envProperties.getProperty("GOOGLE_MAPS_API_KEY")?.takeIf { it.isNotBlank() }
+        ?: localProperties.getProperty("google.api.key")
+        ?: ""
+
 plugins {
     id("com.android.application")
     id("com.google.gms.google-services")
@@ -38,7 +49,7 @@ android {
         versionName = flutter.versionName
 
         // 에러나던 Line 36: 변수 참조 방식을 더 안전하게 변경
-        manifestPlaceholders["googleApiKey"] = localProperties.getProperty("google.api.key") ?: ""
+        manifestPlaceholders["googleApiKey"] = googleMapsApiKey
     }
 
     buildTypes {

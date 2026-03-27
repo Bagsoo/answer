@@ -18,6 +18,7 @@ import 'chat_room_more/chat_room_invite_screen.dart';
 import 'chat_room_more/notices_screen.dart';
 import 'chat_room_more/create_poll_screen.dart';
 import 'chat_room_more/poll_bubble.dart';
+import 'chat_room_more/location_share_sheet.dart';
 import 'user_profile_detail_screen.dart';
 import '../widgets/chat/date_divider.dart';
 import '../widgets/chat/system_message.dart';
@@ -1552,7 +1553,23 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           icon: Icons.share_location_outlined,
           label: l.attachLocation,
           color: Colors.cyan,
-          onTap: () {}),
+          onTap: () async {
+            setState(() => _showAttachPanel = false);
+
+            final result = await showModalBottomSheet<LocationShareResult>(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              builder: (_) => LocationShareSheet(),
+            );
+
+            if (result != null && mounted) {
+              await _sendLocationMessage(result, l);
+            }
+          },),
       AttachItem(
           icon: Icons.insert_drive_file_outlined,
           label: l.attachFile,
@@ -1605,6 +1622,30 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _sendLocationMessage(LocationShareResult result, AppLocalizations l) async {
+    await FirebaseFirestore.instance
+        .collection('chat_rooms')
+        .doc(widget.roomId)
+        .collection('messages')
+        .add({
+      'type': 'location',
+      'location_lat': result.lat,
+      'location_lng': result.lng,
+      'location_type': result.type,
+      'sender_id': _currentUserId,
+      'sender_name': _myName,
+      'created_at': FieldValue.serverTimestamp(),
+    });
+
+    await FirebaseFirestore.instance
+        .collection('chat_rooms')
+        .doc(widget.roomId)
+        .update({
+      'last_message': result.type, // 👈 여기 핵심
+      'last_time': FieldValue.serverTimestamp(),
+    });
   }
 }
 

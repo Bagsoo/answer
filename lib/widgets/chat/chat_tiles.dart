@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import '../../screens/chat_room_screen.dart';
 
 // ── 유저 프로필 메모리 캐시 ────────────────────────────────────────────────────
@@ -20,6 +21,18 @@ class UserCache {
   }
 
   static void invalidate(String uid) => _cache.remove(uid);
+}
+
+String _localizedLastMessage(BuildContext context, String lastMessage) {
+  final l = AppLocalizations.of(context);
+  switch (lastMessage) {
+    case 'current':
+      return l.locationCurrent;
+    case 'destination':
+      return l.locationDestination;
+    default:
+      return lastMessage;
+  }
 }
 
 // ── 1:1 DM 타일 ───────────────────────────────────────────────────────────────
@@ -75,7 +88,10 @@ class _DmTileState extends State<DmTile> {
   Widget build(BuildContext context) {
     final cs = widget.colorScheme;
     final roomId = widget.room['id'] as String;
-    final lastMessage = widget.room['last_message'] as String? ?? '';
+    final lastMessage = _localizedLastMessage(
+      context,
+      widget.room['last_message'] as String? ?? '',
+    );
     final unreadCnt = widget.room['unread_cnt'] as int? ?? 0;
     final hasPhoto = _otherPhoto.isNotEmpty;
 
@@ -244,7 +260,10 @@ class ChatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final roomId = room['id'] as String;
     final name = room['name'] as String? ?? roomId;
-    final lastMessage = room['last_message'] as String? ?? '';
+    final lastMessage = _localizedLastMessage(
+      context,
+      room['last_message'] as String? ?? '',
+    );
     final unreadCnt = room['unread_cnt'] as int? ?? 0;
     final type = room['type'] as String? ?? 'direct';
     final memberIds = List<String>.from(room['member_ids'] as List? ?? []);

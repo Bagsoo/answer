@@ -60,6 +60,8 @@ dependencies:
   provider: ^6.1.5+1
   url_launcher: ^6.3.2
   google_places_flutter: ^2.1.1
+  google_maps_flutter: ^2.9.0
+  geocoding: ^3.0.0
   flutter_dotenv: ^6.0.0
   image_picker: ^1.2.1
   flutter_image_compress: ^2.4.0

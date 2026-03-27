@@ -295,7 +295,16 @@ class AppLocalizations {
   String get attachContact => _s.attachContact;
   String get attachSchedule => _s.attachSchedule;
   String get attachPoll => _s.attachPoll;
-  String get attachLocation => _s.attachLocation; 
+  String get attachLocation => _s.attachLocation;
+  String get locationCurrent => _s.locationCurrent;
+  String get locationDestination => _s.locationDestination;
+  String get locationShareCurrentDesc => _s.locationShareCurrentDesc;
+  String get locationShareDestinationDesc => _s.locationShareDestinationDesc;
+  String get locationServiceDisabled => _s.locationServiceDisabled;
+  String get locationPermissionRequired => _s.locationPermissionRequired;
+  String get locationPermissionOpenSettings => _s.locationPermissionOpenSettings;
+  String get locationFetchFailed => _s.locationFetchFailed;
+  String get loadingAddress => _s.loadingAddress;
 
   // ── 플랜: Free ──────────────────────────────────────────────────────────────
   String get planFree => _s.planFree;
@@ -913,6 +922,15 @@ abstract class _AppStrings {
   String get attachPoll;
   String get attachAiMinutes;
   String get attachLocation;
+  String get locationCurrent;
+  String get locationDestination;
+  String get locationShareCurrentDesc;
+  String get locationShareDestinationDesc;
+  String get locationServiceDisabled;
+  String get locationPermissionRequired;
+  String get locationPermissionOpenSettings;
+  String get locationFetchFailed;
+  String get loadingAddress;
 
   // Free
   String get planFree;
@@ -1532,6 +1550,15 @@ class _EnStrings extends _AppStrings {
   @override String get attachPoll => 'Poll';
   @override String get attachAiMinutes => 'AI Minutes';
   @override String get attachLocation => 'Location Sharing';
+  @override String get locationCurrent => '📍 Current Location';
+  @override String get locationDestination => '📍 Destination';
+  @override String get locationShareCurrentDesc => 'Share where you are right now';
+  @override String get locationShareDestinationDesc => 'Choose a destination on the map and send it';
+  @override String get locationServiceDisabled => 'Location services are turned off.';
+  @override String get locationPermissionRequired => 'Location permission is required.';
+  @override String get locationPermissionOpenSettings => 'Please allow location permission in Settings.';
+  @override String get locationFetchFailed => 'Could not get your location.';
+  @override String get loadingAddress => 'Loading address...';
 
   // Free
   @override String get planFree => 'Free';
@@ -2131,6 +2158,15 @@ class _KoStrings extends _AppStrings {
   @override String get attachPoll => '투표';
   @override String get attachAiMinutes => 'AI 회의록';
   @override String get attachLocation => '위치 공유';
+  @override String get locationCurrent => '📍 현재 위치';
+  @override String get locationDestination => '📍 목적지';
+  @override String get locationShareCurrentDesc => '지금 내 위치를 전송해요';
+  @override String get locationShareDestinationDesc => '지도에서 목적지를 선택해서 전송해요';
+  @override String get locationServiceDisabled => '위치 서비스가 꺼져 있어요.';
+  @override String get locationPermissionRequired => '위치 권한이 필요해요.';
+  @override String get locationPermissionOpenSettings => '설정에서 위치 권한을 허용해주세요.';
+  @override String get locationFetchFailed => '위치를 가져오지 못했어요.';
+  @override String get loadingAddress => '주소 불러오는 중...';
 
   // Free
   @override String get planFree => '무료';
@@ -2730,6 +2766,15 @@ class _JaStrings extends _AppStrings {
   @override String get attachPoll => '投票';
   @override String get attachAiMinutes => 'AI議事録';
   @override String get attachLocation => '位置共有';
+  @override String get locationCurrent => '📍 現在位置';
+  @override String get locationDestination => '📍 目的地';
+  @override String get locationShareCurrentDesc => '今いる場所を共有します';
+  @override String get locationShareDestinationDesc => '地図で目的地を選んで送信します';
+  @override String get locationServiceDisabled => '位置情報サービスがオフになっています。';
+  @override String get locationPermissionRequired => '位置情報の権限が必要です。';
+  @override String get locationPermissionOpenSettings => '設定で位置情報の権限を許可してください。';
+  @override String get locationFetchFailed => '位置情報を取得できませんでした。';
+  @override String get loadingAddress => '住所を読み込み中...';
 
   // Free
   @override String get planFree => '無料';
