@@ -6,12 +6,14 @@ class ChatScheduledMessageSheet extends StatefulWidget {
   final String roomId;
   final String currentUserId;
   final String senderName;
+  final String initialText;
 
   const ChatScheduledMessageSheet({
     super.key,
     required this.roomId,
     required this.currentUserId,
     required this.senderName,
+    this.initialText = '',
   });
 
   @override
@@ -25,25 +27,21 @@ class _ChatScheduledMessageSheetState
   DateTime? _selectedDateTime;
 
   @override
+  void initState() {
+    super.initState();
+    _controller.text = widget.initialText;
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
 
-  Future<DateTime> _fetchServerTime() async {
-    final db = FirebaseFirestore.instance;
-    final ref = db.collection('_server_time').doc('ping');
-    await ref.set({'t': FieldValue.serverTimestamp()});
-    final snap = await ref.get();
-    final ts = snap.data()?['t'] as Timestamp?;
-    return ts?.toDate() ?? DateTime.now();
-  }
-
   Future<void> _pickDateTime() async {
     final l = AppLocalizations.of(context);
-    final serverNow = await _fetchServerTime();
-    if (!mounted) return;
-    final today = DateTime(serverNow.year, serverNow.month, serverNow.day);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     final date = await showDatePicker(
       context: context,
       initialDate: today,
@@ -58,10 +56,7 @@ class _ChatScheduledMessageSheetState
 
     final picked = DateTime(
         date.year, date.month, date.day, time.hour, time.minute);
-    final serverNowCheck = await _fetchServerTime();
-    if (!mounted) return;
-
-    if (picked.isBefore(serverNowCheck.add(const Duration(minutes: 1)))) {
+    if (picked.isBefore(now.add(const Duration(minutes: 1)))) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(l.scheduledTimeMin)));
       return;
@@ -164,7 +159,7 @@ class _ChatScheduledMessageSheetState
                   'created_at': FieldValue.serverTimestamp(),
                 });
                 if (context.mounted) {
-                  Navigator.pop(context);
+                  Navigator.pop(context, true);
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                     content: Text(l.scheduledAt(_formatDateTime(_selectedDateTime!))),
                   ));

@@ -709,9 +709,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     );
   }
 
-  void _showScheduledMessageSheet() {
+  Future<void> _showScheduledMessageSheet({
+    String initialText = '',
+    bool clearComposerOnSuccess = false,
+  }) async {
     final colorScheme = Theme.of(context).colorScheme;
-    showModalBottomSheet(
+    final scheduled = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: colorScheme.surface,
@@ -722,8 +725,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         roomId: widget.roomId,
         currentUserId: _currentUserId,
         senderName: _myName,
+        initialText: initialText,
       ),
     );
+    if (scheduled == true && clearComposerOnSuccess && mounted) {
+      _msgController.clear();
+      setState(() {
+        _replyToId = null;
+        _replyToData = null;
+      });
+    }
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -1503,6 +1514,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   padding: const EdgeInsets.all(6),
                   constraints: const BoxConstraints(),
                   onPressed: _sendMessage,
+                  onLongPress: () => _showScheduledMessageSheet(
+                    initialText: _msgController.text.trim(),
+                    clearComposerOnSuccess: true,
+                  ),
                 ),
               ],
             ),
