@@ -15,6 +15,13 @@ service cloud.firestore {
       allow read: if isLoggedIn();
       allow write: if isOwner(uid);
 
+      match /friends/{friendUid} {
+        allow read, write: if isOwner(uid);
+      }
+      match /blocked/{blockedUid} {
+        allow read, write: if isOwner(uid);
+      }
+
       match /fcm_tokens/{tokenId} {
         allow read, write: if isOwner(uid);
       }

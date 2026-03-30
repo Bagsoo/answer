@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/friend_service.dart';
 import '../../services/group_service.dart';
@@ -770,6 +771,12 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
     }
   }
 
+  Future<void> _callPhoneNumber() async {
+    if (_phoneNumber.isEmpty) return;
+    final uri = Uri(scheme: 'tel', path: _phoneNumber);
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
   @override
   Widget build(BuildContext context) {
     // GroupProvider에서 myRole/myPerms 실시간 반영
@@ -853,10 +860,21 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
                 ),
               )
             else if (_phoneNumber.isNotEmpty)
-              Text(_phoneNumber,
-                  style: TextStyle(
+              InkWell(
+                onTap: _callPhoneNumber,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Text(
+                    _phoneNumber,
+                    style: TextStyle(
                       fontSize: 14,
-                      color: colorScheme.onSurface.withOpacity(0.5))),
+                      color: colorScheme.onSurface.withOpacity(0.5),
+                    ),
+                  ),
+                ),
+              ),
             const SizedBox(height: 24),
             if (!widget.isMe)
               SizedBox(

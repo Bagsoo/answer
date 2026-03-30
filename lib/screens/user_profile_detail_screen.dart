@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/friend_service.dart';
 import '../services/block_service.dart';
 import '../providers/user_provider.dart';
@@ -28,6 +29,7 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
   bool _isFriend = false;
   bool _isBlocked = false;
   bool _loading = true;
+  String _phoneNumber = '';
 
   String get _myUid => FirebaseAuth.instance.currentUser?.uid ?? '';
   bool get _isMe => widget.uid == _myUid;
@@ -41,17 +43,28 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
   Future<void> _loadStatus() async {
     final friendService = context.read<FriendService>();
     final blockService = context.read<BlockService>();
+    final userDocFuture =
+        FirebaseFirestore.instance.collection('users').doc(widget.uid).get();
     final results = await Future.wait([
       friendService.isFriend(widget.uid),
       blockService.isBlocked(widget.uid),
+      userDocFuture,
     ]);
+    final userDoc = results[2] as DocumentSnapshot<Map<String, dynamic>>;
     if (mounted) {
       setState(() {
-        _isFriend = results[0];
-        _isBlocked = results[1];
+        _isFriend = results[0] as bool;
+        _isBlocked = results[1] as bool;
+        _phoneNumber = userDoc.data()?['phone_number'] as String? ?? '';
         _loading = false;
       });
     }
+  }
+
+  Future<void> _callPhoneNumber() async {
+    if (_phoneNumber.isEmpty) return;
+    final uri = Uri(scheme: 'tel', path: _phoneNumber);
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   // ── DM 보내기 ─────────────────────────────────────────────────────────────
@@ -204,6 +217,23 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
           const SizedBox(height: 16),
           Text(widget.displayName,
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          if (_phoneNumber.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            InkWell(
+              onTap: _callPhoneNumber,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text(
+                  _phoneNumber,
+                  style: TextStyle(
+                    color: colorScheme.onSurface.withOpacity(0.5),
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           Text(l.me,
               style: TextStyle(
@@ -246,6 +276,23 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
           // ── 이름 ────────────────────────────────────────────────────────
           Text(widget.displayName,
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          if (_phoneNumber.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            InkWell(
+              onTap: _callPhoneNumber,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text(
+                  _phoneNumber,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colorScheme.onSurface.withOpacity(0.5),
+                  ),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 4),
 
           // ── 친구 뱃지 ────────────────────────────────────────────────────
