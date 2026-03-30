@@ -30,6 +30,10 @@ String _localizedLastMessage(BuildContext context, String lastMessage) {
       return l.locationCurrent;
     case 'destination':
       return l.locationDestination;
+    case 'file':
+      return l.attachFile;
+    case 'contact':
+      return l.attachContact;
     default:
       return lastMessage;
   }

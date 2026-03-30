@@ -1276,7 +1276,7 @@ class _EnStrings extends _AppStrings {
   @override String get joinedSuccess => 'Joined the group successfully!';
   @override String get joinFailed => 'Failed to join the group.';
   @override String get alreadyJoined => 'Joined';
-  @override String get searchPlaceholder => 'Search groups by name...';
+  @override String get searchPlaceholder => 'Search by name...';
   @override String get tabMembers => 'Members';
   @override String get tabApprovals => 'Approvals';
   @override String get tabSchedules => 'Schedules';
@@ -1515,7 +1515,7 @@ class _EnStrings extends _AppStrings {
 
   // 게시글 파일
   @override String get videoProcessingFailed => 'Failed to process video';
-  @override String get fileSizeExceeded => 'File size exceeds 50MB';
+  @override String get fileSizeExceeded => 'File size exceeds 30MB';
   @override String get audioFileSizeExceeded => 'Audio file must be 20MB or less';
   @override String get saveError => 'Failed to save';
   @override String get existingFile => 'Existing attachments';
@@ -1884,7 +1884,7 @@ class _KoStrings extends _AppStrings {
   @override String get joinedSuccess => '그룹에 가입했습니다!';
   @override String get joinFailed => '그룹 가입에 실패했습니다.';
   @override String get alreadyJoined => '가입됨';
-  @override String get searchPlaceholder => '그룹 이름으로 검색...';
+  @override String get searchPlaceholder => '이름으로 검색...';
   @override String get tabMembers => '멤버';
   @override String get tabApprovals => '승인';
   @override String get tabSchedules => '일정';
@@ -2123,7 +2123,7 @@ class _KoStrings extends _AppStrings {
 
   // 게시글 파일
   @override String get videoProcessingFailed => '동영상 처리 실패';
-  @override String get fileSizeExceeded => '파일 크기가 50MB를 초과합니다';
+  @override String get fileSizeExceeded => '파일 크기가 30MB를 초과합니다';
   @override String get audioFileSizeExceeded => '오디오 파일은 20MB 이하만 가능합니다';
   @override String get saveError => '저장 실패';
   @override String get existingFile => '기존 첨부파일';
@@ -2492,7 +2492,7 @@ class _JaStrings extends _AppStrings {
   @override String get joinedSuccess => 'グループに参加しました！';
   @override String get joinFailed => 'グループへの参加に失敗しました。';
   @override String get alreadyJoined => '参加済み';
-  @override String get searchPlaceholder => 'グループ名で検索...';
+  @override String get searchPlaceholder => '名前で検索...';
   @override String get tabMembers => 'メンバー';
   @override String get tabApprovals => '承認';
   @override String get tabSchedules => 'スケジュール';
@@ -2731,7 +2731,7 @@ class _JaStrings extends _AppStrings {
 
   // 게시글 파일
   @override String get videoProcessingFailed => '動画の処理に失敗しました';
-  @override String get fileSizeExceeded => 'ファイルサイズが50MBを超えています';
+  @override String get fileSizeExceeded => 'ファイルサイズが30MBを超えています';
   @override String get audioFileSizeExceeded => '音声ファイルは20MB以下にしてください';
   @override String get saveError => '保存中にエラーが発生しました';
   @override String get existingFile => '既存の添付ファイル';

@@ -13,12 +13,14 @@ import '../l10n/app_localizations.dart';
 import '../services/storage_service.dart';
 import '../services/image_service.dart';
 import '../services/video_service.dart';
+import '../services/file_service.dart';
 import 'chat_room_more/chat_room_participants_screen.dart';
 import 'chat_room_more/chat_room_invite_screen.dart';
 import 'chat_room_more/notices_screen.dart';
 import 'chat_room_more/create_poll_screen.dart';
 import 'chat_room_more/poll_bubble.dart';
 import 'chat_room_more/location_share_sheet.dart';
+import '../widgets/chat/contact_share_sheet.dart';
 import 'user_profile_detail_screen.dart';
 import '../widgets/chat/date_divider.dart';
 import '../widgets/chat/system_message.dart';
@@ -737,6 +739,78 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
   }
 
+  Future<void> _sendFiles() async {
+    setState(() => _showAttachPanel = false);
+    final l = AppLocalizations.of(context);
+    final pickedFiles = await FileService().pickFiles();
+    if (pickedFiles.isEmpty || !mounted) return;
+
+    final chatService = context.read<ChatService>();
+    final userProvider = context.read<UserProvider>();
+    final validFiles = pickedFiles
+        .where((item) => !FileService().isSizeExceeded(item.size))
+        .toList();
+
+    final hasOversized = validFiles.length != pickedFiles.length;
+    if (hasOversized && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.fileSizeExceeded)),
+      );
+    }
+    if (validFiles.isEmpty) return;
+
+    for (final picked in validFiles) {
+      final messageId = chatService.generateMessageId(widget.roomId);
+
+      if (mounted) {
+        setState(() {
+          _uploadingMessages[messageId] = _UploadingMessage(
+            messageId: messageId,
+            type: 'file',
+            senderName: _myName,
+            senderPhotoUrl: userProvider.photoUrl ?? '',
+            createdAt: DateTime.now(),
+            fileName: picked.name,
+            fileSize: picked.size,
+            mimeType: picked.mimeType,
+          );
+        });
+      }
+
+      try {
+        final uploaded = await StorageService().uploadChatFile(
+          roomId: widget.roomId,
+          messageId: messageId,
+          file: picked.file,
+          fileName: picked.name,
+          mimeType: picked.mimeType,
+        );
+        if (!mounted) return;
+
+        await chatService.sendFileMessage(
+          widget.roomId,
+          messageId: messageId,
+          fileUrl: uploaded['url']!,
+          fileName: picked.name,
+          fileSize: picked.size,
+          mimeType: picked.mimeType,
+          senderName: _myName,
+          senderPhotoUrl: userProvider.photoUrl,
+        );
+        chatService.updateLastReadTime(widget.roomId);
+      } catch (e) {
+        if (mounted) {
+          setState(() => _uploadingMessages[messageId]?.failed = true);
+        }
+      } finally {
+        if (mounted) {
+          await Future.delayed(const Duration(milliseconds: 1000));
+          setState(() => _uploadingMessages.remove(messageId));
+        }
+      }
+    }
+  }
+
   // ──────────────────────────────────────────────────────────────────────────
   // 드롭다운 메뉴
   // ──────────────────────────────────────────────────────────────────────────
@@ -1334,6 +1408,50 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           ],
         ),
       );
+    } else if (msg.type == 'file') {
+      content = Container(
+        width: 220,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.insert_drive_file_outlined,
+              color: colorScheme.primary,
+              size: 28,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    msg.fileName ?? l.attachFile,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if ((msg.fileSize ?? 0) > 0)
+                    Text(
+                      _formatFileSize(msg.fileSize!),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: colorScheme.onSurface.withOpacity(0.55),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
     } else {
       content = const SizedBox(width: 80, height: 80);
     }
@@ -1589,12 +1707,31 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           icon: Icons.insert_drive_file_outlined,
           label: l.attachFile,
           color: Colors.brown,
-          onTap: () {}),
+          onTap: _sendFiles),
       AttachItem(
           icon: Icons.contacts_outlined,
           label: l.attachContact,
           color: Colors.indigo,
-          onTap: () {}),
+          onTap: () async {
+            setState(() => _showAttachPanel = false);
+
+            final result = await showModalBottomSheet<ContactShareResult>(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              builder: (_) => ContactShareSheet(
+                shareButtonColor: Colors.white,
+                shareButtonForegroundColor: Colors.black,
+              ),
+            );
+
+            if (result != null && mounted) {
+              await _sendContactMessage(result);
+            }
+          }),
       AttachItem(
         icon: Icons.schedule_send_outlined,
         label: l.attachSchedule,
@@ -1662,6 +1799,29 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       'last_time': FieldValue.serverTimestamp(),
     });
   }
+
+  Future<void> _sendContactMessage(ContactShareResult result) async {
+    final chatService = context.read<ChatService>();
+    final userProvider = context.read<UserProvider>();
+
+    await chatService.sendContactMessage(
+      widget.roomId,
+      sharedUserId: result.uid,
+      sharedUserName: result.displayName,
+      sharedUserPhotoUrl: result.photoUrl,
+      senderName: _myName,
+      senderPhotoUrl: userProvider.photoUrl,
+    );
+    chatService.updateLastReadTime(widget.roomId);
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '${bytes}B';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)}KB';
+    }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
+  }
 }
 
 // ── 업로딩 메시지 모델 ─────────────────────────────────────────────────────────
@@ -1670,6 +1830,9 @@ class _UploadingMessage {
   final String type;
   final List<File> imageFiles;
   final File? thumbnailFile;
+  final String? fileName;
+  final int? fileSize;
+  final String? mimeType;
   final String senderName;
   final String senderPhotoUrl;
   final DateTime createdAt;
@@ -1680,6 +1843,9 @@ class _UploadingMessage {
     required this.type,
     this.imageFiles = const [],
     this.thumbnailFile,
+    this.fileName,
+    this.fileSize,
+    this.mimeType,
     required this.senderName,
     required this.senderPhotoUrl,
     required this.createdAt,

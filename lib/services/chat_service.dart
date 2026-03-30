@@ -245,6 +245,89 @@ class ChatService {
     await batch.commit();
   }
 
+  // ── 파일 메시지 전송 ───────────────────────────────────────────────────────
+  Future<void> sendFileMessage(
+    String roomId, {
+    required String messageId,
+    required String fileUrl,
+    required String fileName,
+    required int fileSize,
+    required String mimeType,
+    required String senderName,
+    String? senderPhotoUrl,
+  }) async {
+    final unreadUpdate = await _buildUnreadUpdate(roomId);
+    final batch = _db.batch();
+
+    final msgRef = _db
+        .collection('chat_rooms')
+        .doc(roomId)
+        .collection('messages')
+        .doc(messageId);
+
+    batch.set(msgRef, {
+      'sender_id': currentUserId,
+      'sender_name': senderName,
+      'sender_photo_url': senderPhotoUrl ?? '',
+      'text': '',
+      'type': 'file',
+      'file_url': fileUrl,
+      'file_name': fileName,
+      'file_size': fileSize,
+      'mime_type': mimeType,
+      'is_system': false,
+      'created_at': FieldValue.serverTimestamp(),
+    });
+
+    batch.update(_db.collection('chat_rooms').doc(roomId), {
+      'last_message': 'file',
+      'last_time': FieldValue.serverTimestamp(),
+      ...unreadUpdate,
+    });
+
+    await batch.commit();
+  }
+
+  // ── 연락처(프로필 카드) 메시지 전송 ───────────────────────────────────────
+  Future<void> sendContactMessage(
+    String roomId, {
+    required String sharedUserId,
+    required String sharedUserName,
+    required String sharedUserPhotoUrl,
+    required String senderName,
+    String? senderPhotoUrl,
+  }) async {
+    final unreadUpdate = await _buildUnreadUpdate(roomId);
+    final batch = _db.batch();
+
+    final msgRef = _db
+        .collection('chat_rooms')
+        .doc(roomId)
+        .collection('messages')
+        .doc();
+
+    batch.set(msgRef, {
+      'sender_id': currentUserId,
+      'sender_name': senderName,
+      'sender_photo_url': senderPhotoUrl ?? '',
+      'text': '',
+      'type': 'contact',
+      'shared_user_id': sharedUserId,
+      'shared_user_name': sharedUserName,
+      'shared_user_photo_url': sharedUserPhotoUrl,
+      'is_system': false,
+      'created_at': FieldValue.serverTimestamp(),
+    });
+
+    batch.update(_db.collection('chat_rooms').doc(roomId), {
+      'last_message': 'contact',
+      'last_time': FieldValue.serverTimestamp(),
+      ...unreadUpdate,
+    });
+
+    await batch.commit();
+  }
+
   // ── 읽음 처리 ─────────────────────────────────────────────────────────────
   Future<void> updateLastReadTime(String roomId) async {
     final batch = _db.batch();

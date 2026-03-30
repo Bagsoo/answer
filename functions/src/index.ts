@@ -5,80 +5,18 @@ import {
 } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as admin from "firebase-admin";
+import {
+  getTokensForUids,
+  sendChunked,
+  cleanupInvalidTokens,
+} from "./utils/fcm";
 
 admin.initializeApp();
 const db = admin.firestore();
-const messaging = admin.messaging();
 
 setGlobalOptions({
   region: "asia-northeast3",
 });
-
-// ── 유틸: uid 배열로 FCM 토큰 배열 조회 ──────────────────────────────────────
-async function getTokensForUids(uids: string[]): Promise<string[]> {
-  if (uids.length === 0) return [];
-  const snaps = await Promise.all(
-    uids.map((uid) =>
-      db.collection("users").doc(uid).collection("fcm_tokens").get()
-    )
-  );
-  return snaps.flatMap((s) => s.docs.map((d) => d.data().token as string));
-}
-
-// ── 유틸: 토큰 배열을 500개씩 청크로 나눠 FCM 전송 ──────────────────────────
-async function sendChunked(
-  tokens: string[],
-  payload: admin.messaging.MulticastMessage
-) {
-  const chunkSize = 500;
-  const invalidTokens: string[] = [];
-
-  for (let i = 0; i < tokens.length; i += chunkSize) {
-    const chunk = tokens.slice(i, i + chunkSize);
-    const response = await messaging.sendEachForMulticast({
-      ...payload,
-      tokens: chunk,
-    });
-
-    response.responses.forEach((res, idx) => {
-      if (res.success) return;
-      console.error(
-        `[FCM response] token: ${chunk[idx].substring(0, 20)}, ` +
-          `error: ${res.error?.code ?? "unknown"}, ` +
-          `message: ${res.error?.message ?? "none"}`
-      );
-    });
-
-    response.responses.forEach((res, idx) => {
-      if (!res.success) {
-        const code = res.error?.code ?? "";
-        if (
-          code === "messaging/invalid-registration-token" ||
-          code === "messaging/registration-token-not-registered"
-        ) {
-          invalidTokens.push(chunk[idx]);
-        }
-      }
-    });
-  }
-
-  return invalidTokens;
-}
-
-// ── 유틸: 유효하지 않은 토큰 DB에서 삭제 ────────────────────────────────────
-async function cleanupInvalidTokens(invalidTokens: string[]) {
-  if (invalidTokens.length === 0) return;
-
-  // Firestore "in" 쿼리는 최대 10개이므로 슬라이스
-  const tokenDocs = await db
-    .collectionGroup("fcm_tokens")
-    .where("token", "in", invalidTokens.slice(0, 10))
-    .get();
-
-  const batch = db.batch();
-  tokenDocs.docs.forEach((doc) => batch.delete(doc.ref));
-  await batch.commit();
-}
 
 // ── 1. 채팅 메시지 알림 ───────────────────────────────────────────────────────
 export const onMessageSentV2 = onDocumentCreated(
@@ -101,6 +39,10 @@ export const onMessageSentV2 = onDocumentCreated(
         "📷 사진을 보냈습니다" :
         type === "video" ?
           "🎥 동영상을 보냈습니다" :
+          type === "file" ?
+            "📎 파일을 보냈습니다" :
+            type === "contact" ?
+              "👤 연락처를 보냈습니다" :
           text;
 
     const roomDoc = await db.collection("chat_rooms").doc(roomId).get();
@@ -133,8 +75,7 @@ export const onMessageSentV2 = onDocumentCreated(
       return null;
     }
 
-    const payload: admin.messaging.MulticastMessage = {
-      tokens: targets,
+    const payload: Omit<admin.messaging.MulticastMessage, "tokens"> = {
       notification: {
         title: roomName ?? senderName,
         body: `${senderName}: ${body}`,
@@ -183,8 +124,7 @@ export const onJoinRequestV2 = onDocumentCreated(
     const groupDoc = await db.collection("groups").doc(groupId).get();
     const groupName = (groupDoc.data()?.name as string) ?? "그룹";
 
-    const payload: admin.messaging.MulticastMessage = {
-      tokens,
+    const payload: Omit<admin.messaging.MulticastMessage, "tokens"> = {
       notification: {
         title: groupName,
         body: `${requesterName}님이 가입을 요청했습니다`,
@@ -244,8 +184,7 @@ export const onScheduleAddedV2 = onDocumentCreated(
     const targets = activeFcmTokens.filter((t) => !mutedTokens.includes(t));
     if (targets.length === 0) return null;
 
-    const payload: admin.messaging.MulticastMessage = {
-      tokens: targets,
+    const payload: Omit<admin.messaging.MulticastMessage, "tokens"> = {
       notification: {
         title: groupName,
         body: `새 일정이 추가됐습니다: ${title}`,
@@ -263,7 +202,6 @@ export const onScheduleAddedV2 = onDocumentCreated(
 );
 
 // ── 4. FCM 토큰 변경 시 active_fcm_tokens Fan-out ────────────────────────────
-// 토큰이 갱신(onTokenRefresh)되거나 로그아웃으로 삭제될 때 모든 방/그룹에 반영
 export const onUserTokenChangedV2 = onDocumentWritten(
   "users/{uid}/fcm_tokens/{tokenId}",
   async (event) => {
@@ -271,7 +209,6 @@ export const onUserTokenChangedV2 = onDocumentWritten(
     const before = event.data?.before.data();
     const after = event.data?.after.data();
 
-    // 실제 토큰 값의 변화가 없으면 스킵 (updated_at만 변경된 경우)
     if (before?.token === after?.token) return null;
 
     const [chatRoomsSnap, groupsSnap] = await Promise.all([
@@ -342,8 +279,7 @@ export const onUserTokenChangedV2 = onDocumentWritten(
   }
 );
 
-// ── 6. 채팅방 멤버 입장 시 토큰 추가 ─────────────────────────────────────────
-// room_members/{uid} 문서가 새로 생길 때 해당 유저의 토큰을 arrayUnion
+// ── 5. 채팅방 멤버 입장 시 토큰 추가 ─────────────────────────────────────────
 export const onChatRoomMemberJoinedV2 = onDocumentCreated(
   "chat_rooms/{roomId}/room_members/{uid}",
   async (event) => {
@@ -373,8 +309,7 @@ export const onChatRoomMemberJoinedV2 = onDocumentCreated(
   }
 );
 
-// ── 7. 채팅방 멤버 퇴장 시 토큰 제거 ─────────────────────────────────────────
-// room_members/{uid} 문서가 삭제될 때 해당 유저의 토큰을 arrayRemove
+// ── 6. 채팅방 멤버 퇴장 시 토큰 제거 ─────────────────────────────────────────
 export const onChatRoomMemberLeftV2 = onDocumentDeleted(
   "chat_rooms/{roomId}/room_members/{uid}",
   async (event) => {
@@ -402,3 +337,9 @@ export const onChatRoomMemberLeftV2 = onDocumentDeleted(
     return null;
   }
 );
+
+// ── 7. 플랜 만료 그룹 자동 다운그레이드 / user_payment 만료 처리 ────────────
+export {
+  downgradeExpiredGroups,
+  expireUserPayments,
+} from "./downgradeExpiredGroups";

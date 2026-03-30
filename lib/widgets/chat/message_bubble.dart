@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
+import '../../l10n/app_localizations.dart';
+import '../../screens/user_profile_detail_screen.dart';
 import 'location_message_bubble.dart';
 
 class MessageBubble extends StatefulWidget {
@@ -149,6 +152,42 @@ class _MessageBubbleState extends State<MessageBubble>
     ));
   }
 
+  Future<void> _openFileUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  IconData _fileIcon(String mime) {
+    if (mime.contains('pdf')) return Icons.picture_as_pdf;
+    if (mime.contains('word') || mime.contains('hwp')) return Icons.description;
+    if (mime.contains('sheet') || mime.contains('excel')) return Icons.table_chart;
+    if (mime.contains('presentation') || mime.contains('powerpoint')) {
+      return Icons.slideshow;
+    }
+    if (mime.contains('audio')) return Icons.audio_file;
+    if (mime.contains('video')) return Icons.video_file;
+    if (mime.contains('image')) return Icons.image;
+    if (mime.contains('zip') || mime.contains('rar')) return Icons.folder_zip;
+    return Icons.insert_drive_file;
+  }
+
+  Color _fileIconColor(String mime, ColorScheme colorScheme) {
+    if (mime.contains('pdf')) return Colors.red;
+    if (mime.contains('sheet') || mime.contains('excel')) return Colors.green;
+    if (mime.contains('presentation') || mime.contains('powerpoint')) {
+      return Colors.orange;
+    }
+    if (mime.contains('word') || mime.contains('hwp')) return Colors.blue;
+    return colorScheme.primary;
+  }
+
+  String _fileSizeText(int bytes) {
+    if (bytes < 1024) return '${bytes}B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)}KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
+  }
+
   // ── 말풍선 내용 빌드 ──────────────────────────────────────────────────────
   Widget _buildBubbleContent({
     required String type,
@@ -158,9 +197,18 @@ class _MessageBubbleState extends State<MessageBubble>
     required List<String> imageUrls,
     required String videoUrl,
     required String thumbnailUrl,
+    required String fileUrl,
+    required String fileName,
+    required int fileSize,
+    required String mimeType,
+    required String sharedUserId,
+    required String sharedUserName,
+    required String sharedUserPhotoUrl,
     required Widget? replyBox,
     required ColorScheme colorScheme,
   }) {
+    final l = AppLocalizations.of(context);
+
     // ── 이미지 ──────────────────────────────────────────────────────────────
     if (type == 'image' && imageUrls.isNotEmpty) {
       return Column(
@@ -274,6 +322,155 @@ class _MessageBubbleState extends State<MessageBubble>
       );
     }
 
+    if (type == 'file') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (replyBox != null) replyBox,
+          GestureDetector(
+            onTap: fileUrl.isNotEmpty ? () => _openFileUrl(fileUrl) : null,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 240),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: colorScheme.outline.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _fileIcon(mimeType),
+                    color: _fileIconColor(mimeType, colorScheme),
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          fileName.isNotEmpty ? fileName : l.attachFile,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (fileSize > 0)
+                          Text(
+                            _fileSizeText(fileSize),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: colorScheme.onSurface.withOpacity(0.5),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.download_outlined,
+                    size: 18,
+                    color: colorScheme.onSurface.withOpacity(0.45),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (type == 'contact') {
+      final hasPhoto = sharedUserPhotoUrl.isNotEmpty;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (replyBox != null) replyBox,
+          GestureDetector(
+            onTap: sharedUserId.isEmpty
+                ? null
+                : () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => UserProfileDetailScreen(
+                          uid: sharedUserId,
+                          displayName: sharedUserName.isNotEmpty
+                              ? sharedUserName
+                              : l.unknown,
+                          photoUrl: sharedUserPhotoUrl,
+                        ),
+                      ),
+                    ),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 240),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: colorScheme.outline.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: colorScheme.primaryContainer,
+                    backgroundImage:
+                        hasPhoto ? NetworkImage(sharedUserPhotoUrl) : null,
+                    child: hasPhoto
+                        ? null
+                        : Text(
+                            sharedUserName.isNotEmpty
+                                ? sharedUserName[0].toUpperCase()
+                                : '?',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          sharedUserName.isNotEmpty
+                              ? sharedUserName
+                              : l.unknown,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          l.attachContact,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: colorScheme.onSurface.withOpacity(0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    color: colorScheme.onSurface.withOpacity(0.35),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     // ── 텍스트 (기본) ────────────────────────────────────────────────────────
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,6 +520,14 @@ class _MessageBubbleState extends State<MessageBubble>
         List<String>.from(widget.data['image_urls'] as List? ?? []);
     final videoUrl = widget.data['video_url'] as String? ?? '';
     final thumbnailUrl = widget.data['thumbnail_url'] as String? ?? '';
+    final fileUrl = widget.data['file_url'] as String? ?? '';
+    final fileName = widget.data['file_name'] as String? ?? '';
+    final fileSize = (widget.data['file_size'] as num?)?.toInt() ?? 0;
+    final mimeType = widget.data['mime_type'] as String? ?? '';
+    final sharedUserId = widget.data['shared_user_id'] as String? ?? '';
+    final sharedUserName = widget.data['shared_user_name'] as String? ?? '';
+    final sharedUserPhotoUrl =
+        widget.data['shared_user_photo_url'] as String? ?? '';
 
     // 답장 데이터
     final replyToText = widget.data['reply_to_text'] as String?;
@@ -393,12 +598,20 @@ class _MessageBubbleState extends State<MessageBubble>
       imageUrls: imageUrls,
       videoUrl: videoUrl,
       thumbnailUrl: thumbnailUrl,
+      fileUrl: fileUrl,
+      fileName: fileName,
+      fileSize: fileSize,
+      mimeType: mimeType,
+      sharedUserId: sharedUserId,
+      sharedUserName: sharedUserName,
+      sharedUserPhotoUrl: sharedUserPhotoUrl,
       replyBox: replyBox,
       colorScheme: colorScheme,
     );
 
     // 이미지/동영상은 패딩 줄임
-    final isMedia = type == 'image' || type == 'video';
+    final isMedia =
+        type == 'image' || type == 'video' || type == 'file' || type == 'contact';
     final bubblePadding = isMedia
         ? const EdgeInsets.all(4)
         : const EdgeInsets.symmetric(horizontal: 13, vertical: 9);

@@ -70,6 +70,32 @@ class StorageService {
     }
   }
 
+  // ── 채팅 일반 파일 업로드 ────────────────────────────────────────────────
+  Future<Map<String, String>> uploadChatFile({
+    required String roomId,
+    required String messageId,
+    required File file,
+    required String fileName,
+    required String mimeType,
+  }) async {
+    final ref = _storage.ref(
+      'chat_rooms/$roomId/files/${DateTime.now().millisecondsSinceEpoch}_$fileName',
+    );
+    try {
+      final task = await ref.putFile(
+        file,
+        SettableMetadata(
+          contentType: mimeType,
+          customMetadata: {'message_id': messageId},
+        ),
+      );
+      final url = await task.ref.getDownloadURL();
+      return {'url': url, 'name': fileName};
+    } catch (e) {
+      throw Exception('파일 업로드 실패: $e');
+    }
+  }
+
   // ── 그룹 프로필 이미지 업로드 ─────────────────────────────────────────────
   Future<String> uploadGroupProfileImage({
     required String groupId,
