@@ -271,9 +271,11 @@ class ChatTile extends StatelessWidget {
     final unreadCnt = room['unread_cnt'] as int? ?? 0;
     final type = room['type'] as String? ?? 'direct';
     final memberIds = List<String>.from(room['member_ids'] as List? ?? []);
+    final groupProfileImage = room['group_profile_image'] as String? ?? '';
+    final hasGroupProfileImage = groupProfileImage.isNotEmpty;
 
     Widget avatar;
-    if (type == 'group_direct') {
+    if (type == 'group_direct' || type == 'group_sub') {
       avatar = GroupDirectAvatar(
         myUid: myUid,
         memberIds: memberIds,
@@ -283,8 +285,17 @@ class ChatTile extends StatelessWidget {
       avatar = CircleAvatar(
         radius: 22,
         backgroundColor: colorScheme.primaryContainer,
-        child:
-            Icon(Icons.group, color: colorScheme.onPrimaryContainer, size: 22),
+        backgroundImage: hasGroupProfileImage
+            ? CachedNetworkImageProvider(groupProfileImage)
+            : null,
+        onBackgroundImageError: hasGroupProfileImage ? (_, __) {} : null,
+        child: hasGroupProfileImage
+            ? null
+            : Icon(
+                Icons.group,
+                color: colorScheme.onPrimaryContainer,
+                size: 22,
+              ),
       );
     } else {
       avatar = CircleAvatar(
@@ -307,7 +318,7 @@ class ChatTile extends StatelessWidget {
                     fontWeight:
                         unreadCnt > 0 ? FontWeight.bold : FontWeight.normal)),
           ),
-          if (type == 'group_direct') ...[
+          if (type == 'group_direct' || type == 'group_sub') ...[
             const SizedBox(width: 4),
             Icon(Icons.people,
                 size: 12, color: colorScheme.onSurface.withOpacity(0.35)),

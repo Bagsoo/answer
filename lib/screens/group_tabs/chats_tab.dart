@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/group_provider.dart';
+import '../../widgets/chat/chat_tiles.dart';
 import '../chat_room_screen.dart';
 
 class ChatsTab extends StatelessWidget {
@@ -72,19 +74,38 @@ class ChatsTab extends StatelessWidget {
               final name = data['name'] as String? ?? 'Untitled Chat';
               final type = data['type'] as String? ?? 'group_sub';
               final isGroupAll = type == 'group_all';
+              final groupProfileImage =
+                  data['group_profile_image'] as String? ?? '';
+              final memberIds =
+                  List<String>.from(data['member_ids'] as List? ?? []);
+
+              Widget avatar;
+              if (isGroupAll) {
+                final hasGroupProfileImage = groupProfileImage.isNotEmpty;
+                avatar = CircleAvatar(
+                  backgroundColor: colorScheme.primaryContainer,
+                  backgroundImage: hasGroupProfileImage
+                      ? CachedNetworkImageProvider(groupProfileImage)
+                      : null,
+                  onBackgroundImageError:
+                      hasGroupProfileImage ? (_, __) {} : null,
+                  child: hasGroupProfileImage
+                      ? null
+                      : Icon(
+                          Icons.group,
+                          color: colorScheme.onPrimaryContainer,
+                        ),
+                );
+              } else {
+                avatar = GroupDirectAvatar(
+                  myUid: currentUserId,
+                  memberIds: memberIds,
+                  colorScheme: colorScheme,
+                );
+              }
 
               return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: isGroupAll
-                      ? colorScheme.primaryContainer
-                      : colorScheme.secondaryContainer,
-                  child: Icon(
-                    isGroupAll ? Icons.speaker_notes : Icons.chat,
-                    color: isGroupAll
-                        ? colorScheme.onPrimaryContainer
-                        : colorScheme.onSecondaryContainer,
-                  ),
-                ),
+                leading: avatar,
                 title: Text(name,
                     style: TextStyle(
                         fontWeight: isGroupAll
