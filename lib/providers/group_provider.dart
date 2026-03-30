@@ -26,6 +26,8 @@ class GroupProvider extends ChangeNotifier {
   int chatCount = 0;
   bool requireApproval = false;
   bool allowPlanUpgrade = false;
+  bool qrEnabled = false;
+  String inviteToken = '';
   List<String> tags = [];
   List<String> likes = [];
   DateTime? createdAt;
@@ -43,6 +45,7 @@ class GroupProvider extends ChangeNotifier {
 
   bool get isOwner => myRole == 'owner';
   bool get isLiked => likes.contains(currentUserId);
+  bool get isPaidPlan => plan == 'plus' || plan == 'pro';
 
   bool get canPostSchedule =>
       isOwner || myPerms['can_post_schedule'] == true;
@@ -123,6 +126,8 @@ class GroupProvider extends ChangeNotifier {
       profileImageUrl = d['group_profile_image'] as String? ?? '';
       requireApproval = d['require_approval'] as bool? ?? false;
       allowPlanUpgrade = d['allow_plan_upgrade'] as bool? ?? false;
+      qrEnabled = d['qr_enabled'] as bool? ?? false;
+      inviteToken = d['invite_token'] as String? ?? '';
       tags = List<String>.from(d['tags'] as List? ?? []);
       likes = List<String>.from(d['likes'] as List? ?? []);
       final ts = d['created_at'] as Timestamp?;

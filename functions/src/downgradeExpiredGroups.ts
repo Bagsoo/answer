@@ -72,6 +72,7 @@ export const downgradeExpiredGroups = onSchedule(
       // 3-1. groups 문서 다운그레이드
       batch.update(groupDoc.ref, {
         plan: "free",
+        qr_enabled: false,
         expires_at: null,
         payment_id: null,
         payer_uid: null,

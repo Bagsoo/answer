@@ -40,6 +40,8 @@ class GroupService {
       'member_count': 1,
       'member_limit': memberLimit,
       'plan': plan,
+      'invite_token': null,
+      'qr_enabled': false,
       'allow_plan_upgrade': allowPlanUpgrade,
       'created_at': FieldValue.serverTimestamp(),
       'searchable_keywords': keywords,
@@ -80,6 +82,7 @@ class GroupService {
       'type': 'group_all',
       'ref_group_id': groupDoc.id,
       'group_name': name,
+      'group_profile_image': profileImage,
       'name': '$name 전체 채팅',
       'member_ids': [currentUserId],
       'last_message': '채팅방이 생성되었습니다.',
@@ -817,10 +820,23 @@ class GroupService {
     required String groupId,
     required String imageUrl,
   }) async {
-    await _db
-        .collection('groups')
-        .doc(groupId)
-        .update({'group_profile_image': imageUrl});
+    final batch = _db.batch();
+    batch.update(
+      _db.collection('groups').doc(groupId),
+      {'group_profile_image': imageUrl},
+    );
+
+    final chatSnap = await _db
+        .collection('chat_rooms')
+        .where('ref_group_id', isEqualTo: groupId)
+        .where('type', isEqualTo: 'group_all')
+        .get();
+
+    for (final chatDoc in chatSnap.docs) {
+      batch.update(chatDoc.reference, {'group_profile_image': imageUrl});
+    }
+
+    await batch.commit();
   }
 
   // ── 방장 위임 ──────────────────────────────────────────────────────────────

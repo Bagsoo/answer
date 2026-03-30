@@ -12,6 +12,8 @@ import 'profile_screen.dart';
 import 'create_group_screen.dart';
 import 'group_detail_screen.dart';
 import 'group_preview_screen.dart';
+import 'group_qr_join_preview_screen.dart';
+import 'group_tabs/group_qr_scanner_screen.dart';
 import 'dart:convert';
 import '../utils/ad_interleaver.dart';
 
@@ -150,6 +152,31 @@ class _GroupListScreenState extends State<GroupListScreen>
         });
       }
     });
+  }
+
+  Future<void> _openQrJoinFlow() async {
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const GroupQrScannerScreen()),
+    );
+
+    if (!mounted || code == null || code.trim().isEmpty) {
+      return;
+    }
+
+    final joined = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => GroupQrJoinPreviewScreen(rawValue: code),
+      ),
+    );
+
+    if (!mounted || joined != true) return;
+
+    setState(() {
+      _searchQuery = '';
+      _searchController.clear();
+      _searchResults = [];
+    });
+    _tabController.animateTo(0);
   }
 
   Future<void> _onJoinPressed(Map<String, dynamic> group) async {
@@ -361,15 +388,23 @@ class _GroupListScreenState extends State<GroupListScreen>
             decoration: InputDecoration(
               hintText: l.searchGroupsHint,
               prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.qr_code_scanner),
+                    onPressed: _openQrJoinFlow,
+                  ),
+                  if (_searchQuery.isNotEmpty)
+                    IconButton(
                       icon: const Icon(Icons.clear),
                       onPressed: () {
                         _searchController.clear();
                         _onSearchChanged('');
                       },
-                    )
-                  : null,
+                    ),
+                ],
+              ),
             ),
             onChanged: _onSearchChanged,
           ),

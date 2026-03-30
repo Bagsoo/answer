@@ -10,6 +10,11 @@ import {
   sendChunked,
   cleanupInvalidTokens,
 } from "./utils/fcm";
+export {
+  regenerateGroupQr,
+  setGroupQrEnabled,
+  joinGroupByQr,
+} from "./groupQr";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -34,16 +39,16 @@ export const onMessageSentV2 = onDocumentCreated(
     const text = message.text as string;
     const type = message.type as string;
 
-    const body =
-      type === "image" ?
-        "📷 사진을 보냈습니다" :
-        type === "video" ?
-          "🎥 동영상을 보냈습니다" :
-          type === "file" ?
-            "📎 파일을 보냈습니다" :
-            type === "contact" ?
-              "👤 연락처를 보냈습니다" :
-          text;
+    let body = text;
+    if (type === "image") {
+      body = "📷 사진을 보냈습니다";
+    } else if (type === "video") {
+      body = "🎥 동영상을 보냈습니다";
+    } else if (type === "file") {
+      body = "📎 파일을 보냈습니다";
+    } else if (type === "contact") {
+      body = "👤 연락처를 보냈습니다";
+    }
 
     const roomDoc = await db.collection("chat_rooms").doc(roomId).get();
     const roomData = roomDoc.data();
@@ -106,7 +111,10 @@ export const onJoinRequestV2 = onDocumentCreated(
     const snap = event.data;
     if (!snap) return null;
     const request = snap.data();
-    const requesterName = (request.name as string) ?? "누군가";
+    const requesterName =
+      (request.display_name as string | undefined) ??
+      (request.name as string | undefined) ??
+      "누군가";
 
     const membersSnap = await db
       .collection("groups")

@@ -8,6 +8,7 @@ import '../../providers/group_provider.dart';
 import '../../services/group_service.dart';
 import '../../services/notification_service.dart';
 import 'group_info_edit_screen.dart';
+import 'group_qr_screen.dart';
 import 'join_requests_screen.dart';
 import 'plan_screen.dart';
 
@@ -399,28 +400,48 @@ class _SettingsTabState extends State<SettingsTab> {
           ),
           const Divider(),
 
-          // ── 유료플랜 관리 ──────────────────────────────────────────────────────
+        ],
+
+        if ((isOwner || canEdit) || gp.isPaidPlan) ...[
           SectionHeader(title: l.sectionPremium),
-          ListTile(
-            leading:
-                Icon(Icons.article_outlined, color: colorScheme.primary),
-            title: Text(l.manageGroupPlan),
-            trailing: Icon(Icons.chevron_right,
-                color: colorScheme.onSurface.withOpacity(0.4)),
-            onTap: () {
-              // 1. 현재 context에서 이미 활성화된 groupProvider를 가져옵니다.
-              final groupProvider = context.read<GroupProvider>();
+          if (isOwner || canEdit)
+            ListTile(
+              leading:
+                  Icon(Icons.article_outlined, color: colorScheme.primary),
+              title: Text(l.manageGroupPlan),
+              trailing: Icon(Icons.chevron_right,
+                  color: colorScheme.onSurface.withOpacity(0.4)),
+              onTap: () {
+                final groupProvider = context.read<GroupProvider>();
 
-              Navigator.of(context).push(MaterialPageRoute(
-                // 2. 새로운 화면으로 기존 groupProvider 인스턴스를 주입하며 이동합니다.
-                builder: (_) => ChangeNotifierProvider.value(
-                  value: groupProvider,
-                  child: PlanScreen(groupId: groupId),
-                ),
-              ));
-            },
-          ),
-
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => ChangeNotifierProvider.value(
+                    value: groupProvider,
+                    child: PlanScreen(groupId: groupId),
+                  ),
+                ));
+              },
+            ),
+          if (gp.isPaidPlan)
+            ListTile(
+              leading:
+                  Icon(Icons.qr_code_2_outlined, color: colorScheme.primary),
+              title: Text(l.groupQr),
+              subtitle: Text(l.groupQrDescription),
+              trailing: Icon(Icons.chevron_right,
+                  color: colorScheme.onSurface.withOpacity(0.4)),
+              onTap: () {
+                final groupProvider = context.read<GroupProvider>();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ChangeNotifierProvider.value(
+                      value: groupProvider,
+                      child: GroupQrScreen(groupId: groupId),
+                    ),
+                  ),
+                );
+              },
+            ),
           const Divider(),
         ],
 
