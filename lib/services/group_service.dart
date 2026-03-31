@@ -509,6 +509,20 @@ class GroupService {
     }
   }
 
+  Future<void> updateLastReadNoticeTime(String groupId) async {
+    if (currentUserId.isEmpty) return;
+    try {
+      await _db
+          .collection('groups')
+          .doc(groupId)
+          .collection('members')
+          .doc(currentUserId)
+          .update({'last_read_notice_time': FieldValue.serverTimestamp()});
+    } catch (e) {
+      debugPrint('updateLastReadNoticeTime error: $e');
+    }
+  }
+
   Stream<Map<String, dynamic>?> streamLatestGroupNotice(String groupId) {
     return _db
         .collection('groups')

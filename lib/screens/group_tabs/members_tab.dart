@@ -29,7 +29,7 @@ class _MembersTabState extends State<MembersTab> {
   String _searchQuery = '';
   String? _selectedTag;
   bool _showSearch = false;
-  bool _noticeExpanded = true;
+  bool _noticeExpanded = false;
 
   List<QueryDocumentSnapshot> _members = [];
   List<String> _tagList = [];
@@ -127,103 +127,122 @@ class _MembersTabState extends State<MembersTab> {
           builder: (context, noticeSnap) {
             final latestNotice = noticeSnap.data;
             final summary = latestNotice?['text'] as String? ?? '';
+            
+            final createdTime = (latestNotice?['created_at'] as Timestamp?)?.toDate();
+            final myLastRead = gp.myLastReadNoticeTime;
+            final hasUnread = latestNotice != null && (myLastRead == null || (createdTime != null && createdTime.isAfter(myLastRead)));
 
-            return Container(
-              width: double.infinity,
-              margin: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withOpacity(0.72),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: colorScheme.onSurface.withOpacity(0.06),
-                ),
-              ),
-              child: Column(
-                children: [
-                  InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () => setState(() => _noticeExpanded = !_noticeExpanded),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
+            return Column(
+              children: [
+                InkWell(
+                  onTap: () {
+                    setState(() => _noticeExpanded = !_noticeExpanded);
+                    if (_noticeExpanded && hasUnread) {
+                      context.read<GroupService>().updateLastReadNoticeTime(groupId);
+                    }
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                      border: Border(
+                        bottom: BorderSide(
+                          color: colorScheme.onSurface.withOpacity(0.08),
+                          width: 1,
+                        ),
                       ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.campaign_outlined,
-                            size: 18,
-                            color: colorScheme.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              l.groupNotice,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.campaign_outlined,
+                          size: 18,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Text(
+                                l.groupNotice,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
+                              if (hasUnread)
+                                Container(
+                                  margin: const EdgeInsets.only(left: 4, bottom: 6),
+                                  width: 5,
+                                  height: 5,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.error,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          _noticeExpanded
+                              ? Icons.keyboard_arrow_up
+                              : Icons.keyboard_arrow_down,
+                          size: 20,
+                          color: colorScheme.onSurface.withOpacity(0.55),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_noticeExpanded)
+                  InkWell(
+                    onTap: () {
+                      if (hasUnread) {
+                        context.read<GroupService>().updateLastReadNoticeTime(groupId);
+                      }
+                      _showGroupNoticeSheet(context, groupId);
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer.withOpacity(0.3),
+                        border: Border(
+                          bottom: BorderSide(
+                            color: colorScheme.primary.withOpacity(0.1),
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            latestNotice == null ? l.noNotices : l.currentNotice,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.primary,
                             ),
                           ),
-                          Icon(
-                            _noticeExpanded
-                                ? Icons.keyboard_arrow_up
-                                : Icons.keyboard_arrow_down,
-                            color: colorScheme.onSurface.withOpacity(0.55),
+                          const SizedBox(height: 6),
+                          Text(
+                            latestNotice == null ? l.groupNoticeTapToOpen : summary,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.35,
+                              color: colorScheme.onPrimaryContainer,
+                              fontWeight: latestNotice == null ? FontWeight.w500 : FontWeight.w600,
+                            ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  if (_noticeExpanded)
-                    InkWell(
-                      borderRadius: const BorderRadius.vertical(
-                        bottom: Radius.circular(16),
-                      ),
-                      onTap: () => _showGroupNoticeSheet(context, groupId),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer.withOpacity(0.42),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                latestNotice == null ? l.noNotices : l.currentNotice,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: colorScheme.primary,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                latestNotice == null
-                                    ? l.groupNoticeTapToOpen
-                                    : summary,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  height: 1.35,
-                                  color: colorScheme.onPrimaryContainer,
-                                  fontWeight: latestNotice == null
-                                      ? FontWeight.w500
-                                      : FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+              ],
             );
           },
         ),

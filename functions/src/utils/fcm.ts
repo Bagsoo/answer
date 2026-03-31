@@ -75,7 +75,8 @@ export async function sendChunked(
         const code = res.error?.code ?? "";
         if (
           code === "messaging/invalid-registration-token" ||
-          code === "messaging/registration-token-not-registered"
+          code === "messaging/registration-token-not-registered" ||
+          code === "messaging/mismatched-credential"
         ) {
           invalidTokens.push(chunk[idx]);
         }

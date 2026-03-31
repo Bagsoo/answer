@@ -38,6 +38,7 @@ class GroupProvider extends ChangeNotifier {
   // ── 내 멤버 정보 ──────────────────────────────────────────────────────────
   String myRole = 'member';
   Map<String, dynamic> myPerms = {};
+  DateTime? myLastReadNoticeTime;
 
   // ── 편의 getter ───────────────────────────────────────────────────────────
   String get currentUserId =>
@@ -150,6 +151,7 @@ class GroupProvider extends ChangeNotifier {
       myRole = d['role'] as String? ?? 'member';
       myPerms =
           Map<String, dynamic>.from(d['permissions'] as Map? ?? {});
+      myLastReadNoticeTime = (d['last_read_notice_time'] as Timestamp?)?.toDate();
       notifyListeners();
     });
   }
