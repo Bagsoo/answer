@@ -509,6 +509,60 @@ class GroupService {
     }
   }
 
+  Stream<Map<String, dynamic>?> streamLatestGroupNotice(String groupId) {
+    return _db
+        .collection('groups')
+        .doc(groupId)
+        .collection('notices')
+        .orderBy('created_at', descending: true)
+        .limit(1)
+        .snapshots()
+        .map((snap) {
+      if (snap.docs.isEmpty) return null;
+      final data = snap.docs.first.data();
+      data['id'] = snap.docs.first.id;
+      return data;
+    });
+  }
+
+  Stream<List<Map<String, dynamic>>> streamGroupNotices(String groupId) {
+    return _db
+        .collection('groups')
+        .doc(groupId)
+        .collection('notices')
+        .orderBy('created_at', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs.map((doc) {
+              final data = doc.data();
+              data['id'] = doc.id;
+              return data;
+            }).toList());
+  }
+
+  Future<bool> createGroupNotice({
+    required String groupId,
+    required String text,
+    required String authorName,
+  }) async {
+    if (currentUserId.isEmpty) return false;
+    try {
+      await _db
+          .collection('groups')
+          .doc(groupId)
+          .collection('notices')
+          .add({
+        'text': text.trim(),
+        'author_uid': currentUserId,
+        'author_name': authorName,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('createGroupNotice error: $e');
+      return false;
+    }
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   // 게시판 관리
   // ══════════════════════════════════════════════════════════════════════════

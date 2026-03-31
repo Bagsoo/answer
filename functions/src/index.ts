@@ -55,7 +55,17 @@ export const onMessageSentV2 = onDocumentCreated(
     if (!roomData) return null;
 
     const roomName = roomData.name as string | undefined;
+    const roomType = roomData.type as string | undefined;
+    const groupProfileImage =
+      (roomData.group_profile_image as string | undefined) ?? "";
     const activeFcmTokens = (roomData.active_fcm_tokens as string[]) ?? [];
+
+    let avatarUrl = groupProfileImage;
+    if (roomType === "direct") {
+      const senderDoc = await db.collection("users").doc(senderId).get();
+      avatarUrl =
+        (senderDoc.data()?.profile_image as string | undefined) ?? "";
+    }
 
     console.log(`[onMessageSentV2] roomId: ${roomId}`);
     console.log(
@@ -81,18 +91,26 @@ export const onMessageSentV2 = onDocumentCreated(
     }
 
     const payload: Omit<admin.messaging.MulticastMessage, "tokens"> = {
-      notification: {
-        title: roomName ?? senderName,
-        body: `${senderName}: ${body}`,
+      data: {
+        type: "chat",
+        roomId,
+        notificationTitle: roomName ?? senderName,
+        notificationBody: `${senderName}: ${body}`,
+        avatarUrl,
       },
-      data: { type: "chat", roomId },
       android: {
+        priority: "high",
         collapseKey: roomId,
-        notification: { channelId: "chat_channel", priority: "high" },
       },
       apns: {
         headers: { "apns-collapse-id": roomId },
-        payload: { aps: { sound: "default", badge: 1 } },
+        payload: {
+          aps: {
+            sound: "default",
+            badge: 1,
+            contentAvailable: true,
+          },
+        },
       },
     };
 
@@ -130,20 +148,133 @@ export const onJoinRequestV2 = onDocumentCreated(
     if (tokens.length === 0) return null;
 
     const groupDoc = await db.collection("groups").doc(groupId).get();
-    const groupName = (groupDoc.data()?.name as string) ?? "그룹";
+    const groupData = groupDoc.data() ?? {};
+    const groupName = (groupData.name as string | undefined) ?? "그룹";
+    const groupProfileImage =
+      (groupData.group_profile_image as string | undefined) ?? "";
 
     const payload: Omit<admin.messaging.MulticastMessage, "tokens"> = {
-      notification: {
-        title: groupName,
-        body: `${requesterName}님이 가입을 요청했습니다`,
+      data: {
+        type: "join_request",
+        groupId,
+        notificationTitle: groupName,
+        notificationBody: `${requesterName}님이 가입을 요청했습니다`,
+        avatarUrl: groupProfileImage,
       },
-      data: { type: "join_request", groupId },
       android: {
-        notification: { channelId: "join_request_channel" },
+        priority: "high",
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: "default",
+            badge: 1,
+            contentAvailable: true,
+          },
+        },
       },
     };
 
     const invalidTokens = await sendChunked(tokens, payload);
+    await cleanupInvalidTokens(invalidTokens);
+    return null;
+  }
+);
+
+export const onGroupNoticeCreatedV2 = onDocumentCreated(
+  "groups/{groupId}/notices/{noticeId}",
+  async (event) => {
+    const groupId = event.params.groupId;
+    const snap = event.data;
+    if (!snap) return null;
+
+    const notice = snap.data();
+    const authorUid = (notice.author_uid as string | undefined) ?? "";
+    const text = (notice.text as string | undefined) ?? "";
+
+    const groupDoc = await db.collection("groups").doc(groupId).get();
+    const groupData = groupDoc.data();
+    if (!groupData) return null;
+
+    const groupName = (groupData.name as string | undefined) ?? "그룹";
+    const groupProfileImage =
+      (groupData.group_profile_image as string | undefined) ?? "";
+    const activeFcmTokens = (groupData.active_fcm_tokens as string[]) ?? [];
+    if (activeFcmTokens.length === 0) return null;
+
+    const membersSnap = await db
+      .collection("groups")
+      .doc(groupId)
+      .collection("members")
+      .get();
+    const memberUids = membersSnap.docs
+      .map((d) => d.id)
+      .filter((uid) => uid !== authorUid);
+    if (memberUids.length === 0) return null;
+
+    let authorTokensPromise: Promise<
+      FirebaseFirestore.QuerySnapshot<FirebaseFirestore.DocumentData> | null
+    >;
+    if (authorUid) {
+      authorTokensPromise = db
+        .collection("users")
+        .doc(authorUid)
+        .collection("fcm_tokens")
+        .get();
+    } else {
+      authorTokensPromise = Promise.resolve(null);
+    }
+
+    const [authorTokensSnap, settingsSnaps] = await Promise.all([
+      authorTokensPromise,
+      Promise.all(
+        memberUids.map((uid) =>
+          db
+            .collection("users")
+            .doc(uid)
+            .collection("group_notification_settings")
+            .doc(groupId)
+            .get()
+        )
+      ),
+    ]);
+
+    const authorTokens =
+      authorTokensSnap?.docs.map((d) => d.data().token as string) ?? [];
+    const mutedUids = settingsSnaps
+      .filter((s) => s.exists && s.data()?.enabled === false)
+      .map((s) => s.ref.parent.parent!.id);
+    const mutedTokens = await getTokensForUids(mutedUids);
+    const targets = activeFcmTokens.filter(
+      (token) => !authorTokens.includes(token) && !mutedTokens.includes(token)
+    );
+    if (targets.length === 0) return null;
+
+    const summary = text.length > 80 ? `${text.slice(0, 77)}...` : text;
+    const payload: Omit<admin.messaging.MulticastMessage, "tokens"> = {
+      data: {
+        type: "group_notice",
+        groupId,
+        groupName,
+        notificationTitle: groupName,
+        notificationBody: `공지: ${summary}`,
+        avatarUrl: groupProfileImage,
+      },
+      android: {
+        priority: "high",
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: "default",
+            badge: 1,
+            contentAvailable: true,
+          },
+        },
+      },
+    };
+
+    const invalidTokens = await sendChunked(targets, payload);
     await cleanupInvalidTokens(invalidTokens);
     return null;
   }
@@ -342,6 +473,60 @@ export const onChatRoomMemberLeftV2 = onDocumentDeleted(
     console.log(
       `[onChatRoomMemberLeftV2] roomId: ${roomId}, uid: ${uid}, tokens removed: ${tokens.length}`
     );
+    return null;
+  }
+);
+
+// ── 6-1. 그룹 멤버 입장 시 그룹 토큰 추가 ────────────────────────────────────
+export const onGroupMemberJoinedV2 = onDocumentCreated(
+  "groups/{groupId}/members/{uid}",
+  async (event) => {
+    const { groupId, uid } = event.params;
+
+    const tokensSnap = await db
+      .collection("users")
+      .doc(uid)
+      .collection("fcm_tokens")
+      .get();
+    const tokens = tokensSnap.docs.map((d) => d.data().token as string);
+    if (tokens.length === 0) return null;
+
+    await db
+      .collection("groups")
+      .doc(groupId)
+      .set(
+        { active_fcm_tokens: admin.firestore.FieldValue.arrayUnion(...tokens) },
+        { merge: true }
+      );
+
+    return null;
+  }
+);
+
+// ── 6-2. 그룹 멤버 퇴장 시 그룹 토큰 제거 ────────────────────────────────────
+export const onGroupMemberLeftV2 = onDocumentDeleted(
+  "groups/{groupId}/members/{uid}",
+  async (event) => {
+    const { groupId, uid } = event.params;
+
+    const tokensSnap = await db
+      .collection("users")
+      .doc(uid)
+      .collection("fcm_tokens")
+      .get();
+    const tokens = tokensSnap.docs.map((d) => d.data().token as string);
+    if (tokens.length === 0) return null;
+
+    await db
+      .collection("groups")
+      .doc(groupId)
+      .set(
+        {
+          active_fcm_tokens: admin.firestore.FieldValue.arrayRemove(...tokens),
+        },
+        { merge: true }
+      );
+
     return null;
   }
 );

@@ -91,6 +91,16 @@ service cloud.firestore {
         allow write: if isLoggedIn() &&
           exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
       }
+      match /notices/{noticeId} {
+        allow read: if isLoggedIn() &&
+          exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+        allow write: if isLoggedIn() &&
+          get(/databases/$(database)/documents/groups/$(groupId)).data.plan == 'pro' &&
+          (
+            get(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data.role == 'owner' ||
+            get(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data.permissions.can_edit_group_info == true
+          );
+      }
     }
   }
 }

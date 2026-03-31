@@ -85,6 +85,7 @@ class MessengerApp extends StatelessWidget {
 
     return MaterialApp(
       title: 'Group Messenger',
+      navigatorKey: NotificationService.navigatorKey,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeMode,

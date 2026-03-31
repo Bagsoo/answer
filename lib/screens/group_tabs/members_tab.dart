@@ -9,6 +9,7 @@ import '../../services/friend_service.dart';
 import '../../services/group_service.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/group_provider.dart';
+import '../../widgets/groups/group_notice_sheet.dart';
 import '../chat_room_screen.dart';
 import '../user_profile_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -28,6 +29,7 @@ class _MembersTabState extends State<MembersTab> {
   String _searchQuery = '';
   String? _selectedTag;
   bool _showSearch = false;
+  bool _noticeExpanded = true;
 
   List<QueryDocumentSnapshot> _members = [];
   List<String> _tagList = [];
@@ -120,6 +122,111 @@ class _MembersTabState extends State<MembersTab> {
 
     return Column(
       children: [
+        StreamBuilder<Map<String, dynamic>?>(
+          stream: context.read<GroupService>().streamLatestGroupNotice(groupId),
+          builder: (context, noticeSnap) {
+            final latestNotice = noticeSnap.data;
+            final summary = latestNotice?['text'] as String? ?? '';
+
+            return Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withOpacity(0.72),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: colorScheme.onSurface.withOpacity(0.06),
+                ),
+              ),
+              child: Column(
+                children: [
+                  InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => setState(() => _noticeExpanded = !_noticeExpanded),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.campaign_outlined,
+                            size: 18,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              l.groupNotice,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            _noticeExpanded
+                                ? Icons.keyboard_arrow_up
+                                : Icons.keyboard_arrow_down,
+                            color: colorScheme.onSurface.withOpacity(0.55),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (_noticeExpanded)
+                    InkWell(
+                      borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(16),
+                      ),
+                      onTap: () => _showGroupNoticeSheet(context, groupId),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer.withOpacity(0.42),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                latestNotice == null ? l.noNotices : l.currentNotice,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: colorScheme.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                latestNotice == null
+                                    ? l.groupNoticeTapToOpen
+                                    : summary,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  height: 1.35,
+                                  color: colorScheme.onPrimaryContainer,
+                                  fontWeight: latestNotice == null
+                                      ? FontWeight.w500
+                                      : FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
         // ── 툴바 ───────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 8, 6),
@@ -354,6 +461,21 @@ class _MembersTabState extends State<MembersTab> {
                 ),
         ),
       ],
+    );
+  }
+
+  void _showGroupNoticeSheet(BuildContext context, String groupId) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => ChangeNotifierProvider.value(
+        value: context.read<GroupProvider>(),
+        child: GroupNoticeSheet(groupId: groupId),
+      ),
     );
   }
 
