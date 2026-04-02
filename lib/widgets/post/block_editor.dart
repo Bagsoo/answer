@@ -13,11 +13,13 @@ import '../../l10n/app_localizations.dart';
 class BlockEditor extends StatefulWidget {
   final String groupId;
   final List<PostBlock> initialBlocks;
+  final VoidCallback? onChanged;
 
   const BlockEditor({
     super.key,
     required this.groupId,
     required this.initialBlocks,
+    this.onChanged,
   });
 
   @override
@@ -74,6 +76,7 @@ class BlockEditorState extends State<BlockEditor> {
   // ── 텍스트 변경 — setState 없이 내부만 업데이트 ──────────────────────────
   void _onTextChanged(int index, String value) {
     _blocks[index] = _blocks[index].copyWithText(value);
+    widget.onChanged?.call();
     // setState 호출 안 함 → 포커스 유지
   }
 
@@ -85,6 +88,7 @@ class BlockEditorState extends State<BlockEditor> {
       _ensureTrailingText();
       _buildControllers();
     });
+    widget.onChanged?.call();
   }
 
   void _mergeAdjacentText() {
@@ -148,6 +152,7 @@ class BlockEditorState extends State<BlockEditor> {
       _ensureTrailingText();
       _buildControllers();
     });
+    widget.onChanged?.call();
   }
 
   void _replaceBlock(String blockId, PostBlock uploaded) {
@@ -155,6 +160,7 @@ class BlockEditorState extends State<BlockEditor> {
       final i = _blocks.indexWhere((b) => b.id == blockId);
       if (i != -1) _blocks[i] = uploaded;
     });
+    widget.onChanged?.call();
   }
 
   // ── 이미지 ────────────────────────────────────────────────────────────────

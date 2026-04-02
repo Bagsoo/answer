@@ -7,6 +7,7 @@ import '../../providers/group_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../screens/group_tabs/plan_screen.dart';
 import '../../services/group_service.dart';
+import '../../services/local_preferences_service.dart';
 
 class GroupNoticeSheet extends StatefulWidget {
   final String groupId;
@@ -23,11 +24,41 @@ class GroupNoticeSheet extends StatefulWidget {
 class _GroupNoticeSheetState extends State<GroupNoticeSheet> {
   final TextEditingController _controller = TextEditingController();
   bool _saving = false;
+  late final String _prefsUserId;
+
+  String get _draftKey => LocalPreferencesService.groupNoticeDraftKey(
+        _prefsUserId,
+        widget.groupId,
+      );
+
+  @override
+  void initState() {
+    super.initState();
+    _prefsUserId = context.read<UserProvider>().uid;
+    _controller.addListener(_persistDraft);
+    _loadDraft();
+  }
 
   @override
   void dispose() {
+    _persistDraft();
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadDraft() async {
+    final draft = await LocalPreferencesService.getString(_draftKey);
+    if (!mounted || draft == null || draft.isEmpty) return;
+    _controller.text = draft;
+    _controller.selection = TextSelection.collapsed(offset: draft.length);
+  }
+
+  void _persistDraft() {
+    LocalPreferencesService.setString(_draftKey, _controller.text);
+  }
+
+  Future<void> _clearDraft() async {
+    await LocalPreferencesService.remove(_draftKey);
   }
 
   Future<void> _submitNotice() async {
@@ -51,6 +82,7 @@ class _GroupNoticeSheetState extends State<GroupNoticeSheet> {
     setState(() => _saving = false);
     if (success) {
       _controller.clear();
+      await _clearDraft();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l.noticePosted)),
       );

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import '../../l10n/app_localizations.dart';
@@ -384,6 +385,23 @@ class _MessageBubbleState extends State<MessageBubble>
       );
     }
 
+    if (type == 'audio') {
+      final durationMs =
+          (widget.data['audio_duration_ms'] as num?)?.toInt() ?? 0;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (replyBox != null) replyBox,
+          _AudioMessagePlayer(
+            audioUrl: widget.data['audio_url'] as String? ?? fileUrl,
+            durationMs: durationMs,
+            colorScheme: colorScheme,
+          ),
+        ],
+      );
+    }
+
     if (type == 'contact') {
       final hasPhoto = sharedUserPhotoUrl.isNotEmpty;
       return Column(
@@ -611,7 +629,11 @@ class _MessageBubbleState extends State<MessageBubble>
 
     // 이미지/동영상은 패딩 줄임
     final isMedia =
-        type == 'image' || type == 'video' || type == 'file' || type == 'contact';
+        type == 'image' ||
+        type == 'video' ||
+        type == 'file' ||
+        type == 'contact' ||
+        type == 'audio';
     final bubblePadding = isMedia
         ? const EdgeInsets.all(4)
         : const EdgeInsets.symmetric(horizontal: 13, vertical: 9);
@@ -883,6 +905,142 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
               ),
             )
           : null,
+    );
+  }
+}
+
+class _AudioMessagePlayer extends StatefulWidget {
+  final String audioUrl;
+  final int durationMs;
+  final ColorScheme colorScheme;
+
+  const _AudioMessagePlayer({
+    required this.audioUrl,
+    required this.durationMs,
+    required this.colorScheme,
+  });
+
+  @override
+  State<_AudioMessagePlayer> createState() => _AudioMessagePlayerState();
+}
+
+class _AudioMessagePlayerState extends State<_AudioMessagePlayer> {
+  final AudioPlayer _player = AudioPlayer();
+  bool _ready = false;
+  bool _playing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+    _player.playerStateStream.listen((state) {
+      if (!mounted) return;
+      setState(() {
+        _playing = state.playing;
+      });
+    });
+  }
+
+  Future<void> _init() async {
+    if (widget.audioUrl.isEmpty) return;
+    await _player.setUrl(widget.audioUrl);
+    if (mounted) setState(() => _ready = true);
+  }
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    if (!_ready) return;
+    if (_player.playing) {
+      await _player.pause();
+      return;
+    }
+    final total = _player.duration;
+    if (total != null && _player.position >= total) {
+      await _player.seek(Duration.zero);
+    }
+    await _player.play();
+  }
+
+  String _format(Duration duration) {
+    final minutes = duration.inMinutes.toString().padLeft(2, '0');
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = widget.colorScheme;
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 240),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cs.outline.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          InkWell(
+            onTap: _toggle,
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: cs.primary.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _playing ? Icons.pause : Icons.play_arrow,
+                color: cs.primary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: StreamBuilder<Duration>(
+              stream: _player.positionStream,
+              builder: (context, snapshot) {
+                final position = snapshot.data ?? Duration.zero;
+                final total = _player.duration ??
+                    Duration(milliseconds: widget.durationMs);
+                final progress = total.inMilliseconds <= 0
+                    ? 0.0
+                    : position.inMilliseconds / total.inMilliseconds;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: progress.clamp(0.0, 1.0),
+                        minHeight: 4,
+                        backgroundColor: cs.outline.withOpacity(0.12),
+                        color: cs.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${_format(position)} / ${_format(total)}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: cs.onSurface.withOpacity(0.55),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

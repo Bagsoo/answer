@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/user_provider.dart';
 import '../services/group_service.dart';
+import '../services/local_preferences_service.dart';
 import '../services/recommendation_service.dart';
 import '../widgets/groups/group_tile.dart';
 import '../screens/group_tabs/group_type_category_data.dart';
@@ -43,17 +44,21 @@ class _GroupListScreenState extends State<GroupListScreen>
   bool _recommendLoaded = false;
 
   String get _currentUserId => context.read<UserProvider>().uid;
+  String get _tabKey => LocalPreferencesService.groupListTabKey(_currentUserId);
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
+      if (_tabController.indexIsChanging) return;
+      LocalPreferencesService.setInt(_tabKey, _tabController.index);
       // 추천 탭 선택 시 처음 한 번만 로드
       if (_tabController.index == 1 && !_recommendLoaded) {
         _loadRecommendations();
       }
     });
+    _restoreSelectedTab();
     _loadCachedGroups();
     context.read<GroupService>().getMyJoinedGroups().listen((list) {
       if (mounted) {
@@ -152,6 +157,14 @@ class _GroupListScreenState extends State<GroupListScreen>
         });
       }
     });
+  }
+
+  Future<void> _restoreSelectedTab() async {
+    final savedIndex = await LocalPreferencesService.getInt(_tabKey);
+    if (!mounted || savedIndex == null || savedIndex < 0 || savedIndex > 2) {
+      return;
+    }
+    _tabController.animateTo(savedIndex);
   }
 
   Future<void> _openQrJoinFlow() async {

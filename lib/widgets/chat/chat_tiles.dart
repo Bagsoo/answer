@@ -34,6 +34,8 @@ String _localizedLastMessage(BuildContext context, String lastMessage) {
       return l.attachFile;
     case 'contact':
       return l.attachContact;
+    case 'audio':
+      return l.attachVoice;
     default:
       return lastMessage;
   }

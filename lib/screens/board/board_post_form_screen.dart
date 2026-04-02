@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../../models/post_block.dart';
 import '../../providers/user_provider.dart';
 import '../../services/board_service.dart';
+import '../../services/local_preferences_service.dart';
 import '../../widgets/post/block_editor.dart';
 
 class BoardPostFormScreen extends StatefulWidget {
@@ -37,9 +40,17 @@ class _BoardPostFormScreenState extends State<BoardPostFormScreen> {
   final _editorKey = GlobalKey<BlockEditorState>();
 
   bool _saving = false;
+  bool _draftReady = false;
+  Timer? _draftDebounce;
 
   String get currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
   bool get isEditing => widget.post != null;
+  String get _draftKey => LocalPreferencesService.boardPostDraftKey(
+        currentUserId,
+        widget.groupId,
+        widget.boardId,
+        postId: widget.post?['id'] as String?,
+      );
 
   late List<PostBlock> _initialBlocks;
 
@@ -52,12 +63,72 @@ class _BoardPostFormScreenState extends State<BoardPostFormScreen> {
     } else {
       _initialBlocks = [PostBlock.text()];
     }
+    _titleCtrl.addListener(_schedulePersistDraft);
+    _loadDraft();
   }
 
   @override
   void dispose() {
+    _draftDebounce?.cancel();
+    _persistDraft();
     _titleCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadDraft() async {
+    final draft = await LocalPreferencesService.getJsonMap(_draftKey);
+    if (!mounted) return;
+    if (draft == null) {
+      setState(() => _draftReady = true);
+      return;
+    }
+
+    final draftTitle = draft['title'] as String? ?? '';
+    final draftContent = draft['content'] as String? ?? '';
+
+    if (draftTitle.isEmpty && draftContent.isEmpty) {
+      setState(() => _draftReady = true);
+      return;
+    }
+
+    setState(() {
+      _titleCtrl.text = draftTitle;
+      _titleCtrl.selection =
+          TextSelection.collapsed(offset: draftTitle.length);
+      _initialBlocks = [
+        PostBlock.text(draftContent),
+      ];
+      _draftReady = true;
+    });
+  }
+
+  void _schedulePersistDraft() {
+    _draftDebounce?.cancel();
+    _draftDebounce = Timer(
+      const Duration(milliseconds: 300),
+      _persistDraft,
+    );
+  }
+
+  Future<void> _persistDraft() async {
+    final blocks = _editorKey.currentState?.getBlocks() ?? _initialBlocks;
+    final plainText = blocks
+        .where((b) => b.isText)
+        .map((b) => b.textValue)
+        .join('\n')
+        .trim();
+    if (_titleCtrl.text.trim().isEmpty && plainText.isEmpty) {
+      await _clearDraft();
+      return;
+    }
+    await LocalPreferencesService.setJsonMap(_draftKey, {
+      'title': _titleCtrl.text,
+      'content': plainText,
+    });
+  }
+
+  Future<void> _clearDraft() async {
+    await LocalPreferencesService.remove(_draftKey);
   }
 
   Future<void> _save() async {
@@ -112,7 +183,10 @@ class _BoardPostFormScreenState extends State<BoardPostFormScreen> {
         setState(() => _saving = false);
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(ok ? l.postSaved : l.postSaveFailed)));
-        if (ok) Navigator.pop(context);
+        if (ok) {
+          await _clearDraft();
+          Navigator.pop(context);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -149,7 +223,9 @@ class _BoardPostFormScreenState extends State<BoardPostFormScreen> {
             ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: !_draftReady
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,6 +251,7 @@ class _BoardPostFormScreenState extends State<BoardPostFormScreen> {
               key: _editorKey,
               groupId: widget.groupId,
               initialBlocks: _initialBlocks,
+              onChanged: _schedulePersistDraft,
             ),
           ],
         ),

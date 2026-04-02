@@ -14,6 +14,8 @@ import '../services/storage_service.dart';
 import '../services/image_service.dart';
 import '../services/video_service.dart';
 import '../services/file_service.dart';
+import '../services/audio_service.dart';
+import '../services/local_preferences_service.dart';
 import 'chat_room_more/chat_room_participants_screen.dart';
 import 'chat_room_more/chat_room_invite_screen.dart';
 import 'chat_room_more/notices_screen.dart';
@@ -30,6 +32,7 @@ import '../widgets/chat/attach_button.dart';
 import '../widgets/chat/chat_memo_sheet.dart';
 import '../widgets/chat/chat_scheduled_message_sheet.dart';
 import '../widgets/chat/chat_message_options_sheet.dart';
+import '../widgets/chat/voice_message_recorder_sheet.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final String roomId;
@@ -90,9 +93,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final Map<String, GlobalKey> _messageKeys = {};
   bool _uploadingMedia = false;
   final Map<String, _UploadingMessage> _uploadingMessages = {};
+  late final String _prefsUserId;
 
   String get _currentUserId =>
       FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  String get _chatDraftKey => LocalPreferencesService.chatDraftKey(
+        _prefsUserId,
+        widget.roomId,
+      );
 
   // ──────────────────────────────────────────────────────────────────────────
   // Lifecycle
@@ -101,6 +110,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   @override
   void initState() {
     super.initState();
+    _prefsUserId = context.read<UserProvider>().uid;
+    _msgController.addListener(_persistMessageDraft);
     final chatService = context.read<ChatService>();
     // 현재 방 등록
     chatService.currentRoomId = widget.roomId;
@@ -110,6 +121,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     chatService.updateLastReadTime(widget.roomId);
     _loadRoomMeta();
     _loadMuteState();
+    _loadMessageDraft();
     _scrollController.addListener(_onScroll);
     _checkAndSendScheduledMessages();
 
@@ -124,6 +136,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   @override
   void dispose() {
     _scrollController.removeListener(_onScroll);
+    _persistMessageDraft();
     _msgController.dispose();
     _searchController.dispose();
     _scrollController.dispose();
@@ -132,6 +145,21 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     // 방 떠날 때 초기화
     context.read<ChatService>().currentRoomId = null;
     super.dispose();
+  }
+
+  Future<void> _loadMessageDraft() async {
+    final draft = await LocalPreferencesService.getString(_chatDraftKey);
+    if (!mounted || draft == null || draft.isEmpty) return;
+    _msgController.text = draft;
+    _msgController.selection = TextSelection.collapsed(offset: draft.length);
+  }
+
+  void _persistMessageDraft() {
+    LocalPreferencesService.setString(_chatDraftKey, _msgController.text);
+  }
+
+  void _clearMessageDraft() {
+    LocalPreferencesService.remove(_chatDraftKey);
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -412,6 +440,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final text = _msgController.text.trim();
     if (text.isEmpty) return;
     _msgController.clear();
+    _clearMessageDraft();
     final replyId = _replyToId;
     final replyData = _replyToData;
     if (mounted) setState(() { _replyToId = null; _replyToData = null; });
@@ -732,6 +761,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     );
     if (scheduled == true && clearComposerOnSuccess && mounted) {
       _msgController.clear();
+      _clearMessageDraft();
       setState(() {
         _replyToId = null;
         _replyToData = null;
@@ -807,6 +837,71 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           await Future.delayed(const Duration(milliseconds: 1000));
           setState(() => _uploadingMessages.remove(messageId));
         }
+      }
+    }
+  }
+
+  Future<void> _sendVoiceMessage() async {
+    setState(() => _showAttachPanel = false);
+    final result = await showModalBottomSheet<VoiceMessageRecordResult>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const VoiceMessageRecorderSheet(),
+    );
+
+    if (result == null || !mounted) return;
+
+    final audioService = AudioService();
+    if (audioService.isSizeExceeded(result.file)) {
+      final l = AppLocalizations.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.audioFileSizeExceeded)),
+      );
+      return;
+    }
+
+    final chatService = context.read<ChatService>();
+    final userProvider = context.read<UserProvider>();
+    final messageId = chatService.generateMessageId(widget.roomId);
+
+    setState(() => _uploadingMedia = true);
+    try {
+      final uploaded = await StorageService().uploadChatAudio(
+        roomId: widget.roomId,
+        messageId: messageId,
+        file: result.file,
+        fileName: result.fileName,
+        mimeType: result.mimeType,
+      );
+      if (!mounted) return;
+      await chatService.sendAudioMessage(
+        widget.roomId,
+        messageId: messageId,
+        audioUrl: uploaded['url'] ?? '',
+        durationMs: result.durationMs,
+        fileName: result.fileName,
+        mimeType: result.mimeType,
+        senderName: _myName,
+        senderPhotoUrl: userProvider.photoUrl,
+      );
+      chatService.updateLastReadTime(widget.roomId);
+    } catch (_) {
+      if (mounted) {
+        final l = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.voiceSendFailed)),
+        );
+      }
+    } finally {
+      if (await result.file.exists()) {
+        await result.file.delete();
+      }
+      if (mounted) {
+        setState(() => _uploadingMedia = false);
       }
     }
   }
@@ -1666,7 +1761,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           icon: Icons.mic_outlined,
           label: l.attachVoice,
           color: Colors.orange,
-          onTap: () {}),
+          onTap: _sendVoiceMessage),
       AttachItem(
           icon: Icons.call_outlined,
           label: l.attachCall,

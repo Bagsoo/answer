@@ -44,6 +44,8 @@ export const onMessageSentV2 = onDocumentCreated(
       body = "📷 사진을 보냈습니다";
     } else if (type === "video") {
       body = "🎥 동영상을 보냈습니다";
+    } else if (type === "audio") {
+      body = "🎤 음성 메시지를 보냈습니다";
     } else if (type === "file") {
       body = "📎 파일을 보냈습니다";
     } else if (type === "contact") {

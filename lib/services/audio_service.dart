@@ -24,12 +24,12 @@ class AudioService {
     return {
       'file': file,
       'name': pf.name,
-      'mimeType': _mimeFromExt(pf.extension?.toLowerCase() ?? 'mp3'),
+      'mimeType': mimeFromExt(pf.extension?.toLowerCase() ?? 'mp3'),
       'size': pf.size,
     };
   }
 
-  String _mimeFromExt(String ext) {
+  String mimeFromExt(String ext) {
     switch (ext) {
       case 'mp3': return 'audio/mpeg';
       case 'wav': return 'audio/wav';

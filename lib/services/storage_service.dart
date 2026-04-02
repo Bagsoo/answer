@@ -96,6 +96,32 @@ class StorageService {
     }
   }
 
+  // ── 채팅 음성 메시지 업로드 ───────────────────────────────────────────────
+  Future<Map<String, String>> uploadChatAudio({
+    required String roomId,
+    required String messageId,
+    required File file,
+    required String fileName,
+    required String mimeType,
+  }) async {
+    final ref = _storage.ref(
+      'chat_rooms/$roomId/audio/${DateTime.now().millisecondsSinceEpoch}_$fileName',
+    );
+    try {
+      final task = await ref.putFile(
+        file,
+        SettableMetadata(
+          contentType: mimeType,
+          customMetadata: {'message_id': messageId},
+        ),
+      );
+      final url = await task.ref.getDownloadURL();
+      return {'url': url, 'name': fileName};
+    } catch (e) {
+      throw Exception('음성 업로드 실패: $e');
+    }
+  }
+
   // ── 그룹 프로필 이미지 업로드 ─────────────────────────────────────────────
   Future<String> uploadGroupProfileImage({
     required String groupId,

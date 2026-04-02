@@ -60,8 +60,10 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
     <string>We need your location to show nearby places.</string>
-    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
     <string>We need your location to show nearby places.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>We need microphone access so you can record voice messages.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/chat_service.dart';
 import '../services/friend_service.dart';
+import '../services/local_preferences_service.dart';
 import '../providers/user_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/chat/chat_tiles.dart';
@@ -49,6 +50,22 @@ class _ChatListScreenState extends State<ChatListScreen> {
       if (t != null) return (t as dynamic).toDate();
     }
     return null;
+  }
+
+  Future<void> _persistSectionUnread({
+    required int privateUnread,
+    required Map<String, int> groupUnread,
+  }) async {
+    await LocalPreferencesService.setInt(
+      LocalPreferencesService.privateChatUnreadKey(_myUid),
+      privateUnread,
+    );
+    for (final entry in groupUnread.entries) {
+      await LocalPreferencesService.setInt(
+        LocalPreferencesService.groupChatUnreadKey(_myUid, entry.key),
+        entry.value,
+      );
+    }
   }
 
   bool _matchesRoom(Map<String, dynamic> room, String query) {
@@ -187,6 +204,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
           final dmRooms =
               rooms.where((r) => r['ref_group_id'] == null).toList();
+          final privateUnread = dmRooms.fold<int>(
+            0,
+            (sum, room) => sum + ((room['unread_cnt'] as int?) ?? 0),
+          );
 
           final Map<String, List<Map<String, dynamic>>> groupedRooms = {};
           for (final room in rooms.where((r) => r['ref_group_id'] != null)) {
@@ -203,13 +224,23 @@ class _ChatListScreenState extends State<ChatListScreen> {
               if (bLatest == null) return -1;
               return bLatest.compareTo(aLatest);
             });
+          final groupUnread = <String, int>{
+            for (final entry in sortedGroups)
+              entry.key: entry.value.fold<int>(
+                0,
+                (sum, room) => sum + ((room['unread_cnt'] as int?) ?? 0),
+              ),
+          };
+          _persistSectionUnread(
+            privateUnread: privateUnread,
+            groupUnread: groupUnread,
+          );
           // 1) 그룹 위젯 리스트
           final groupWidgets = sortedGroups.map<Widget>((entry) {
             final roomsInGroup = entry.value;
             final groupName = roomsInGroup.first['group_name'] as String? ?? l.unknown;
             final groupId = entry.key;
-            final totalUnread = roomsInGroup.fold<int>(
-                0, (sum, r) => sum + ((r['unread_cnt'] as int?) ?? 0));
+            final totalUnread = groupUnread[groupId] ?? 0;
 
             return GroupChatSection(
               key: ValueKey(groupId),
@@ -230,6 +261,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     key: const ValueKey('private_section'),
                     title: l.privateChats,
                     rooms: dmRooms,
+                    totalUnread: privateUnread,
                     colorScheme: colorScheme,
                     myUid: _myUid,
                     prefs: _prefs!,

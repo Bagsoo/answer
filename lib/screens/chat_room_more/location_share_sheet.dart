@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/local_preferences_service.dart';
 import 'location_picker_map_screen.dart';
 
 class LocationShareResult {
@@ -26,6 +28,28 @@ class LocationShareSheet extends StatefulWidget {
 class _LocationShareSheetState extends State<LocationShareSheet> {
   bool _loading = false;
   String? _error;
+  String _lastUsedType = 'current';
+
+  String get _shareTypeKey => LocalPreferencesService.locationShareTypeKey(
+        FirebaseAuth.instance.currentUser?.uid ?? 'guest',
+      );
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastUsedType();
+  }
+
+  Future<void> _loadLastUsedType() async {
+    final saved = await LocalPreferencesService.getString(_shareTypeKey);
+    if (!mounted || saved == null || saved.isEmpty) return;
+    setState(() => _lastUsedType = saved);
+  }
+
+  Future<void> _saveLastUsedType(String type) async {
+    _lastUsedType = type;
+    await LocalPreferencesService.setString(_shareTypeKey, type);
+  }
 
   Future<void> _shareCurrentLocation() async {
     setState(() {
@@ -82,6 +106,7 @@ class _LocationShareSheetState extends State<LocationShareSheet> {
 
       // 4. 결과 반환
       if (mounted) {
+        await _saveLastUsedType('current');
         Navigator.pop(
           context,
           LocationShareResult(
@@ -105,6 +130,71 @@ class _LocationShareSheetState extends State<LocationShareSheet> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
+    final currentTile = ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.blue.withOpacity(0.1),
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.my_location, color: Colors.blue),
+      ),
+      title: Text(l.locationCurrent),
+      subtitle: Text(
+        l.locationShareCurrentDesc,
+        style: TextStyle(
+          fontSize: 12,
+          color: cs.onSurface.withOpacity(0.5),
+        ),
+      ),
+      trailing: _loading
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : _lastUsedType == 'current'
+              ? Icon(Icons.history, color: cs.primary, size: 18)
+              : const Icon(Icons.chevron_right),
+      onTap: _loading ? null : _shareCurrentLocation,
+    );
+    final destinationTile = ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.red.withOpacity(0.1),
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.place, color: Colors.red),
+      ),
+      title: Text(l.locationDestination),
+      subtitle: Text(
+        l.locationShareDestinationDesc,
+        style: TextStyle(
+          fontSize: 12,
+          color: cs.onSurface.withOpacity(0.5),
+        ),
+      ),
+      trailing: _lastUsedType == 'destination'
+          ? Icon(Icons.history, color: cs.primary, size: 18)
+          : null,
+      onTap: () async {
+        final result = await Navigator.push<LocationShareResult>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const LocationPickerMapScreen(),
+          ),
+        );
+
+        if (result != null && mounted) {
+          await _saveLastUsedType('destination');
+          Navigator.pop(context, result);
+        }
+      },
+    );
+    final tiles = _lastUsedType == 'destination'
+        ? [destinationTile, currentTile]
+        : [currentTile, destinationTile];
 
     return SafeArea(
       child: Padding(
@@ -146,65 +236,7 @@ class _LocationShareSheetState extends State<LocationShareSheet> {
                 ],
               ),
             ),
-
-            // 현재 위치 공유 버튼
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.my_location, color: Colors.blue),
-              ),
-              title: Text(l.locationCurrent),
-              subtitle: Text(
-                l.locationShareCurrentDesc,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: cs.onSurface.withOpacity(0.5),
-                ),
-              ),
-              trailing: _loading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.chevron_right),
-              onTap: _loading ? null : _shareCurrentLocation,
-            ),
-
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.place, color: Colors.red),
-              ),
-              title: Text(l.locationDestination),
-              subtitle: Text(
-                l.locationShareDestinationDesc,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: cs.onSurface.withOpacity(0.5),
-                ),
-              ),
-              onTap: () async {
-                final result = await Navigator.push<LocationShareResult>(
-                    context,
-                    MaterialPageRoute(
-                    builder: (_) => const LocationPickerMapScreen(),
-                    ),
-                );
-
-                if (result != null && mounted) {
-                    Navigator.pop(context, result);
-                }
-              },
-            ),
+            ...tiles,
 
             // 에러 메시지
             if (_error != null)

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../services/local_preferences_service.dart';
 import '../../widgets/group_settings/group_avatar_widget.dart';
 import 'chat_tiles.dart';
 
@@ -29,14 +31,25 @@ class GroupChatSection extends StatefulWidget {
 
 class _GroupChatSectionState extends State<GroupChatSection> {
   late bool _expanded;
+  late int _cachedUnread;
 
   String get _prefKey => 'chat_expanded_${widget.groupId}';
+  String get _unreadPrefKey =>
+      LocalPreferencesService.groupChatUnreadKey(widget.myUid, widget.groupId);
 
   @override
   void initState() {
     super.initState();
-    // prefs가 이미 로드되어 있으므로 동기적으로 읽기 → 애니메이션 없음
     _expanded = widget.prefs.getBool(_prefKey) ?? true;
+    _cachedUnread = widget.prefs.getInt(_unreadPrefKey) ?? 0;
+  }
+
+  @override
+  void didUpdateWidget(covariant GroupChatSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.totalUnread != oldWidget.totalUnread) {
+      _cachedUnread = widget.totalUnread;
+    }
   }
 
   Future<void> _toggleExpanded() async {
@@ -48,6 +61,7 @@ class _GroupChatSectionState extends State<GroupChatSection> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = widget.colorScheme;
+    final unread = widget.totalUnread > 0 ? widget.totalUnread : _cachedUnread;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,52 +71,58 @@ class _GroupChatSectionState extends State<GroupChatSection> {
           child: Container(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-            child: Row(children: [
-              GroupAvatar(
-                groupId: widget.groupId,
-                groupName: widget.groupName,
-                radius: 14,
-                fallbackIcon: Icons.group,
-                backgroundColor: colorScheme.primaryContainer,
-                foregroundColor: colorScheme.onPrimaryContainer,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  widget.groupName,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.primary,
-                    letterSpacing: 0.5,
+            child: Row(
+              children: [
+                GroupAvatar(
+                  groupId: widget.groupId,
+                  groupName: widget.groupName,
+                  radius: 14,
+                  fallbackIcon: Icons.group,
+                  backgroundColor: colorScheme.primaryContainer,
+                  foregroundColor: colorScheme.onPrimaryContainer,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.groupName,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.primary,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
-              ),
-              if (!_expanded && widget.totalUnread > 0) ...[
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: colorScheme.error,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    widget.totalUnread > 99 ? '99+' : '${widget.totalUnread}',
-                    style: TextStyle(
+                if (unread > 0) ...[
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: colorScheme.error,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      unread > 99 ? '99+' : '$unread',
+                      style: TextStyle(
                         color: colorScheme.onError,
                         fontSize: 11,
-                        fontWeight: FontWeight.bold),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                AnimatedRotation(
+                  turns: _expanded ? 0.0 : -0.25,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.expand_more,
+                    size: 18,
+                    color: colorScheme.primary.withOpacity(0.6),
                   ),
                 ),
-                const SizedBox(width: 6),
               ],
-              AnimatedRotation(
-                turns: _expanded ? 0.0 : -0.25,
-                duration: const Duration(milliseconds: 200),
-                child: Icon(Icons.expand_more,
-                    size: 18, color: colorScheme.primary.withOpacity(0.6)),
-              ),
-            ]),
+            ),
           ),
         ),
         AnimatedCrossFade(
@@ -130,9 +150,10 @@ class _GroupChatSectionState extends State<GroupChatSection> {
           duration: const Duration(milliseconds: 220),
         ),
         Divider(
-            height: 8,
-            thickness: 8,
-            color: colorScheme.surfaceContainerHighest),
+          height: 8,
+          thickness: 8,
+          color: colorScheme.surfaceContainerHighest,
+        ),
       ],
     );
   }
@@ -141,6 +162,7 @@ class _GroupChatSectionState extends State<GroupChatSection> {
 class PrivateChatSection extends StatefulWidget {
   final String title;
   final List<Map<String, dynamic>> rooms;
+  final int totalUnread;
   final ColorScheme colorScheme;
   final String myUid;
   final SharedPreferences prefs;
@@ -149,6 +171,7 @@ class PrivateChatSection extends StatefulWidget {
     super.key,
     required this.title,
     required this.rooms,
+    required this.totalUnread,
     required this.colorScheme,
     required this.myUid,
     required this.prefs,
@@ -160,13 +183,25 @@ class PrivateChatSection extends StatefulWidget {
 
 class _PrivateChatSectionState extends State<PrivateChatSection> {
   late bool _expanded;
+  late int _cachedUnread;
 
   String get _prefKey => 'chat_expanded_private';
+  String get _unreadPrefKey =>
+      LocalPreferencesService.privateChatUnreadKey(widget.myUid);
 
   @override
   void initState() {
     super.initState();
     _expanded = widget.prefs.getBool(_prefKey) ?? true;
+    _cachedUnread = widget.prefs.getInt(_unreadPrefKey) ?? 0;
+  }
+
+  @override
+  void didUpdateWidget(covariant PrivateChatSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.totalUnread != oldWidget.totalUnread) {
+      _cachedUnread = widget.totalUnread;
+    }
   }
 
   Future<void> _toggleExpanded() async {
@@ -175,12 +210,10 @@ class _PrivateChatSectionState extends State<PrivateChatSection> {
     await widget.prefs.setBool(_prefKey, next);
   }
 
-  int get _totalUnread => widget.rooms.fold<int>(
-      0, (sum, room) => sum + ((room['unread_cnt'] as int?) ?? 0));
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = widget.colorScheme;
+    final unread = widget.totalUnread > 0 ? widget.totalUnread : _cachedUnread;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -213,7 +246,7 @@ class _PrivateChatSectionState extends State<PrivateChatSection> {
                     ),
                   ),
                 ),
-                if (!_expanded && _totalUnread > 0) ...[
+                if (unread > 0) ...[
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -222,7 +255,7 @@ class _PrivateChatSectionState extends State<PrivateChatSection> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      _totalUnread > 99 ? '99+' : '$_totalUnread',
+                      unread > 99 ? '99+' : '$unread',
                       style: TextStyle(
                         color: colorScheme.onError,
                         fontSize: 11,

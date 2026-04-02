@@ -1,7 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/group_service.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/local_preferences_service.dart';
 
 class BoardFormScreen extends StatefulWidget {
   final String groupId;
@@ -21,6 +23,10 @@ class _BoardFormScreenState extends State<BoardFormScreen> {
   bool _saving = false;
 
   bool get isEditing => widget.board != null;
+  String get _defaultsKey => LocalPreferencesService.boardFormDefaultsKey(
+        FirebaseAuth.instance.currentUser?.uid ?? 'guest',
+        widget.groupId,
+      );
 
   @override
   void initState() {
@@ -32,6 +38,8 @@ class _BoardFormScreenState extends State<BoardFormScreen> {
       _writePermission = b['write_permission'] as String? ?? 'all';
       _allowedTags =
           List<String>.from(b['allowed_tags'] as List? ?? []);
+    } else {
+      _loadDefaults();
     }
   }
 
@@ -47,6 +55,25 @@ class _BoardFormScreenState extends State<BoardFormScreen> {
       _boardType = val;
       if (val == 'notice') _writePermission = 'owner_only';
       if (val == 'free' || val == 'greeting') _writePermission = 'all';
+    });
+    _persistDefaults();
+  }
+
+  Future<void> _loadDefaults() async {
+    final defaults = await LocalPreferencesService.getJsonMap(_defaultsKey);
+    if (!mounted || defaults == null) return;
+    setState(() {
+      _boardType = defaults['board_type'] as String? ?? _boardType;
+      _writePermission =
+          defaults['write_permission'] as String? ?? _writePermission;
+    });
+  }
+
+  Future<void> _persistDefaults() async {
+    if (isEditing) return;
+    await LocalPreferencesService.setJsonMap(_defaultsKey, {
+      'board_type': _boardType,
+      'write_permission': _writePermission,
     });
   }
 
@@ -74,6 +101,8 @@ class _BoardFormScreenState extends State<BoardFormScreen> {
     } else {
       ok = await service.createBoard(widget.groupId, data);
     }
+
+    await _persistDefaults();
 
     if (mounted) {
       setState(() => _saving = false);
@@ -144,14 +173,20 @@ class _BoardFormScreenState extends State<BoardFormScreen> {
           RadioListTile<String>(
             value: 'owner_only',
             groupValue: _writePermission,
-            onChanged: (v) => setState(() => _writePermission = v!),
+            onChanged: (v) {
+              setState(() => _writePermission = v!);
+              _persistDefaults();
+            },
             title: Text(l.boardWriteOwnerOnly),
             dense: true,
           ),
           RadioListTile<String>(
             value: 'all',
             groupValue: _writePermission,
-            onChanged: (v) => setState(() => _writePermission = v!),
+            onChanged: (v) {
+              setState(() => _writePermission = v!);
+              _persistDefaults();
+            },
             title: Text(l.boardWriteAll),
             dense: true,
           ),

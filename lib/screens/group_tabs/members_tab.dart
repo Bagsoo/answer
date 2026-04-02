@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/friend_service.dart';
 import '../../services/group_service.dart';
+import '../../services/local_preferences_service.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/group_provider.dart';
 import '../../widgets/groups/group_notice_sheet.dart';
@@ -30,6 +31,7 @@ class _MembersTabState extends State<MembersTab> {
   String? _selectedTag;
   bool _showSearch = false;
   bool _noticeExpanded = false;
+  DateTime? _localLastReadNoticeTime;
 
   List<QueryDocumentSnapshot> _members = [];
   List<String> _tagList = [];
@@ -47,7 +49,39 @@ class _MembersTabState extends State<MembersTab> {
       final groupId = context.read<GroupProvider>().groupId;
       _subscribeMembers(groupId);
       _subscribeTags(groupId);
+      _loadLocalLastReadNoticeTime(groupId);
     }
+  }
+
+  Future<void> _loadLocalLastReadNoticeTime(String groupId) async {
+    final uid = context.read<UserProvider>().uid;
+    final key = LocalPreferencesService.groupNoticeLastReadKey(uid, groupId);
+    final millis = await LocalPreferencesService.getInt(key);
+    if (!mounted || millis == null) return;
+    setState(() {
+      _localLastReadNoticeTime = DateTime.fromMillisecondsSinceEpoch(millis);
+    });
+  }
+
+  Future<void> _markNoticeRead(
+    String groupId, {
+    DateTime? referenceTime,
+  }) async {
+    final uid = context.read<UserProvider>().uid;
+    final time = referenceTime ?? DateTime.now();
+    final key = LocalPreferencesService.groupNoticeLastReadKey(uid, groupId);
+    await LocalPreferencesService.setInt(
+      key,
+      time.millisecondsSinceEpoch,
+    );
+    if (mounted) {
+      setState(() {
+        _localLastReadNoticeTime = time;
+      });
+    }
+    unawaited(
+      context.read<GroupService>().updateLastReadNoticeTime(groupId),
+    );
   }
 
   void _subscribeMembers(String groupId) {
@@ -130,15 +164,32 @@ class _MembersTabState extends State<MembersTab> {
             
             final createdTime = (latestNotice?['created_at'] as Timestamp?)?.toDate();
             final myLastRead = gp.myLastReadNoticeTime;
-            final hasUnread = latestNotice != null && (myLastRead == null || (createdTime != null && createdTime.isAfter(myLastRead)));
+            DateTime? effectiveLastRead;
+            if (myLastRead == null) {
+              effectiveLastRead = _localLastReadNoticeTime;
+            } else if (_localLastReadNoticeTime == null) {
+              effectiveLastRead = myLastRead;
+            } else {
+              effectiveLastRead = myLastRead.isAfter(_localLastReadNoticeTime!)
+                  ? myLastRead
+                  : _localLastReadNoticeTime!;
+            }
+            final hasUnread = latestNotice != null &&
+                (effectiveLastRead == null ||
+                    (createdTime != null &&
+                        createdTime.isAfter(effectiveLastRead)));
 
             return Column(
               children: [
                 InkWell(
-                  onTap: () {
-                    setState(() => _noticeExpanded = !_noticeExpanded);
-                    if (_noticeExpanded && hasUnread) {
-                      context.read<GroupService>().updateLastReadNoticeTime(groupId);
+                  onTap: () async {
+                    final nextExpanded = !_noticeExpanded;
+                    setState(() => _noticeExpanded = nextExpanded);
+                    if (nextExpanded && hasUnread) {
+                      await _markNoticeRead(
+                        groupId,
+                        referenceTime: createdTime,
+                      );
                     }
                   },
                   child: Container(
@@ -197,9 +248,12 @@ class _MembersTabState extends State<MembersTab> {
                 ),
                 if (_noticeExpanded)
                   InkWell(
-                    onTap: () {
+                    onTap: () async {
                       if (hasUnread) {
-                        context.read<GroupService>().updateLastReadNoticeTime(groupId);
+                        await _markNoticeRead(
+                          groupId,
+                          referenceTime: createdTime,
+                        );
                       }
                       _showGroupNoticeSheet(context, groupId);
                     },

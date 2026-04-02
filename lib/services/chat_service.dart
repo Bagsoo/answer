@@ -371,6 +371,49 @@ class ChatService {
     await batch.commit();
   }
 
+  // ── 음성 메시지 전송 ───────────────────────────────────────────────────────
+  Future<void> sendAudioMessage(
+    String roomId, {
+    required String messageId,
+    required String audioUrl,
+    required int durationMs,
+    required String fileName,
+    required String mimeType,
+    required String senderName,
+    String? senderPhotoUrl,
+  }) async {
+    final unreadUpdate = await _buildUnreadUpdate(roomId);
+    final batch = _db.batch();
+
+    final msgRef = _db
+        .collection('chat_rooms')
+        .doc(roomId)
+        .collection('messages')
+        .doc(messageId);
+
+    batch.set(msgRef, {
+      'sender_id': currentUserId,
+      'sender_name': senderName,
+      'sender_photo_url': senderPhotoUrl ?? '',
+      'text': '',
+      'type': 'audio',
+      'audio_url': audioUrl,
+      'audio_duration_ms': durationMs,
+      'file_name': fileName,
+      'mime_type': mimeType,
+      'is_system': false,
+      'created_at': FieldValue.serverTimestamp(),
+    });
+
+    batch.update(_db.collection('chat_rooms').doc(roomId), {
+      'last_message': 'audio',
+      'last_time': FieldValue.serverTimestamp(),
+      ...unreadUpdate,
+    });
+
+    await batch.commit();
+  }
+
   // ── 읽음 처리 ─────────────────────────────────────────────────────────────
   Future<void> updateLastReadTime(String roomId) async {
     final batch = _db.batch();

@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import '../../l10n/app_localizations.dart';
+import '../../services/local_preferences_service.dart';
 import 'dart:io';
 
 /// 위치 선택 결과
@@ -49,10 +51,34 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
   bool _loadingCurrentLocation = false;
   String? _errorMsg;
 
+  String get _searchKey => LocalPreferencesService.groupLocationSearchKey(
+        FirebaseAuth.instance.currentUser?.uid ?? 'guest',
+      );
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreRecentSearch();
+  }
+
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _restoreRecentSearch() async {
+    if (!widget.showGroupHint) return;
+    final saved = await LocalPreferencesService.getString(_searchKey);
+    if (!mounted || saved == null || saved.isEmpty) return;
+    _searchCtrl.text = saved;
+    _searchCtrl.selection = TextSelection.collapsed(offset: saved.length);
+    await _searchPlaces(saved);
+  }
+
+  Future<void> _saveRecentSearch(String query) async {
+    if (!widget.showGroupHint) return;
+    await LocalPreferencesService.setString(_searchKey, query);
   }
 
   // ── Google Places Autocomplete ────────────────────────────────────────────
@@ -178,6 +204,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
 
       final locationName =
           await _reverseGeocode(position.latitude, position.longitude);
+      await _saveRecentSearch(locationName);
 
       if (mounted) {
         Navigator.pop(
@@ -409,6 +436,9 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                                               .withOpacity(0.5)))
                                   : null,
                               onTap: () async {
+                                await _saveRecentSearch(
+                                  _searchCtrl.text.trim(),
+                                );
                                 final result =
                                     await _getPlaceDetails(
                                         p.placeId, p.mainText);

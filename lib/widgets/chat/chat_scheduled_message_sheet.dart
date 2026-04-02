@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/local_preferences_service.dart';
 
 class ChatScheduledMessageSheet extends StatefulWidget {
   final String roomId;
@@ -26,16 +27,39 @@ class _ChatScheduledMessageSheetState
   final _controller = TextEditingController();
   DateTime? _selectedDateTime;
 
+  String get _draftKey => LocalPreferencesService.scheduledMessageDraftKey(
+        widget.currentUserId,
+        widget.roomId,
+      );
+
   @override
   void initState() {
     super.initState();
-    _controller.text = widget.initialText;
+    _controller.addListener(_persistDraft);
+    _loadDraft();
   }
 
   @override
   void dispose() {
+    _persistDraft();
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadDraft() async {
+    final draft = await LocalPreferencesService.getString(_draftKey);
+    final initial = draft?.isNotEmpty == true ? draft! : widget.initialText;
+    if (!mounted || initial.isEmpty) return;
+    _controller.text = initial;
+    _controller.selection = TextSelection.collapsed(offset: initial.length);
+  }
+
+  void _persistDraft() {
+    LocalPreferencesService.setString(_draftKey, _controller.text);
+  }
+
+  Future<void> _clearDraft() async {
+    await LocalPreferencesService.remove(_draftKey);
   }
 
   Future<void> _pickDateTime() async {
@@ -159,6 +183,7 @@ class _ChatScheduledMessageSheetState
                   'created_at': FieldValue.serverTimestamp(),
                 });
                 if (context.mounted) {
+                  await _clearDraft();
                   Navigator.pop(context, true);
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                     content: Text(l.scheduledAt(_formatDateTime(_selectedDateTime!))),
