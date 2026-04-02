@@ -5,15 +5,44 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/group_provider.dart';
+import '../../services/chat_service.dart';
 import '../../widgets/chat/chat_tiles.dart';
 import '../chat_room_screen.dart';
 
-class ChatsTab extends StatelessWidget {
+class ChatsTab extends StatefulWidget {
   final String groupName;
 
   const ChatsTab({super.key, required this.groupName});
 
+  @override
+  State<ChatsTab> createState() => _ChatsTabState();
+}
+
+class _ChatsTabState extends State<ChatsTab> {
+  final TextEditingController _filterController = TextEditingController();
+  bool _isFiltering = false;
+  String _filterQuery = '';
+
   String get currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  @override
+  void dispose() {
+    _filterController.dispose();
+    super.dispose();
+  }
+
+  bool _matchesRoom(Map<String, dynamic> room, String query) {
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty) return true;
+
+    final roomName = (room['name'] as String? ?? '').toLowerCase();
+    final memberNames = List<String>.from(room['search_member_names'] as List? ?? [])
+        .map((name) => name.toLowerCase())
+        .toList();
+
+    if (roomName.contains(normalized)) return true;
+    return memberNames.any((name) => name.contains(normalized));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,20 +64,30 @@ class ChatsTab extends StatelessWidget {
               child: const Icon(Icons.add),
             )
           : null,
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('chat_rooms')
-            .where('ref_group_id', isEqualTo: groupId)
-            .where('member_ids', arrayContains: currentUserId)
-            .orderBy('last_time', descending: true)
-            .snapshots(),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: context.read<ChatService>().getChatRooms(
+              refGroupId: groupId,
+              includeSearchMembers: true,
+            ),
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            debugPrint('ChatsTab Stream Error: \${snapshot.error}');
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text('에러 발생: \${snapshot.error}', textAlign: TextAlign.center),
+              ),
+            );
+          }
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final chats = snapshot.data?.docs ?? [];
-          if (chats.isEmpty) {
+          final allChats = snapshot.data ?? [];
+          final chats = allChats
+              .where((room) => _matchesRoom(room, _filterQuery))
+              .toList();
+          if (allChats.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -65,67 +104,146 @@ class ChatsTab extends StatelessWidget {
             );
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.only(bottom: 80),
-            itemCount: chats.length,
-            itemBuilder: (context, index) {
-              final data = chats[index].data() as Map<String, dynamic>;
-              final roomId = chats[index].id;
-              final name = data['name'] as String? ?? 'Untitled Chat';
-              final type = data['type'] as String? ?? 'group_sub';
-              final isGroupAll = type == 'group_all';
-              final groupProfileImage =
-                  data['group_profile_image'] as String? ?? '';
-              final memberIds =
-                  List<String>.from(data['member_ids'] as List? ?? []);
-
-              Widget avatar;
-              if (isGroupAll) {
-                final hasGroupProfileImage = groupProfileImage.isNotEmpty;
-                avatar = CircleAvatar(
-                  backgroundColor: colorScheme.primaryContainer,
-                  backgroundImage: hasGroupProfileImage
-                      ? CachedNetworkImageProvider(groupProfileImage)
-                      : null,
-                  onBackgroundImageError:
-                      hasGroupProfileImage ? (_, __) {} : null,
-                  child: hasGroupProfileImage
-                      ? null
-                      : Icon(
-                          Icons.group,
-                          color: colorScheme.onPrimaryContainer,
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isFiltering = !_isFiltering;
+                          if (!_isFiltering) {
+                            _filterController.clear();
+                            _filterQuery = '';
+                          }
+                        });
+                      },
+                      child: Icon(
+                        _isFiltering ? Icons.search_off : Icons.search,
+                        size: 20,
+                        color: _isFiltering
+                            ? colorScheme.primary
+                            : colorScheme.onSurface.withOpacity(0.5),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (_isFiltering)
+                      Expanded(
+                        child: TextField(
+                          controller: _filterController,
+                          autofocus: true,
+                          onChanged: (v) =>
+                              setState(() => _filterQuery = v.trim()),
+                          decoration: InputDecoration(
+                            hintText: l.searchPlaceholder,
+                            prefixIcon: const Icon(Icons.search, size: 18),
+                            suffixIcon: _filterQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.close, size: 16),
+                                    onPressed: () => setState(() {
+                                      _filterController.clear();
+                                      _filterQuery = '';
+                                    }),
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: colorScheme.surfaceContainerHighest,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                          ),
                         ),
-                );
-              } else {
-                avatar = GroupDirectAvatar(
-                  myUid: currentUserId,
-                  memberIds: memberIds,
-                  colorScheme: colorScheme,
-                );
-              }
+                      )
+                    else
+                      const Spacer(),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: chats.isEmpty
+                    ? Center(
+                        child: Text(
+                          l.noSearchResults,
+                          style: TextStyle(
+                            color: colorScheme.onSurface.withOpacity(0.4),
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.only(bottom: 80),
+                        itemCount: chats.length,
+                        itemBuilder: (context, index) {
+                          final data = chats[index];
+                          final roomId = data['id'] as String;
+                          final name =
+                              data['name'] as String? ?? 'Untitled Chat';
+                          final type = data['type'] as String? ?? 'group_sub';
+                          final isGroupAll = type == 'group_all';
+                          final groupProfileImage =
+                              data['group_profile_image'] as String? ?? '';
+                          final memberIds =
+                              List<String>.from(data['member_ids'] as List? ?? []);
 
-              return ListTile(
-                leading: avatar,
-                title: Text(name,
-                    style: TextStyle(
-                        fontWeight: isGroupAll
-                            ? FontWeight.bold
-                            : FontWeight.normal)),
-                subtitle: Text(
-                  data['last_message'] as String? ?? 'No messages yet...',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: Icon(Icons.chevron_right,
-                    color: colorScheme.onSurface.withOpacity(0.4)),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => ChatRoomScreen(roomId: roomId),
-                  ),
-                ),
-              );
-            },
-            separatorBuilder: (_, __) => const Divider(height: 1),
+                          Widget avatar;
+                          if (isGroupAll) {
+                            final hasGroupProfileImage =
+                                groupProfileImage.isNotEmpty;
+                            avatar = CircleAvatar(
+                              backgroundColor: colorScheme.primaryContainer,
+                              backgroundImage: hasGroupProfileImage
+                                  ? CachedNetworkImageProvider(groupProfileImage)
+                                  : null,
+                              onBackgroundImageError:
+                                  hasGroupProfileImage ? (_, __) {} : null,
+                              child: hasGroupProfileImage
+                                  ? null
+                                  : Icon(
+                                      Icons.group,
+                                      color: colorScheme.onPrimaryContainer,
+                                    ),
+                            );
+                          } else {
+                            avatar = GroupDirectAvatar(
+                              myUid: currentUserId,
+                              memberIds: memberIds,
+                              colorScheme: colorScheme,
+                            );
+                          }
+
+                          return ListTile(
+                            leading: avatar,
+                            title: Text(name,
+                                style: TextStyle(
+                                    fontWeight: isGroupAll
+                                        ? FontWeight.bold
+                                        : FontWeight.normal)),
+                            subtitle: Text(
+                              data['last_message'] as String? ??
+                                  'No messages yet...',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: Icon(Icons.chevron_right,
+                                color: colorScheme.onSurface.withOpacity(0.4)),
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ChatRoomScreen(roomId: roomId),
+                              ),
+                            ),
+                          );
+                        },
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                      ),
+              ),
+            ],
           );
         },
       ),
@@ -143,7 +261,7 @@ class ChatsTab extends StatelessWidget {
       ),
       builder: (ctx) => _CreateSubChatSheet(
         groupId: groupId,
-        groupName: groupName,
+        groupName: widget.groupName,
         currentUserId: currentUserId,
         l: l,
         colorScheme: colorScheme,
@@ -362,7 +480,7 @@ class _CreateSubChatSheetState extends State<_CreateSubChatSheet> {
                       ),
                     ),
                     title: Text(
-                        isMe ? '$displayName (${l.me})' : displayName),
+                        isMe ? '$displayName (\${l.me})' : displayName),
                     subtitle:
                         Text(member['role'] as String? ?? 'member'),
                     activeColor: colorScheme.primary,

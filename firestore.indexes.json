@@ -73,6 +73,24 @@
       "density": "SPARSE_ALL"
     },
     {
+      "collectionGroup": "chat_rooms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "member_ids",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "ref_group_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "last_time",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "posts",
       "queryScope": "COLLECTION",
       "fields": [

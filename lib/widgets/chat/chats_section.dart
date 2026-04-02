@@ -137,3 +137,143 @@ class _GroupChatSectionState extends State<GroupChatSection> {
     );
   }
 }
+
+class PrivateChatSection extends StatefulWidget {
+  final String title;
+  final List<Map<String, dynamic>> rooms;
+  final ColorScheme colorScheme;
+  final String myUid;
+  final SharedPreferences prefs;
+
+  const PrivateChatSection({
+    super.key,
+    required this.title,
+    required this.rooms,
+    required this.colorScheme,
+    required this.myUid,
+    required this.prefs,
+  });
+
+  @override
+  State<PrivateChatSection> createState() => _PrivateChatSectionState();
+}
+
+class _PrivateChatSectionState extends State<PrivateChatSection> {
+  late bool _expanded;
+
+  String get _prefKey => 'chat_expanded_private';
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.prefs.getBool(_prefKey) ?? true;
+  }
+
+  Future<void> _toggleExpanded() async {
+    final next = !_expanded;
+    setState(() => _expanded = next);
+    await widget.prefs.setBool(_prefKey, next);
+  }
+
+  int get _totalUnread => widget.rooms.fold<int>(
+      0, (sum, room) => sum + ((room['unread_cnt'] as int?) ?? 0));
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = widget.colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: _toggleExpanded,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: colorScheme.secondaryContainer,
+                  child: Icon(
+                    Icons.chat_bubble_outline,
+                    size: 16,
+                    color: colorScheme.onSecondaryContainer,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.primary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                if (!_expanded && _totalUnread > 0) ...[
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: colorScheme.error,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      _totalUnread > 99 ? '99+' : '$_totalUnread',
+                      style: TextStyle(
+                        color: colorScheme.onError,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                AnimatedRotation(
+                  turns: _expanded ? 0.0 : -0.25,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.expand_more,
+                    size: 18,
+                    color: colorScheme.primary.withOpacity(0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedCrossFade(
+          firstChild: Column(
+            children: widget.rooms.map<Widget>((room) {
+              final type = room['type'] as String? ?? '';
+              if (type == 'direct') {
+                return DmTile(
+                  room: room,
+                  colorScheme: colorScheme,
+                  myUid: widget.myUid,
+                );
+              }
+              return ChatTile(
+                room: room,
+                colorScheme: colorScheme,
+                myUid: widget.myUid,
+              );
+            }).toList(),
+          ),
+          secondChild: const SizedBox.shrink(),
+          crossFadeState:
+              _expanded ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+          duration: const Duration(milliseconds: 220),
+        ),
+        Divider(
+          height: 8,
+          thickness: 8,
+          color: colorScheme.surfaceContainerHighest,
+        ),
+      ],
+    );
+  }
+}

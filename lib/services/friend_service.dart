@@ -195,6 +195,7 @@ class FriendService {
     final existing = await _db
         .collection('chat_rooms')
         .where('dm_key', isEqualTo: dmKey)
+        .where('member_ids', arrayContains: currentUserId)
         .limit(1)
         .get();
 

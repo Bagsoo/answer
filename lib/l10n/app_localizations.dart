@@ -36,6 +36,7 @@ class AppLocalizations {
   String get me => _s.me;
   String get create => _s.create;
   String get directMessages => _s.directMessages;
+  String get privateChats => _s.privateChats;
   String get underConstruction => _s.underConstruction;
   String get sectionGroupInfo => _s.sectionGroupInfo;
   String get sectionNotifications => _s.sectionNotifications;
@@ -681,6 +682,7 @@ abstract class _AppStrings {
   String get me;
   String get create;
   String get directMessages;
+  String get privateChats;
   String get underConstruction;
   String get sectionGroupInfo;
   String get sectionNotifications;
@@ -1335,6 +1337,7 @@ class _EnStrings extends _AppStrings {
   @override String get me => 'me';
   @override String get create => 'Create';
   @override String get directMessages => 'DIRECT MESSAGES';
+  @override String get privateChats => 'Private Chats';
   @override String get underConstruction => 'Under construction!';
   @override String get sectionGroupInfo => 'GROUP INFO';
   @override String get sectionNotifications => 'NOTIFICATIONS';
@@ -1965,6 +1968,7 @@ class _KoStrings extends _AppStrings {
   @override String get me => '나';
   @override String get create => '만들기';
   @override String get directMessages => '개인 메시지';
+  @override String get privateChats => '내 채팅';
   @override String get underConstruction => '준비 중입니다!';
   @override String get sectionGroupInfo => '그룹 정보';
   @override String get groupType => '그룹 유형';
@@ -2595,6 +2599,7 @@ class _JaStrings extends _AppStrings {
   @override String get me => '自分';
   @override String get create => '作成';
   @override String get directMessages => 'ダイレクトメッセージ';
+  @override String get privateChats => 'プライベートチャット';
   @override String get underConstruction => '準備中です！';
   @override String get sectionGroupInfo => 'グループ情報';
   @override String get groupType => 'グループタイプ';

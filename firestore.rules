@@ -52,7 +52,10 @@ service cloud.firestore {
           request.auth.uid in
             get(/databases/$(database)/documents/chat_rooms/$(roomId))
               .data.member_ids;
-        allow write: if isOwner(memberId);
+        allow write: if isLoggedIn() &&
+          request.auth.uid in
+            getAfter(/databases/$(database)/documents/chat_rooms/$(roomId))
+              .data.member_ids;
       }
       match /notices/{noticeId} {
         allow read: if isLoggedIn() &&

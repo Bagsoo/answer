@@ -20,6 +20,9 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   SharedPreferences? _prefs;
+  final TextEditingController _filterController = TextEditingController();
+  bool _isFiltering = false;
+  String _filterQuery = '';
 
   String get _myUid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
@@ -34,12 +37,31 @@ class _ChatListScreenState extends State<ChatListScreen> {
     if (mounted) setState(() => _prefs = prefs);
   }
 
+  @override
+  void dispose() {
+    _filterController.dispose();
+    super.dispose();
+  }
+
   DateTime? _latestTime(List<Map<String, dynamic>> rooms) {
     for (final room in rooms) {
       final t = room['last_time'];
       if (t != null) return (t as dynamic).toDate();
     }
     return null;
+  }
+
+  bool _matchesRoom(Map<String, dynamic> room, String query) {
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty) return true;
+
+    final roomName = (room['name'] as String? ?? '').toLowerCase();
+    final memberNames = List<String>.from(room['search_member_names'] as List? ?? [])
+        .map((name) => name.toLowerCase())
+        .toList();
+
+    if (roomName.contains(normalized)) return true;
+    return memberNames.any((name) => name.contains(normalized));
   }
 
   void _showNewChatSheet(BuildContext context) {
@@ -126,7 +148,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         child: const Icon(Icons.edit_outlined),
       ),
       body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: chatService.getChatRooms(),
+        stream: chatService.getChatRooms(includeSearchMembers: true),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -135,9 +157,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
 
-          final rooms = snapshot.data ?? [];
+          final allRooms = snapshot.data ?? [];
+          final rooms = allRooms
+              .where((room) => _matchesRoom(room, _filterQuery))
+              .toList();
 
-          if (rooms.isEmpty) {
+          if (allRooms.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -178,16 +203,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               if (bLatest == null) return -1;
               return bLatest.compareTo(aLatest);
             });
-          // 1) DM 위젯 리스트
-          final dmWidgets = dmRooms.map<Widget>((room) {
-            final type = room['type'] as String? ?? 'direct';
-            if (type == 'direct') {
-              return DmTile(room: room, colorScheme: colorScheme, myUid: _myUid);
-            }
-            return ChatTile(room: room, colorScheme: colorScheme, myUid: _myUid);
-          }).toList();
-
-          // 2) 그룹 위젯 리스트
+          // 1) 그룹 위젯 리스트
           final groupWidgets = sortedGroups.map<Widget>((entry) {
             final roomsInGroup = entry.value;
             final groupName = roomsInGroup.first['group_name'] as String? ?? l.unknown;
@@ -207,17 +223,100 @@ class _ChatListScreenState extends State<ChatListScreen> {
             );
           }).toList();
 
-          // 3) 광고 삽입 후 ListView로 렌더링
-          return ListView(
+          final privateSection = dmRooms.isEmpty
+              ? const <Widget>[]
+              : [
+                  PrivateChatSection(
+                    key: const ValueKey('private_section'),
+                    title: l.privateChats,
+                    rooms: dmRooms,
+                    colorScheme: colorScheme,
+                    myUid: _myUid,
+                    prefs: _prefs!,
+                  ),
+                ];
+
+          // 2) 섹션 렌더링
+          return Column(
             children: [
-              ...interleaveAds(dmWidgets, keyPrefix: 'dm_ad'),
-              if (dmRooms.isNotEmpty && sortedGroups.isNotEmpty)
-                Divider(
-                  height: 8,
-                  thickness: 8,
-                  color: colorScheme.surfaceContainerHighest,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isFiltering = !_isFiltering;
+                          if (!_isFiltering) {
+                            _filterController.clear();
+                            _filterQuery = '';
+                          }
+                        });
+                      },
+                      child: Icon(
+                        _isFiltering ? Icons.search_off : Icons.search,
+                        size: 20,
+                        color: _isFiltering
+                            ? colorScheme.primary
+                            : colorScheme.onSurface.withOpacity(0.5),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (_isFiltering)
+                      Expanded(
+                        child: TextField(
+                          controller: _filterController,
+                          autofocus: true,
+                          onChanged: (v) =>
+                              setState(() => _filterQuery = v.trim()),
+                          decoration: InputDecoration(
+                            hintText: l.searchPlaceholder,
+                            prefixIcon: const Icon(Icons.search, size: 18),
+                            suffixIcon: _filterQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.close, size: 16),
+                                    onPressed: () => setState(() {
+                                      _filterController.clear();
+                                      _filterQuery = '';
+                                    }),
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: colorScheme.surfaceContainerHighest,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      const Spacer(),
+                  ],
                 ),
-              ...interleaveAds(groupWidgets, keyPrefix: 'group_ad'),
+              ),
+              Expanded(
+                child: rooms.isEmpty
+                    ? Center(
+                        child: Text(
+                          l.noSearchResults,
+                          style: TextStyle(
+                            color: colorScheme.onSurface.withOpacity(0.4),
+                          ),
+                        ),
+                      )
+                    : ListView(
+                        children: [
+                          ...privateSection,
+                          ...interleaveAds(groupWidgets, keyPrefix: 'group_ad'),
+                        ],
+                      ),
+              ),
             ],
           );
         },
