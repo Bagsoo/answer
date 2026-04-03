@@ -90,7 +90,8 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/answer_icon.png"
+  image_path: "assets/images/answer_icon.png"  
+  remove_alpha_ios: true
   min_sdk_android: 21
 
 # For information on the generic Dart part of this file, see the
