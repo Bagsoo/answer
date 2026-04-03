@@ -936,8 +936,18 @@ class _AudioMessagePlayerState extends State<_AudioMessagePlayer> {
     _player.playerStateStream.listen((state) {
       if (!mounted) return;
       setState(() {
-        _playing = state.playing;
+        _playing = state.playing &&
+            state.processingState != ProcessingState.completed;
       });
+
+      if (state.processingState == ProcessingState.completed) {
+        Future.microtask(() async {
+          await _player.pause();
+          await _player.seek(Duration.zero);
+          if (!mounted) return;
+          setState(() => _playing = false);
+        });
+      }
     });
   }
 

@@ -55,10 +55,7 @@ class _VoiceMessageRecorderSheetState extends State<VoiceMessageRecorderSheet> {
         _playing = state.playing;
       });
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _startRecording();
-    });
+    _busy = false;
   }
 
   @override
@@ -293,7 +290,7 @@ class _VoiceMessageRecorderSheetState extends State<VoiceMessageRecorderSheet> {
             ),
             const SizedBox(height: 20),
             Text(
-              (_recording || _busy) && !_readyToPreview
+              _recording
                   ? l.voiceRecordingNow
                   : l.voicePreviewTitle,
               style: const TextStyle(
@@ -312,9 +309,9 @@ class _VoiceMessageRecorderSheetState extends State<VoiceMessageRecorderSheet> {
               child: Column(
                 children: [
                   Icon(
-                    _recording ? Icons.mic : Icons.multitrack_audio,
-                    size: 36,
-                    color: _recording ? cs.primary : cs.onSurface,
+                    _recording ? Icons.mic : Icons.mic_none_rounded,
+                    size: 40,
+                    color: _recording ? Colors.red : cs.onSurface,
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -327,9 +324,13 @@ class _VoiceMessageRecorderSheetState extends State<VoiceMessageRecorderSheet> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    (_recording || _busy) && !_readyToPreview
+                    _recording
                         ? l.voiceRecordingHint
-                        : l.voicePreviewHint(_formatDuration(_elapsedSeconds)),
+                        : _readyToPreview
+                            ? l.voicePreviewHint(
+                                _formatDuration(_elapsedSeconds),
+                              )
+                            : l.attachVoice,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,
@@ -386,6 +387,23 @@ class _VoiceMessageRecorderSheetState extends State<VoiceMessageRecorderSheet> {
                     ],
                   ),
                 ],
+              )
+            else if (!_recording && !_readyToPreview)
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _startRecording,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: cs.surfaceContainerHighest,
+                    foregroundColor: cs.onSurface,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  icon: Icon(
+                    Icons.mic,
+                    color: cs.onSurface,
+                  ),
+                  label: Text(l.attachVoice),
+                ),
               )
             else if (_recording)
               SizedBox(

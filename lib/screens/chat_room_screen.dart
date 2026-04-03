@@ -868,7 +868,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final userProvider = context.read<UserProvider>();
     final messageId = chatService.generateMessageId(widget.roomId);
 
-    setState(() => _uploadingMedia = true);
+    setState(() {
+      _uploadingMessages[messageId] = _UploadingMessage(
+        messageId: messageId,
+        type: 'audio',
+        senderName: _myName,
+        senderPhotoUrl: userProvider.photoUrl ?? '',
+        createdAt: DateTime.now(),
+        fileName: result.fileName,
+        fileSize: result.file.lengthSync(),
+        mimeType: result.mimeType,
+        audioDurationMs: result.durationMs,
+      );
+    });
     try {
       final uploaded = await StorageService().uploadChatAudio(
         roomId: widget.roomId,
@@ -891,17 +903,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       chatService.updateLastReadTime(widget.roomId);
     } catch (_) {
       if (mounted) {
-        final l = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.voiceSendFailed)),
-        );
+        setState(() => _uploadingMessages[messageId]?.failed = true);
       }
     } finally {
       if (await result.file.exists()) {
         await result.file.delete();
       }
       if (mounted) {
-        setState(() => _uploadingMedia = false);
+        await Future.delayed(const Duration(milliseconds: 1000));
+        setState(() => _uploadingMessages.remove(messageId));
       }
     }
   }
@@ -1547,6 +1557,56 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           ],
         ),
       );
+    } else if (msg.type == 'audio') {
+      content = Container(
+        width: 220,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.mic_none_rounded,
+                color: colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    l.attachVoice,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    _formatAudioDuration(msg.audioDurationMs ?? 0),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colorScheme.onSurface.withOpacity(0.55),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
     } else {
       content = const SizedBox(width: 80, height: 80);
     }
@@ -1917,6 +1977,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
   }
+
+  String _formatAudioDuration(int durationMs) {
+    final totalSeconds = durationMs ~/ 1000;
+    final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
+    final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
 }
 
 // ── 업로딩 메시지 모델 ─────────────────────────────────────────────────────────
@@ -1928,6 +1995,7 @@ class _UploadingMessage {
   final String? fileName;
   final int? fileSize;
   final String? mimeType;
+  final int? audioDurationMs;
   final String senderName;
   final String senderPhotoUrl;
   final DateTime createdAt;
@@ -1941,6 +2009,7 @@ class _UploadingMessage {
     this.fileName,
     this.fileSize,
     this.mimeType,
+    this.audioDurationMs,
     required this.senderName,
     required this.senderPhotoUrl,
     required this.createdAt,
