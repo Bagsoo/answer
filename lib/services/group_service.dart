@@ -9,6 +9,18 @@ class GroupService {
 
   String get currentUserId => _auth.currentUser?.uid ?? '';
 
+  int defaultMaxMemberLimitForPlan(String plan) {
+    switch (plan) {
+      case 'plus':
+        return 300;
+      case 'pro':
+        return 1000;
+      case 'free':
+      default:
+        return 50;
+    }
+  }
+
   // ── 그룹 생성 ──────────────────────────────────────────────────────────────
   Future<String?> createGroup({
     required String name,
@@ -17,8 +29,9 @@ class GroupService {
     required bool requireApproval,
     required String displayName,
     String profileImage = '',
-    int memberLimit = 50,
+    int? memberLimit,
     String plan = 'free',
+    String status = 'active',
     bool allowPlanUpgrade = true,
     GeoPoint? location,
     String locationName = '',
@@ -27,6 +40,8 @@ class GroupService {
 
     final batch = _db.batch();
     final groupDoc = _db.collection('groups').doc();
+    final maxMemberLimit = defaultMaxMemberLimitForPlan(plan);
+    final initialMemberLimit = memberLimit ?? maxMemberLimit;
 
     List<String> keywords = name.toLowerCase().split(' ');
     keywords.add(name.toLowerCase());
@@ -38,8 +53,10 @@ class GroupService {
       'require_approval': requireApproval,
       'owner_id': currentUserId,
       'member_count': 1,
-      'member_limit': memberLimit,
+      'member_limit': initialMemberLimit,
+      'max_member_limit': maxMemberLimit,
       'plan': plan,
+      'status': status,
       'invite_token': null,
       'qr_enabled': false,
       'allow_plan_upgrade': allowPlanUpgrade,

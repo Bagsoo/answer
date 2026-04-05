@@ -68,10 +68,14 @@ export const downgradeExpiredGroups = onSchedule(
       const group = groupDoc.data();
       const groupId = groupDoc.id;
       const prevPlan = group.plan as string;
+      const currentMemberLimit =
+        (group.member_limit as number | undefined) ?? 50;
 
       // 3-1. groups 문서 다운그레이드
       batch.update(groupDoc.ref, {
         plan: "free",
+        max_member_limit: 50,
+        member_limit: currentMemberLimit > 50 ? 50 : currentMemberLimit,
         qr_enabled: false,
         expires_at: null,
         payment_id: null,

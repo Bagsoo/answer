@@ -8,6 +8,7 @@ import 'group_detail_screen.dart';
 import 'group_tabs/group_type_category_data.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../widgets/common/location_picker_sheet.dart';
+import '../services/purchase_service.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   const CreateGroupScreen({super.key});
@@ -87,6 +88,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   }
 
   Future<void> _createGroup(AppLocalizations l) async {
+    if (_isLoading) return;
     setState(() => _isLoading = true);
 
     final groupService = context.read<GroupService>();
@@ -97,14 +99,18 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             _selectedCategory!, _selectedType!, l) ??
         _selectedCategory!;
 
+    final startPlan = 'free'; // 서버 보안상 클라이언트는 일단 free, 결제 성공시 서버가 업그레이드
+    final startStatus = _plan == 'free' ? 'active' : 'pending';
+
     final newGroupId = await groupService.createGroup(
       name: _nameController.text.trim(),
       type: _selectedType!,
       category: categoryKey,
       requireApproval: _requireApproval,
       displayName: displayName,
-      memberLimit: 50, // 기본값 고정, 설정 탭에서 조정 가능
-      plan: _plan,
+      memberLimit: null,
+      plan: startPlan,
+      status: startStatus,
       location: (_locationLat != null && _locationLng != null)
           ? GeoPoint(_locationLat!, _locationLng!)
           : null,
@@ -114,18 +120,48 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     if (!mounted) return;
 
     if (newGroupId != null) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => GroupDetailScreen(
+      if (_plan != 'free') {
+        try {
+          final catalog = await GroupPurchaseService.instance.loadCatalog();
+          final logicalId = '$_plan-monthly';
+          final items = catalog.items.where((i) => i.logicalProductId == logicalId).toList();
+          
+          if (items.isEmpty) throw Exception('Store item not found for $_plan. Created as free.');
+
+          await GroupPurchaseService.instance.purchaseGroupPlan(
             groupId: newGroupId,
-            groupName: _nameController.text.trim(),
+            item: items.first,
+          );
+
+          for (int i = 0; i < 15; i++) {
+            final doc = await FirebaseFirestore.instance.collection('groups').doc(newGroupId).get(const GetOptions(source: Source.server));
+            if (doc.data()?['plan'] == _plan && doc.data()?['status'] == 'active') break;
+            await Future.delayed(const Duration(milliseconds: 500));
+          }
+
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Purchase completed successfully!')));
+        } catch (e) {
+          if (mounted) {
+            final eStr = e.toString().replaceFirst("Exception: ", "");
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$eStr\nGroup created as pending. Please upgrade later.')));
+          }
+        }
+      }
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => GroupDetailScreen(
+              groupId: newGroupId,
+              groupName: _nameController.text.trim(),
+            ),
           ),
-        ),
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.groupCreatedSuccess)),
-      );
+        );
+        if (_plan == 'free') {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.groupCreatedSuccess)));
+        }
+      }
     } else {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(

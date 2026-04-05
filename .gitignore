@@ -68,6 +68,9 @@ GoogleService-Info.plist
 *.env.*
 ios/Flutter/Debug.xcconfig
 firebase.json
+android/key.properties
+android/upload-keystore.jks
+functions/.env
 
 # OS 관련
 Thumbs.db

@@ -22,6 +22,7 @@ class GroupProvider extends ChangeNotifier {
   String profileImageUrl = '';
   int memberCount = 0;
   int memberLimit = 50;
+  int maxMemberLimit = 50;
   int boardCount = 0;
   int chatCount = 0;
   bool requireApproval = false;
@@ -63,6 +64,7 @@ class GroupProvider extends ChangeNotifier {
   bool get loaded => _loaded;
 
   int get absoluteMaxLimit {
+    if (maxMemberLimit > 0) return maxMemberLimit;
     switch (plan) {
       case 'plus':
         return 300;
@@ -122,6 +124,7 @@ class GroupProvider extends ChangeNotifier {
       ownerId = d['owner_id'] as String? ?? '';
       memberCount = d['member_count'] as int? ?? 0;
       memberLimit = d['member_limit'] as int? ?? 50;
+      maxMemberLimit = d['max_member_limit'] as int? ?? 0;
       boardCount = d['board_count'] as int? ?? 0;
       chatCount = d['chat_count'] as int? ?? 0;
       profileImageUrl = d['group_profile_image'] as String? ?? '';

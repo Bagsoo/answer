@@ -1661,7 +1661,7 @@ class _EnStrings extends _AppStrings {
   @override String get planFree => 'Free';
   @override String get planFreePrice => 'Free forever';
   @override String get planFreeFeature1 => 'Up to 50 members';
-  @override String get planFreeFeature2 => 'Up to 3 boards & 5 sub-chats';
+  @override String get planFreeFeature2 => 'Up to 3 boards & unlimited sub-chats';
   @override String get planFreeFeature3 => 'Basic chat, schedules & boards';
   @override String get planFreeFeature4 => 'Invite link & join code';
 
@@ -1669,7 +1669,7 @@ class _EnStrings extends _AppStrings {
   @override String get planPlus => 'Plus';
   @override String get planPlusPrice => 'Coming soon';
   @override String get planPlusFeature1 => 'Up to 300 members';
-  @override String get planPlusFeature2 => 'Up to 5 boards & 10 sub-chats';
+  @override String get planPlusFeature2 => 'Up to 5 boards & unlimited sub-chats';
   @override String get planPlusFeature3 => 'Group intro & welcome message';
   @override String get planPlusFeature4 => 'Custom role names & member privacy';
   @override String get planPlusFeature5 => 'QR code for joining';
@@ -2305,7 +2305,7 @@ class _KoStrings extends _AppStrings {
   @override String get planFree => '무료';
   @override String get planFreePrice => '영구 무료';
   @override String get planFreeFeature1 => '최대 50명';
-  @override String get planFreeFeature2 => '게시판 3개 · 서브채팅 5개';
+  @override String get planFreeFeature2 => '게시판 3개 · 서브채팅 무제한';
   @override String get planFreeFeature3 => '기본 채팅, 일정, 게시판';
   @override String get planFreeFeature4 => '초대 링크 · 가입 코드 제공';
 
@@ -2313,7 +2313,7 @@ class _KoStrings extends _AppStrings {
   @override String get planPlus => 'Plus';
   @override String get planPlusPrice => '출시 예정';
   @override String get planPlusFeature1 => '최대 300명';
-  @override String get planPlusFeature2 => '게시판 5개 · 서브채팅 10개';
+  @override String get planPlusFeature2 => '게시판 5개 · 서브채팅 무제한';
   @override String get planPlusFeature3 => '그룹 소개글 · 신규 가입자 환영 메시지';
   @override String get planPlusFeature4 => '역할 이름 커스텀 · 멤버 공개/비공개 설정';
   @override String get planPlusFeature5 => 'QR코드 가입 지원';
@@ -2949,7 +2949,7 @@ class _JaStrings extends _AppStrings {
   @override String get planFree => '無料';
   @override String get planFreePrice => '永久無料';
   @override String get planFreeFeature1 => '最大50人';
-  @override String get planFreeFeature2 => '掲示板3つ・サブチャット5つ';
+  @override String get planFreeFeature2 => '掲示板3つ・サブチャット無制限';
   @override String get planFreeFeature3 => '基本チャット、スケジュール、掲示板';
   @override String get planFreeFeature4 => '招待リンク・参加コード提供';
 
@@ -2957,7 +2957,7 @@ class _JaStrings extends _AppStrings {
   @override String get planPlus => 'Plus';
   @override String get planPlusPrice => '近日公開';
   @override String get planPlusFeature1 => '最大300人';
-  @override String get planPlusFeature2 => '掲示板5つ・サブチャット10つ';
+  @override String get planPlusFeature2 => '掲示板5つ・サブチャット無制限';
   @override String get planPlusFeature3 => 'グループ紹介文・新規参加者へのウェルカムメッセージ';
   @override String get planPlusFeature4 => '役職名カスタム・メンバー公開設定';
   @override String get planPlusFeature5 => 'QRコード参加対応';

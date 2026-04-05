@@ -233,7 +233,7 @@ class _SettingsTabState extends State<SettingsTab> {
           leading:
               Icon(Icons.people_outline, color: colorScheme.primary),
           title: Text(l.memberLimit),
-          subtitle: Text('$memberCount / $maxLimit ${l.people}'),
+          subtitle: Text('$memberCount / $memberLimit ${l.people}'),
           trailing: canEdit
               ? TextButton(
                   onPressed: () => _showMemberLimitDialog(context, l,

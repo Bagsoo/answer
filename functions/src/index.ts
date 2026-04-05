@@ -15,6 +15,7 @@ export {
   setGroupQrEnabled,
   joinGroupByQr,
 } from "./groupQr";
+export { submitGroupPurchaseV1 } from "./billing";
 
 admin.initializeApp();
 const db = admin.firestore();

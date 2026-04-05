@@ -2,11 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:messenger/providers/group_provider.dart';
 import 'package:messenger/l10n/app_localizations.dart';
+import '../../services/purchase_service.dart';
 
-class PlanScreen extends StatelessWidget {
+class PlanScreen extends StatefulWidget {
   final String groupId;
 
   const PlanScreen({super.key, required this.groupId});
+
+  @override
+  State<PlanScreen> createState() => _PlanScreenState();
+}
+
+class _PlanScreenState extends State<PlanScreen> {
+  final GroupPurchaseService _purchaseService = GroupPurchaseService.instance;
+  late Future<PurchaseCatalog> _catalogFuture;
+  String? _purchasingProductId;
+
+  @override
+  void initState() {
+    super.initState();
+    _catalogFuture = _purchaseService.loadCatalog();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,79 +34,158 @@ class PlanScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(l.manageGroupPlan),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 현재 플랜 정보 카드
-            _buildCurrentPlanCard(context, groupProvider, l),
-            const SizedBox(height: 24),
-            
-            Text(
-              l.viewPlans,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            
-            // FREE 플랜 ($0)
-            _buildPlanItem(
-              context,
-              l,
-              name: 'FREE',
-              price: r'$0',
-              description: l.freePlanDesc,
-              features: [
-                l.boardLimitText(3),
-                l.chatLimitText(5),
-                l.memberLimitText(50),
+      body: FutureBuilder<PurchaseCatalog>(
+        future: _catalogFuture,
+        builder: (context, snapshot) {
+          final catalog = snapshot.data;
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildCurrentPlanCard(context, groupProvider, l),
+                const SizedBox(height: 24),
+                Text(
+                  l.viewPlans,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                _buildFreePlanItem(context, l, groupProvider),
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else ..._buildAllPlans(context, l, groupProvider, catalog),
               ],
-              isCurrent: groupProvider.plan == 'free',
             ),
-            
-            // PLUS 플랜 ($5)
-            _buildPlanItem(
-              context,
-              l,
-              name: 'PLUS',
-              price: r'$5 / mo',
-              description: l.plusPlanDesc,
-              features: [
-                l.boardLimitText(5),
-                l.chatLimitText(10),
-                l.memberLimitText(300),
-                l.prioritySupport,
-              ],
-              isCurrent: groupProvider.plan == 'plus',
-            ),
-            
-            // PRO 플랜 ($8)
-            _buildPlanItem(
-              context,
-              l,
-              name: 'PRO',
-              price: r'$8 / mo',
-              description: l.proPlanDesc,
-              features: [
-                l.boardLimitText(l.unlimited),
-                l.chatLimitText(l.unlimited),
-                l.memberLimitText(1000),
-                l.advancedAdminTool,
-              ],
-              isCurrent: groupProvider.plan == 'pro',
-              isPremium: true,
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildCurrentPlanCard(BuildContext context, GroupProvider provider, AppLocalizations l) {
+  Widget _buildFreePlanItem(
+    BuildContext context,
+    AppLocalizations l,
+    GroupProvider groupProvider,
+  ) {
+    return _buildPlanItem(
+      context,
+      l,
+      name: 'FREE',
+      price: l.planFreePrice,
+      description: l.freePlanDesc,
+      features: [
+        l.boardLimitText(3),
+        l.chatLimitText(l.unlimited),
+        l.memberLimitText(50),
+      ],
+      isCurrent: groupProvider.plan == 'free',
+      buttonEnabled: false,
+    );
+  }
+
+  Widget _buildStorePlanItem(
+    BuildContext context,
+    AppLocalizations l,
+    GroupProvider groupProvider, {
+    PurchaseCatalogItem? item,
+    String? plan,
+  }) {
+    plan ??= _purchaseService.planForProduct(item!.logicalProductId);
+    final isCurrent = groupProvider.plan == plan;
+    final isYearly = item != null && _purchaseService.isYearlyProduct(item.logicalProductId);
+
+    final features = plan == 'pro'
+        ? <String>[
+            l.boardLimitText(l.unlimited),
+            l.chatLimitText(l.unlimited),
+            l.memberLimitText(1000),
+            l.advancedAdminTool,
+          ]
+        : <String>[
+            l.boardLimitText(5),
+            l.chatLimitText(l.unlimited),
+            l.memberLimitText(300),
+            l.prioritySupport,
+          ];
+
+    return _buildPlanItem(
+      context,
+      l,
+      name: item?.title ?? (plan == 'pro' ? 'PRO Monthly' : 'PLUS Monthly'),
+      price: item?.price ?? 'Unavailable',
+      description: item == null 
+          ? l.comingSoon
+          : (item.description.trim().isEmpty
+            ? (isYearly ? 'Yearly subscription' : 'Monthly subscription')
+            : item.description.trim()),
+      features: features,
+      isCurrent: isCurrent,
+      isPremium: plan == 'pro',
+      buttonEnabled: item != null && _purchasingProductId != item.logicalProductId,
+      buttonText: item == null 
+          ? l.comingSoon
+          : (_purchasingProductId == item.logicalProductId ? l.loading : l.selectPlan),
+      onPressed: item != null ? () => _startPurchase(context, item) : null,
+    );
+  }
+
+  List<Widget> _buildAllPlans(BuildContext context, AppLocalizations l, GroupProvider provider, PurchaseCatalog? catalog) {
+    if (catalog != null && catalog.items.isNotEmpty) {
+      return catalog.items.map((item) => _buildStorePlanItem(context, l, provider, item: item)).toList();
+    }
+    // Fallbacks if native products are not available
+    return [
+      _buildStorePlanItem(context, l, provider, plan: 'plus'),
+      _buildStorePlanItem(context, l, provider, plan: 'pro'),
+    ];
+  }
+
+  Future<void> _startPurchase(
+    BuildContext context,
+    PurchaseCatalogItem item,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _purchasingProductId = item.logicalProductId);
+
+    try {
+      await _purchaseService.purchaseGroupPlan(
+        groupId: widget.groupId,
+        item: item,
+      );
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Purchase completed successfully.')),
+      );
+      setState(() {
+        _catalogFuture = _purchaseService.loadCatalog();
+      });
+    } catch (error) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _purchasingProductId = null);
+      }
+    }
+  }
+}
+
+extension on _PlanScreenState {
+  Widget _buildCurrentPlanCard(
+    BuildContext context,
+    GroupProvider provider,
+    AppLocalizations l,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -135,14 +230,17 @@ class PlanScreen extends StatelessWidget {
     required List<String> features,
     bool isCurrent = false,
     bool isPremium = false,
+    bool buttonEnabled = true,
+    String? buttonText,
+    VoidCallback? onPressed,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: isPremium 
+        side: isPremium
             ? BorderSide(color: colorScheme.primary, width: 2)
             : BorderSide.none,
       ),
@@ -202,10 +300,8 @@ class PlanScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: isCurrent ? null : () {
-                  // TODO: 결제 로직 구현
-                },
-                child: Text(isCurrent ? l.active : l.selectPlan),
+                onPressed: buttonEnabled ? onPressed : null,
+                child: Text(buttonText ?? (isCurrent ? l.active : l.selectPlan)),
               ),
             ),
           ],
