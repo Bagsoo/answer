@@ -13,7 +13,8 @@ import 'chat_room_screen.dart';
 import '../utils/ad_interleaver.dart';
 
 class ChatListScreen extends StatefulWidget {
-  const ChatListScreen({super.key});
+  final void Function(String roomId)? onRoomSelected;
+  const ChatListScreen({super.key, this.onRoomSelected});  
 
   @override
   State<ChatListScreen> createState() => _ChatListScreenState();
@@ -251,6 +252,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               colorScheme: colorScheme,
               myUid: _myUid,
               prefs: _prefs!,
+              onRoomSelected: widget.onRoomSelected,
             );
           }).toList();
 
@@ -265,6 +267,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     colorScheme: colorScheme,
                     myUid: _myUid,
                     prefs: _prefs!,
+                    onRoomSelected: widget.onRoomSelected,
                   ),
                 ];
 

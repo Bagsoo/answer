@@ -46,12 +46,14 @@ class DmTile extends StatefulWidget {
   final Map<String, dynamic> room;
   final ColorScheme colorScheme;
   final String myUid;
+  final void Function(String roomId)? onRoomSelected;
 
   const DmTile({
     super.key,
     required this.room,
     required this.colorScheme,
     required this.myUid,
+    this.onRoomSelected,
   });
 
   @override
@@ -145,8 +147,15 @@ class _DmTileState extends State<DmTile> {
               ),
             )
           : null,
-      onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => ChatRoomScreen(roomId: roomId))),
+      onTap: () {
+        if (widget.onRoomSelected != null) {
+          widget.onRoomSelected!(roomId); // 데스크톱
+        } else {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => ChatRoomScreen(roomId: roomId)),
+          );
+        }
+      },
     );
   }
 }
@@ -253,6 +262,7 @@ class ChatTile extends StatelessWidget {
   final ColorScheme colorScheme;
   final bool isInGroup;
   final String myUid;
+  final void Function(String roomId)? onRoomSelected;
 
   const ChatTile({
     super.key,
@@ -260,6 +270,7 @@ class ChatTile extends StatelessWidget {
     required this.colorScheme,
     required this.myUid,
     this.isInGroup = false,
+    this.onRoomSelected,
   });
 
   @override
@@ -344,8 +355,15 @@ class ChatTile extends StatelessWidget {
               ),
             )
           : null,
-      onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => ChatRoomScreen(roomId: roomId))),
+      onTap: () {
+        if (onRoomSelected != null) {
+          onRoomSelected!(roomId); // 데스크톱
+        } else {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => ChatRoomScreen(roomId: roomId)),
+          );
+        }
+      },
     );
   }
 }

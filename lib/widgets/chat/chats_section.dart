@@ -13,7 +13,7 @@ class GroupChatSection extends StatefulWidget {
   final ColorScheme colorScheme;
   final String myUid;
   final SharedPreferences prefs;
-
+  final void Function(String roomId)? onRoomSelected;
   const GroupChatSection({
     super.key,
     required this.groupId,
@@ -23,6 +23,7 @@ class GroupChatSection extends StatefulWidget {
     required this.colorScheme,
     required this.myUid,
     required this.prefs,
+    this.onRoomSelected,
   });
 
   @override
@@ -134,6 +135,7 @@ class _GroupChatSectionState extends State<GroupChatSection> {
                   room: room,
                   colorScheme: colorScheme,
                   myUid: widget.myUid,
+                  onRoomSelected: widget.onRoomSelected,
                 );
               }
               return ChatTile(
@@ -141,6 +143,7 @@ class _GroupChatSectionState extends State<GroupChatSection> {
                 colorScheme: colorScheme,
                 isInGroup: true,
                 myUid: widget.myUid,
+                onRoomSelected: widget.onRoomSelected,
               );
             }).toList(),
           ),
@@ -166,6 +169,7 @@ class PrivateChatSection extends StatefulWidget {
   final ColorScheme colorScheme;
   final String myUid;
   final SharedPreferences prefs;
+  final void Function(String roomId)? onRoomSelected;
 
   const PrivateChatSection({
     super.key,
@@ -175,6 +179,7 @@ class PrivateChatSection extends StatefulWidget {
     required this.colorScheme,
     required this.myUid,
     required this.prefs,
+    this.onRoomSelected,
   });
 
   @override
@@ -287,12 +292,14 @@ class _PrivateChatSectionState extends State<PrivateChatSection> {
                   room: room,
                   colorScheme: colorScheme,
                   myUid: widget.myUid,
+                  onRoomSelected: widget.onRoomSelected,
                 );
               }
               return ChatTile(
                 room: room,
                 colorScheme: colorScheme,
                 myUid: widget.myUid,
+                onRoomSelected: widget.onRoomSelected,
               );
             }).toList(),
           ),

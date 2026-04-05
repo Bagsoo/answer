@@ -81,6 +81,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_launcher_icons: ^0.13.1
+  msix: ^3.16.1
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -141,3 +142,10 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+msix_config:
+  display_name: Answer
+  publisher_display_name: Answer
+  identity_name: com.answer.app
+  msix_version: 1.0.0.0
+  logo_path: assets/images/answer_icon.png
+  capabilities: internetClient, microphone, webcam

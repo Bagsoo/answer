@@ -10,6 +10,7 @@ import '../providers/user_provider.dart';
 import '../services/chat_service.dart';
 import '../l10n/app_localizations.dart';
 import 'chat_list_screen.dart' hide GroupListScreen;
+import 'chat_room_screen.dart';
 import 'group_list_screen.dart';
 import 'app_settings_screen.dart';
 import 'friends_screen.dart';
@@ -28,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   int _currentIndex = 0;
   int _unreadCount = 0;         // SP 캐시에서 즉시 로드
+  String? _selectedRoomId;
   StreamSubscription<int>? _unreadSub;
 
   @override
@@ -132,7 +134,48 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        body: pages[_currentIndex],
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 700 && _currentIndex == 1) {
+              return Row(
+                children: [
+                  SizedBox(
+                    width: 320,
+                    child: ChatListScreen(  // FAB은 ChatListScreen 내부에 그대로
+                      onRoomSelected: (roomId) {
+                        setState(() => _selectedRoomId = roomId);
+                      },
+                    ),
+                  ),
+                  const VerticalDivider(width: 1),
+                  Expanded(
+                    child: _selectedRoomId != null
+                        ? ChatRoomScreen(roomId: _selectedRoomId!)
+                        : Center(
+                            child: Text(
+                              'Select chatroom!',
+                              style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withOpacity(0.4),
+                              ),
+                            ),
+                          ),
+                  ),
+                ],
+              );
+            }
+            // 모바일: 기존 방식
+            final pages = [
+              FriendsScreen(),
+              const ChatListScreen(), // 모바일은 onRoomSelected 없이
+              const MemoScreen(),
+              GroupListScreen(),
+            ];
+            return pages[_currentIndex];
+          },
+        ),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (index) => setState(() => _currentIndex = index),
