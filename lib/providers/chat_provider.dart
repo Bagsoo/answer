@@ -1,35 +1,7 @@
-// lib/providers/chat_provider.dart
-
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
-// ── 룸 메타 모델 ──────────────────────────────────────────────────────────────
-class RoomMeta {
-  final String roomId;
-  final String? refGroupId;
-  final String? roomType;
-  final String myRole;
-  final String roomName;
-  final String groupName;
-  final Map<String, dynamic>? pinnedMessage;
-  final String otherUserUid;
-  final String otherUserName;
-  final String otherUserPhoto;
-
-  const RoomMeta({
-    required this.roomId,
-    this.refGroupId,
-    this.roomType,
-    this.myRole = 'member',
-    this.roomName = '',
-    this.groupName = '',
-    this.pinnedMessage,
-    this.otherUserUid = '',
-    this.otherUserName = '',
-    this.otherUserPhoto = '',
-  });
-}
 
 // ── LRU 캐시 ─────────────────────────────────────────────────────────────────
 class _LruCache<K, V> {
@@ -58,69 +30,198 @@ class _LruCache<K, V> {
   }
 
   bool containsKey(K key) => _map.containsKey(key);
+  void remove(K key) { _map.remove(key); _order.remove(key); }
+  void clear() { _map.clear(); _order.clear(); }
+  Iterable<K> get keys => _map.keys;
+}
 
-  void remove(K key) {
-    _map.remove(key);
-    _order.remove(key);
-  }
+// ── 룸 메타 모델 ──────────────────────────────────────────────────────────────
+class RoomMeta {
+  final String roomId;
+  final String? refGroupId;
+  final String? roomType;
+  final String myRole;
+  final String roomName;
+  final String groupName;
+  final Map<String, dynamic>? pinnedMessage;
+  final String otherUserUid;
+  final String otherUserName;
+  final String otherUserPhoto;
 
-  void clear() {
-    _map.clear();
-    _order.clear();
-  }
+  const RoomMeta({
+    required this.roomId,
+    this.refGroupId,
+    this.roomType,
+    this.myRole = 'member',
+    this.roomName = '',
+    this.groupName = '',
+    this.pinnedMessage,
+    this.otherUserUid = '',
+    this.otherUserName = '',
+    this.otherUserPhoto = '',
+  });
+
+  RoomMeta copyWith({Map<String, dynamic>? pinnedMessage}) => RoomMeta(
+        roomId: roomId,
+        refGroupId: refGroupId,
+        roomType: roomType,
+        myRole: myRole,
+        roomName: roomName,
+        groupName: groupName,
+        pinnedMessage: pinnedMessage ?? this.pinnedMessage,
+        otherUserUid: otherUserUid,
+        otherUserName: otherUserName,
+        otherUserPhoto: otherUserPhoto,
+      );
+}
+
+// ── 방별 메시지 상태 ───────────────────────────────────────────────────────────
+class RoomMessageState {
+  final Stream<QuerySnapshot> messageStream;
+  final Stream<QuerySnapshot> memberStream;
+  final List<QueryDocumentSnapshot> cachedMessages;
+  final bool isLoaded;
+
+  const RoomMessageState({
+    required this.messageStream,
+    required this.memberStream,
+    this.cachedMessages = const [],
+    this.isLoaded = false,
+  });
+
+  RoomMessageState copyWith({
+    List<QueryDocumentSnapshot>? cachedMessages,
+    bool? isLoaded,
+  }) =>
+      RoomMessageState(
+        messageStream: messageStream,
+        memberStream: memberStream,
+        cachedMessages: cachedMessages ?? this.cachedMessages,
+        isLoaded: isLoaded ?? this.isLoaded,
+      );
 }
 
 // ── ChatProvider ──────────────────────────────────────────────────────────────
 class ChatProvider extends ChangeNotifier {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // 룸 메타 LRU 캐시 (최대 50개 방)
-  final _metaCache = _LruCache<String, RoomMeta>(maxSize: 50);
+  // 룸 메타 LRU 캐시 (최대 100개)
+  final _metaCache = _LruCache<String, RoomMeta>(maxSize: 100);
 
-  // 유저 프로필 LRU 캐시 (최대 200명)
-  final _userCache = _LruCache<String, Map<String, dynamic>>(maxSize: 200);
+  // 방별 스트림 캐시 - 한 번 연결하면 유지 (최대 20개 방)
+  // 20개 초과 시 가장 오래된 방 스트림 해제
+  final _roomStates = _LruCache<String, RoomMessageState>(maxSize: 20);
 
-  // 현재 로딩 중인 방 ID (중복 요청 방지)
+  // 유저 프로필 LRU 캐시 (최대 300명)
+  final _userCache = _LruCache<String, Map<String, dynamic>>(maxSize: 300);
+
+  // 현재 로딩 중인 방 메타 (중복 요청 방지)
   final _loadingMeta = <String>{};
+
+  // PC 모드에서 방문한 방 순서 (IndexedStack용)
+  final List<String> _visitedRooms = [];
+  String? _activeRoomId;
 
   String get _currentUserId =>
       FirebaseAuth.instance.currentUser?.uid ?? '';
 
-  // ── 룸 메타 가져오기 ────────────────────────────────────────────────────────
+  List<String> get visitedRooms => List.unmodifiable(_visitedRooms);
+  String? get activeRoomId => _activeRoomId;
+
+  // ── 방 선택 (PC 모드) ────────────────────────────────────────────────────────
+  void selectRoom(String roomId) {
+    if (_activeRoomId == roomId) return;
+    _activeRoomId = roomId;
+
+    if (!_visitedRooms.contains(roomId)) {
+      _visitedRooms.add(roomId);
+    }
+
+    // 스트림 미리 연결
+    ensureRoomStream(roomId);
+
+    // 메타 미리 로드
+    if (!_metaCache.containsKey(roomId)) {
+      loadRoomMeta(roomId);
+    }
+
+    notifyListeners();
+  }
+
+  // ── 방 스트림 보장 (없으면 생성, 있으면 재사용) ──────────────────────────────
+  RoomMessageState ensureRoomStream(String roomId) {
+    final existing = _roomStates.get(roomId);
+    if (existing != null) return existing;
+
+    // 새 스트림 생성 (broadcast로 여러 곳에서 listen 가능)
+    final messageStream = _db
+        .collection('chat_rooms')
+        .doc(roomId)
+        .collection('messages')
+        .orderBy('created_at', descending: true)
+        .limit(30)
+        .snapshots()
+        .asBroadcastStream();
+
+    final memberStream = _db
+        .collection('chat_rooms')
+        .doc(roomId)
+        .collection('room_members')
+        .snapshots()
+        .asBroadcastStream();
+
+    final state = RoomMessageState(
+      messageStream: messageStream,
+      memberStream: memberStream,
+    );
+
+    _roomStates.put(roomId, state);
+    return state;
+  }
+
+  Stream<QuerySnapshot> getMessageStream(String roomId) =>
+      ensureRoomStream(roomId).messageStream;
+
+  Stream<QuerySnapshot> getMemberStream(String roomId) =>
+      ensureRoomStream(roomId).memberStream;
+
+  // ── 룸 메타 ─────────────────────────────────────────────────────────────────
   RoomMeta? getCachedMeta(String roomId) => _metaCache.get(roomId);
 
   Future<RoomMeta> loadRoomMeta(String roomId) async {
-    // 캐시 히트
     final cached = _metaCache.get(roomId);
     if (cached != null) {
-      // 백그라운드에서 최신 데이터 갱신
+      // 백그라운드 갱신
       _fetchAndCacheMeta(roomId);
       return cached;
     }
-    // 캐시 미스: 직접 로드
     return await _fetchAndCacheMeta(roomId);
   }
 
   Future<RoomMeta> _fetchAndCacheMeta(String roomId) async {
-    // 중복 요청 방지
     if (_loadingMeta.contains(roomId)) {
-      // 이미 로딩 중이면 잠깐 대기 후 캐시 반환
-      await Future.delayed(const Duration(milliseconds: 300));
+      // 이미 로딩 중이면 완료될 때까지 대기
+      await Future.doWhile(() async {
+        await Future.delayed(const Duration(milliseconds: 100));
+        return _loadingMeta.contains(roomId);
+      });
       return _metaCache.get(roomId) ?? RoomMeta(roomId: roomId);
     }
 
     _loadingMeta.add(roomId);
-
     try {
       final results = await Future.wait([
         _db.collection('chat_rooms').doc(roomId).get(),
-        _db.collection('chat_rooms').doc(roomId)
-            .collection('room_members').doc(_currentUserId).get(),
+        _db
+            .collection('chat_rooms')
+            .doc(roomId)
+            .collection('room_members')
+            .doc(_currentUserId)
+            .get(),
       ]);
 
       final roomDoc = results[0] as DocumentSnapshot<Map<String, dynamic>>;
       final memberDoc = results[1] as DocumentSnapshot<Map<String, dynamic>>;
-
       final roomType = roomDoc.data()?['type'] as String?;
       final memberIds =
           List<String>.from(roomDoc.data()?['member_ids'] as List? ?? []);
@@ -159,40 +260,32 @@ class ChatProvider extends ChangeNotifier {
       notifyListeners();
       return meta;
     } catch (e) {
-      debugPrint('ChatProvider: loadRoomMeta error: $e');
+      debugPrint('ChatProvider._fetchAndCacheMeta error: $e');
       return _metaCache.get(roomId) ?? RoomMeta(roomId: roomId);
     } finally {
       _loadingMeta.remove(roomId);
     }
   }
 
-  // ── 룸 메타 캐시 업데이트 (핀 메시지 변경 등) ──────────────────────────────
   void updatePinnedMessage(String roomId, Map<String, dynamic>? pinData) {
     final cached = _metaCache.get(roomId);
     if (cached == null) return;
-    _metaCache.put(
-      roomId,
-      RoomMeta(
-        roomId: roomId,
-        refGroupId: cached.refGroupId,
-        roomType: cached.roomType,
-        myRole: cached.myRole,
-        roomName: cached.roomName,
-        groupName: cached.groupName,
-        pinnedMessage: pinData,
-        otherUserUid: cached.otherUserUid,
-        otherUserName: cached.otherUserName,
-        otherUserPhoto: cached.otherUserPhoto,
-      ),
-    );
+    _metaCache.put(roomId, cached.copyWith(pinnedMessage: pinData));
     notifyListeners();
   }
 
-  // ── 유저 프로필 캐시 ────────────────────────────────────────────────────────
+  void invalidateRoom(String roomId) {
+    _metaCache.remove(roomId);
+    _roomStates.remove(roomId);
+    _visitedRooms.remove(roomId);
+    if (_activeRoomId == roomId) _activeRoomId = null;
+    notifyListeners();
+  }
+
+  // ── 유저 프로필 ──────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getUserProfile(String uid) async {
     final cached = _userCache.get(uid);
     if (cached != null) return cached;
-
     try {
       final doc = await _db.collection('users').doc(uid).get();
       final data = {
@@ -209,17 +302,35 @@ class ChatProvider extends ChangeNotifier {
   Map<String, dynamic>? getCachedUserProfile(String uid) =>
       _userCache.get(uid);
 
-  void invalidateUserProfile(String uid) => _userCache.remove(uid);
+  // ── PC 모드 인접 방 미리 로드 (선택한 방 주변 방들 preload) ──────────────────
+  void preloadAdjacentRooms(List<String> roomIds, String currentRoomId) {
+    final index = roomIds.indexOf(currentRoomId);
+    if (index == -1) return;
 
-  // ── 캐시 무효화 ─────────────────────────────────────────────────────────────
-  void invalidateRoom(String roomId) {
-    _metaCache.remove(roomId);
-    notifyListeners();
+    // 앞뒤 2개 방씩 미리 로드
+    final toPreload = <String>[];
+    for (int i = index - 2; i <= index + 2; i++) {
+      if (i >= 0 && i < roomIds.length && roomIds[i] != currentRoomId) {
+        toPreload.add(roomIds[i]);
+      }
+    }
+
+    for (final roomId in toPreload) {
+      if (!_metaCache.containsKey(roomId)) {
+        loadRoomMeta(roomId); // 백그라운드 로드
+      }
+      if (!_roomStates.containsKey(roomId)) {
+        ensureRoomStream(roomId); // 스트림 미리 연결
+      }
+    }
   }
 
   void clearAll() {
     _metaCache.clear();
+    _roomStates.clear();
     _userCache.clear();
+    _visitedRooms.clear();
+    _activeRoomId = null;
     notifyListeners();
   }
 }

@@ -38,8 +38,9 @@ import '../widgets/chat/voice_message_recorder_sheet.dart';
 class ChatRoomScreen extends StatefulWidget {
   final String roomId;
   final String? initialScrollToMessageId;
+  final bool isDesktopMode;
   const ChatRoomScreen(
-      {super.key, required this.roomId, this.initialScrollToMessageId});
+      {super.key, required this.roomId, this.initialScrollToMessageId, this.isDesktopMode = false});
 
   @override
   State<ChatRoomScreen> createState() => _ChatRoomScreenState();
@@ -112,9 +113,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     _msgController.addListener(_persistMessageDraft);
 
     final chatService = context.read<ChatService>();
+    final chatProvider = context.read<ChatProvider>();
+
     chatService.currentRoomId = widget.roomId;
-    _messagesStream = chatService.getMessages(widget.roomId);
-    _membersStream = chatService.getRoomMembers(widget.roomId);
+
+    // 데스크톱: Provider에서 스트림 가져오기 (재연결 없음)
+    // 모바일: 기존처럼 새 스트림 생성
+    if (widget.isDesktopMode) {
+      _messagesStream = chatProvider.getMessageStream(widget.roomId);
+      _membersStream = chatProvider.getMemberStream(widget.roomId);
+    } else {
+      _messagesStream = chatService.getMessages(widget.roomId);
+      _membersStream = chatService.getRoomMembers(widget.roomId);
+    }
     chatService.updateLastReadTime(widget.roomId);
 
     _loadRoomMeta();
@@ -129,53 +140,53 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
   }
 
-  @override
-  void didUpdateWidget(covariant ChatRoomScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.roomId != widget.roomId) {
-      final chatService = context.read<ChatService>();
+  // @override
+  // void didUpdateWidget(covariant ChatRoomScreen oldWidget) {
+  //   super.didUpdateWidget(oldWidget);
+  //   if (oldWidget.roomId != widget.roomId) {
+  //     final chatService = context.read<ChatService>();
 
-      // 기존 방 정리
-      chatService.updateLastReadTime(oldWidget.roomId);
-      chatService.currentRoomId = widget.roomId;
+  //     // 기존 방 정리
+  //     chatService.updateLastReadTime(oldWidget.roomId);
+  //     chatService.currentRoomId = widget.roomId;
 
-      // 잔상 방지: 즉시 새 roomId로 전환 표시
-      setState(() {
-        _displayingRoomId = widget.roomId;
-        _metaLoading = true;
-        _roomMeta = null;
+  //     // 잔상 방지: 즉시 새 roomId로 전환 표시
+  //     setState(() {
+  //       _displayingRoomId = widget.roomId;
+  //       _metaLoading = true;
+  //       _roomMeta = null;
 
-        // 상태 초기화
-        _olderMessages.clear();
-        _hasMore = true;
-        _lastStreamDoc = null;
-        _loadingMore = false;
-        _noticeBannerDismissed = false;
-        _replyToId = null;
-        _replyToData = null;
-        _showAttachPanel = false;
-        _messageKeys.clear();
-        _uploadingMessages.clear();
-        _highlightMessageId = null;
-        _isSearching = false;
-        _searchQuery = '';
-        _searchResults = [];
+  //       // 상태 초기화
+  //       _olderMessages.clear();
+  //       _hasMore = true;
+  //       _lastStreamDoc = null;
+  //       _loadingMore = false;
+  //       _noticeBannerDismissed = false;
+  //       _replyToId = null;
+  //       _replyToData = null;
+  //       _showAttachPanel = false;
+  //       _messageKeys.clear();
+  //       _uploadingMessages.clear();
+  //       _highlightMessageId = null;
+  //       _isSearching = false;
+  //       _searchQuery = '';
+  //       _searchResults = [];
 
-        // 스트림 교체
-        _messagesStream = chatService.getMessages(widget.roomId);
-        _membersStream = chatService.getRoomMembers(widget.roomId);
-      });
+  //       // 스트림 교체
+  //       _messagesStream = chatService.getMessages(widget.roomId);
+  //       _membersStream = chatService.getRoomMembers(widget.roomId);
+  //     });
 
-      // 스크롤 리셋
-      if (_scrollController.hasClients) {
-        _scrollController.jumpTo(0);
-      }
+  //     // 스크롤 리셋
+  //     if (_scrollController.hasClients) {
+  //       _scrollController.jumpTo(0);
+  //     }
 
-      chatService.updateLastReadTime(widget.roomId);
-      _loadRoomMeta();
-      _loadMuteState();
-    }
-  }
+  //     chatService.updateLastReadTime(widget.roomId);
+  //     _loadRoomMeta();
+  //     _loadMuteState();
+  //   }
+  // }
 
   @override
   void dispose() {
@@ -195,8 +206,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   // ──────────────────────────────────────────────────────────────────────────
 
   Future<void> _loadRoomMeta() async {
-    if (!mounted) return;
-    setState(() => _metaLoading = true);
+    if (!mounted) return;    
 
     // ChatProvider에서 캐시된 메타 즉시 사용
     final chatProvider = context.read<ChatProvider>();
@@ -206,6 +216,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         _roomMeta = cached;
         _metaLoading = false;
       });
+    } else {
+      setState(() => _metaLoading = true);
     }
 
     // 최신 데이터 로드 (캐시 없으면 기다림, 있으면 백그라운드 갱신)

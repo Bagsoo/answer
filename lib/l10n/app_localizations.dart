@@ -202,6 +202,12 @@ class AppLocalizations {
 
   String get adLabel => _s.adLabel;
 
+  // ── 데스크톱 모드 ──
+  String get selectFriendHint => _s.selectFriendHint;
+  String get selectMemoHint => _s.selectMemoHint;
+  String get selectGroupHint => _s.selectGroupHint;
+  String get selectChatHint => _s.selectChatHint;
+
   // ── 그룹 위치 ──
   String get groupLocation => _s.groupLocation;
   String get selectGroupLocation => _s.selectGroupLocation;
@@ -847,6 +853,12 @@ abstract class _AppStrings {
   String get plusPlanDesc;
   String get proPlanDesc;
   String get viewOnMap;
+
+  // ── 데스크톱 모드 ──
+  String get selectFriendHint;
+  String get selectMemoHint;
+  String get selectGroupHint;
+  String get selectChatHint;
 
   // ── 그룹 위치 ──
   String get groupLocation;
@@ -1516,6 +1528,12 @@ class _EnStrings extends _AppStrings {
   @override String get proPlanDesc => 'Pro plan description';  
   @override String get viewOnMap => 'View on map';
 
+  // ── 데스크톱 모드 ──
+  @override String get selectFriendHint => 'Select a friend';
+  @override String get selectMemoHint => 'Select a memo';
+  @override String get selectGroupHint => 'Select a group';
+  @override String get selectChatHint => 'Select a chat';
+
   // ── 그룹 위치 ──
   @override String get groupLocation => 'Group location';
   @override String get selectGroupLocation => 'Select location (optional)';
@@ -2160,6 +2178,12 @@ class _KoStrings extends _AppStrings {
   @override String get proPlanDesc => 'Pro 플랜 혜택';  
   @override String get viewOnMap => '지도 보기';
 
+  // ── 데스크톱 모드 ──
+  @override String get selectFriendHint => '친구를 선택하세요';
+  @override String get selectMemoHint => '메모를 선택하세요';
+  @override String get selectGroupHint => '그룹을 선택하세요';
+  @override String get selectChatHint => '채팅을 선택하세요';
+
   // ── 그룹 위치 ──
   @override String get groupLocation => '그룹 위치';
   @override String get selectGroupLocation => '위치 선택(선택사항)';
@@ -2803,6 +2827,12 @@ class _JaStrings extends _AppStrings {
   @override String get plusPlanDesc => '成長中のコミュニティに';
   @override String get proPlanDesc => '大規模グループ向け';  
   @override String get viewOnMap => '地図で確認';
+
+  // ── 데스크톱 모드 ──
+  @override String get selectFriendHint => '友達を選択してください';
+  @override String get selectMemoHint => 'メモを選択してください';
+  @override String get selectGroupHint => 'グループを選択してください';
+  @override String get selectChatHint => 'チャットを選択してください';
 
   // ── 그룹 위치 ──
   @override String get groupLocation => 'グループの場所';
