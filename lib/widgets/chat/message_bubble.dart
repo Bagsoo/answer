@@ -1,9 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:google_mlkit_language_id/google_mlkit_language_id.dart';
+import 'package:google_mlkit_translation/google_mlkit_translation.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import '../../l10n/app_localizations.dart';
+import '../../providers/user_provider.dart';
 import '../../screens/user_profile_detail_screen.dart';
 import 'location_message_bubble.dart';
 
@@ -38,8 +42,19 @@ class MessageBubble extends StatefulWidget {
 class _MessageBubbleState extends State<MessageBubble>
     with SingleTickerProviderStateMixin {
   static const int _collapseThreshold = 200;
+
+  // ── 번역 상태 ──────────────────────────────────────────────────────────────
+  String? _translatedText;
+  bool _translating = false;
+  // 이 메시지에 번역 버튼을 보여줄지 여부 (언어 감지 후 결정)
+  bool _showTranslateButton = false;
+  bool _languageChecked = false; // 중복 감지 방지
+
   bool _expanded = false;
   late AnimationController _highlightController;
+
+  // ML Kit 언어 감지 신뢰도 최소값
+  static const double _minConfidence = 0.7;
 
   @override
   void initState() {
@@ -54,6 +69,13 @@ class _MessageBubbleState extends State<MessageBubble>
             .forward()
             .then((_) => _highlightController.reverse());
       });
+    }
+
+    // 텍스트 타입 메시지만 언어 감지
+    final type = widget.data['type'] as String? ?? 'text';
+    final text = widget.data['text'] as String? ?? '';
+    if (type == 'text' && text.trim().isNotEmpty) {
+      _checkLanguage(text);
     }
   }
 
@@ -71,6 +93,129 @@ class _MessageBubbleState extends State<MessageBubble>
   void dispose() {
     _highlightController.dispose();
     super.dispose();
+  }
+
+  // ── ML Kit 언어 코드 → TranslateLanguage 변환 ─────────────────────────────
+  TranslateLanguage? _toTranslateLanguage(String bcp47) {
+    // ML Kit 언어 감지는 BCP-47 코드 반환 (예: 'ko', 'en', 'ja', 'zh')
+    // TranslateLanguage enum과 매핑
+    switch (bcp47.split('-').first.toLowerCase()) {
+      case 'ko': return TranslateLanguage.korean;
+      case 'en': return TranslateLanguage.english;
+      case 'ja': return TranslateLanguage.japanese;
+      case 'zh': return TranslateLanguage.chinese;
+      case 'es': return TranslateLanguage.spanish;
+      case 'fr': return TranslateLanguage.french;
+      case 'de': return TranslateLanguage.german;
+      case 'pt': return TranslateLanguage.portuguese;
+      case 'ru': return TranslateLanguage.russian;
+      case 'ar': return TranslateLanguage.arabic;
+      case 'hi': return TranslateLanguage.hindi;
+      case 'id': return TranslateLanguage.indonesian;
+      case 'th': return TranslateLanguage.thai;
+      case 'vi': return TranslateLanguage.vietnamese;
+      case 'tr': return TranslateLanguage.turkish;
+      case 'it': return TranslateLanguage.italian;
+      case 'nl': return TranslateLanguage.dutch;
+      case 'pl': return TranslateLanguage.polish;
+      case 'sv': return TranslateLanguage.swedish;
+      default: return null;
+    }
+  }
+
+  // ── 내 locale → TranslateLanguage 변환 ───────────────────────────────────
+  TranslateLanguage _myTranslateLanguage(String locale) {
+    return _toTranslateLanguage(locale) ?? TranslateLanguage.english;
+  }
+
+  // ── 언어 감지: 내 언어와 다를 때만 버튼 표시 ──────────────────────────────
+  Future<void> _checkLanguage(String text) async {
+    if (_languageChecked) return;
+    _languageChecked = true;
+
+    // 너무 짧은 텍스트는 감지 정확도가 낮으므로 스킵
+    if (text.trim().length < 4) return;
+
+    final myLocale = context.read<UserProvider>().locale;
+
+    try {
+      final languageIdentifier = LanguageIdentifier(confidenceThreshold: _minConfidence);
+      final result = await languageIdentifier.identifyLanguage(text);
+      languageIdentifier.close();
+
+      // 'und' = 감지 불가 (undetermined)
+      if (result == 'und' || result.isEmpty) return;
+
+      final detectedLang = result.split('-').first.toLowerCase();
+      final myLang = myLocale.split('-').first.toLowerCase();
+
+      if (detectedLang != myLang && mounted) {
+        setState(() => _showTranslateButton = true);
+      }
+    } catch (e) {
+      debugPrint('언어 감지 실패: $e');
+    }
+  }
+
+  // ── 번역 실행 ─────────────────────────────────────────────────────────────
+  Future<void> _translate(String text) async {
+    if (_translating) return;
+
+    // 이미 번역됐으면 토글 (번역 숨기기)
+    if (_translatedText != null) {
+      setState(() => _translatedText = null);
+      return;
+    }
+
+    setState(() => _translating = true);
+
+    final myLocale = context.read<UserProvider>().locale;
+    final targetLang = _myTranslateLanguage(myLocale);
+
+    try {
+      final languageIdentifier = LanguageIdentifier(confidenceThreshold: _minConfidence);
+      final sourceLangCode = await languageIdentifier.identifyLanguage(text);
+      languageIdentifier.close();
+
+      final sourceLang = _toTranslateLanguage(sourceLangCode);
+      if (sourceLang == null) {
+        if (mounted) setState(() => _translating = false);
+        return;
+      }
+
+      final translator = OnDeviceTranslator(
+        sourceLanguage: sourceLang,
+        targetLanguage: targetLang,
+      );
+
+      // 언어 모델 다운로드 확인 및 다운로드
+      final modelManager = OnDeviceTranslatorModelManager();      
+      final String sourceCode = sourceLang.bcpCode;
+      final String targetCode = targetLang.bcpCode;
+
+      if (!await modelManager.isModelDownloaded(sourceCode)) {
+        debugPrint('📥 Downloading source model: $sourceCode');
+        await modelManager.downloadModel(sourceCode);
+      }
+
+      if (!await modelManager.isModelDownloaded(targetCode)) {
+        debugPrint('📥 Downloading target model: $targetCode');
+        await modelManager.downloadModel(targetCode);
+      }
+
+      final translated = await translator.translateText(text);
+      translator.close();
+
+      if (mounted) {
+        setState(() {
+          _translatedText = translated;
+          _translating = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('번역 실패: $e');
+      if (mounted) setState(() => _translating = false);
+    }
   }
 
   // ── 검색 키워드 하이라이트 텍스트 ────────────────────────────────────────
@@ -105,6 +250,73 @@ class _MessageBubbleState extends State<MessageBubble>
         style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
         children: spans,
       ),
+    );
+  }
+
+  // ── 번역 버튼 + 번역 결과 ─────────────────────────────────────────────────
+  Widget _buildTranslationSection(String text, ColorScheme colorScheme) {
+    final l = AppLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 번역 결과
+        if (_translatedText != null) ...[
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            height: 1,
+            color: colorScheme.onSurface.withOpacity(0.08),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _translatedText!,
+            style: TextStyle(
+              fontSize: 13,
+              color: colorScheme.onSurface.withOpacity(0.75),
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+
+        // 번역 버튼
+        const SizedBox(height: 4),
+        GestureDetector(
+          onTap: _translating ? null : () => _translate(text),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_translating)
+                SizedBox(
+                  width: 10,
+                  height: 10,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: colorScheme.primary.withOpacity(0.6),
+                  ),
+                )
+              else
+                Icon(
+                  Icons.translate_rounded,
+                  size: 11,
+                  color: colorScheme.primary.withOpacity(0.6),
+                ),
+              const SizedBox(width: 3),
+              Text(
+                _translating
+                    ? l.translating        // '번역 중...'
+                    : _translatedText != null
+                        ? l.hideTranslation // '번역 숨기기'
+                        : l.translate,     // '번역'
+                style: TextStyle(
+                  fontSize: 11,
+                  color: colorScheme.primary.withOpacity(0.6),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -500,7 +712,7 @@ class _MessageBubbleState extends State<MessageBubble>
           GestureDetector(
             onTap: () => setState(() => _expanded = !_expanded),
             child: Text(
-              _expanded ? '접기' : '더보기',
+              _expanded ? l.collapse : l.showMore,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -509,6 +721,9 @@ class _MessageBubbleState extends State<MessageBubble>
             ),
           ),
         ],
+        // 번역 버튼 + 결과 (내 메시지 아닐 때 + 텍스트 타입 + 언어 감지 완료 시)
+        if (_showTranslateButton)
+          _buildTranslationSection(text, colorScheme),
       ],
     );
   }
@@ -909,6 +1124,7 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
   }
 }
 
+// ── 오디오 메시지 플레이어 ─────────────────────────────────────────────────────
 class _AudioMessagePlayer extends StatefulWidget {
   final String audioUrl;
   final int durationMs;

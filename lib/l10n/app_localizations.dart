@@ -202,6 +202,13 @@ class AppLocalizations {
 
   String get adLabel => _s.adLabel;
 
+  // ── 번역 ──────────────────────────────────────────────────────────────
+  String get translate => _s.translate;
+  String get translating => _s.translating;
+  String get hideTranslation => _s.hideTranslation;
+  String get collapse => _s.collapse;
+  String get showMore => _s.showMore;
+
   // ── 데스크톱 모드 ──
   String get selectFriendHint => _s.selectFriendHint;
   String get selectMemoHint => _s.selectMemoHint;
@@ -853,6 +860,13 @@ abstract class _AppStrings {
   String get plusPlanDesc;
   String get proPlanDesc;
   String get viewOnMap;
+
+  // ── 번역 ──────────────────────────────────────────────────────────────
+  String get translate;
+  String get translating;
+  String get hideTranslation;
+  String get collapse;
+  String get showMore;
 
   // ── 데스크톱 모드 ──
   String get selectFriendHint;
@@ -1528,6 +1542,13 @@ class _EnStrings extends _AppStrings {
   @override String get proPlanDesc => 'Pro plan description';  
   @override String get viewOnMap => 'View on map';
 
+  // ── 번역 ──
+  @override String get translate => 'Translate';
+  @override String get translating => 'Translating...';
+  @override String get hideTranslation => 'Hide translation';
+  @override String get collapse => 'Collapse';
+  @override String get showMore => 'Show more';
+
   // ── 데스크톱 모드 ──
   @override String get selectFriendHint => 'Select a friend';
   @override String get selectMemoHint => 'Select a memo';
@@ -2184,6 +2205,13 @@ class _KoStrings extends _AppStrings {
   @override String get selectGroupHint => '그룹을 선택하세요';
   @override String get selectChatHint => '채팅을 선택하세요';
 
+  // ── 번역 ──
+  @override String get translate => '번역';
+  @override String get translating => '번역 중...';
+  @override String get hideTranslation => '번역 숨기기';
+  @override String get collapse => '접기';
+  @override String get showMore => '더 보기';
+
   // ── 그룹 위치 ──
   @override String get groupLocation => '그룹 위치';
   @override String get selectGroupLocation => '위치 선택(선택사항)';
@@ -2827,6 +2855,13 @@ class _JaStrings extends _AppStrings {
   @override String get plusPlanDesc => '成長中のコミュニティに';
   @override String get proPlanDesc => '大規模グループ向け';  
   @override String get viewOnMap => '地図で確認';
+
+  // ── 번역 ──
+  @override String get translate => '翻訳';
+  @override String get translating => '翻訳中...';
+  @override String get hideTranslation => '翻訳を隠す';
+  @override String get collapse => '折りたたむ';
+  @override String get showMore => 'もっと見る';
 
   // ── 데스크톱 모드 ──
   @override String get selectFriendHint => '友達を選択してください';
