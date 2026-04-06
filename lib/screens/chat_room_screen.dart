@@ -73,6 +73,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Map<String, dynamic>? _replyToData;
   String? _replyToId;
   bool _noticeBannerDismissed = false;
+  bool _showScrollToBottom = false;
 
   // ── 페이지네이션 ───────────────────────────────────────────────────────────
   final List<QueryDocumentSnapshot> _olderMessages = [];
@@ -317,10 +318,27 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   // ──────────────────────────────────────────────────────────────────────────
 
   void _onScroll() {
+    // 기존 페이지네이션 로직
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
       _loadMoreMessages();
     }
+
+    // 추가: 맨 아래로 가기 버튼 노출 로직 (바닥에서 200px 이상 떨어지면 노출)
+    bool isBottom = _scrollController.offset <= 200; // reverse: true 이므로 offset이 작을수록 바닥
+    if (_showScrollToBottom == isBottom) {
+      setState(() {
+        _showScrollToBottom = !isBottom;
+      });
+    }
+  }
+
+  void _jumpToBottom() {
+    _scrollController.animateTo(
+      0, // reverse: true이므로 0이 가장 하단입니다.
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
   }
 
   Future<void> _scrollToTarget() async {
@@ -1206,7 +1224,28 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 minHeight: 2,
                 backgroundColor: colorScheme.surface,
                 color: colorScheme.primary),
-          Expanded(child: _buildMessageList(l, colorScheme)),
+          Expanded(
+            child: Stack(
+              children: [
+                _buildMessageList(l, colorScheme),
+                
+                // 맨 아래로 가기 버튼
+                if (_showScrollToBottom)
+                  Positioned(
+                    right: 16,
+                    bottom: 16,
+                    child: GestureDetector(                      
+                      child: FloatingActionButton.small(
+                        onPressed: _jumpToBottom,
+                        backgroundColor: colorScheme.surface.withOpacity(0.9),
+                        elevation: 2, // 그림자가 너무 없으면 안 보일 수 있으니 2 정도 권장
+                        child: Icon(Icons.keyboard_arrow_down, color: colorScheme.primary),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
           if (!_isSearching) _buildMessageInput(colorScheme, l),
           if (_showAttachPanel && !_isSearching)
             _buildAttachPanel(colorScheme, l),
