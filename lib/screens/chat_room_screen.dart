@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -75,6 +76,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   bool _noticeBannerDismissed = false;
   bool _showScrollToBottom = false;
 
+  // ── 새 메시지 배너 ─────────────────────────────────────────────────────────
+  String? _newMessagePreviewText;
+  String? _newMessagePreviewSender;
+  Timer? _previewTimer;
+
   // ── 페이지네이션 ───────────────────────────────────────────────────────────
   final List<QueryDocumentSnapshot> _olderMessages = [];
   bool _loadingMore = false;
@@ -118,8 +124,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
     chatService.currentRoomId = widget.roomId;
 
-    // 데스크톱: Provider에서 스트림 가져오기 (재연결 없음)
-    // 모바일: 기존처럼 새 스트림 생성
     if (widget.isDesktopMode) {
       _messagesStream = chatProvider.getMessageStream(widget.roomId);
       _membersStream = chatProvider.getMemberStream(widget.roomId);
@@ -141,56 +145,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
   }
 
-  // @override
-  // void didUpdateWidget(covariant ChatRoomScreen oldWidget) {
-  //   super.didUpdateWidget(oldWidget);
-  //   if (oldWidget.roomId != widget.roomId) {
-  //     final chatService = context.read<ChatService>();
-
-  //     // 기존 방 정리
-  //     chatService.updateLastReadTime(oldWidget.roomId);
-  //     chatService.currentRoomId = widget.roomId;
-
-  //     // 잔상 방지: 즉시 새 roomId로 전환 표시
-  //     setState(() {
-  //       _displayingRoomId = widget.roomId;
-  //       _metaLoading = true;
-  //       _roomMeta = null;
-
-  //       // 상태 초기화
-  //       _olderMessages.clear();
-  //       _hasMore = true;
-  //       _lastStreamDoc = null;
-  //       _loadingMore = false;
-  //       _noticeBannerDismissed = false;
-  //       _replyToId = null;
-  //       _replyToData = null;
-  //       _showAttachPanel = false;
-  //       _messageKeys.clear();
-  //       _uploadingMessages.clear();
-  //       _highlightMessageId = null;
-  //       _isSearching = false;
-  //       _searchQuery = '';
-  //       _searchResults = [];
-
-  //       // 스트림 교체
-  //       _messagesStream = chatService.getMessages(widget.roomId);
-  //       _membersStream = chatService.getRoomMembers(widget.roomId);
-  //     });
-
-  //     // 스크롤 리셋
-  //     if (_scrollController.hasClients) {
-  //       _scrollController.jumpTo(0);
-  //     }
-
-  //     chatService.updateLastReadTime(widget.roomId);
-  //     _loadRoomMeta();
-  //     _loadMuteState();
-  //   }
-  // }
-
   @override
   void dispose() {
+    _previewTimer?.cancel();
     _scrollController.removeListener(_onScroll);
     _persistMessageDraft();
     _msgController.dispose();
@@ -207,9 +164,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   // ──────────────────────────────────────────────────────────────────────────
 
   Future<void> _loadRoomMeta() async {
-    if (!mounted) return;    
+    if (!mounted) return;
 
-    // ChatProvider에서 캐시된 메타 즉시 사용
     final chatProvider = context.read<ChatProvider>();
     final cached = chatProvider.getCachedMeta(widget.roomId);
     if (cached != null && mounted) {
@@ -221,7 +177,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       setState(() => _metaLoading = true);
     }
 
-    // 최신 데이터 로드 (캐시 없으면 기다림, 있으면 백그라운드 갱신)
     final meta = await chatProvider.loadRoomMeta(widget.roomId);
     if (mounted && widget.roomId == _displayingRoomId) {
       setState(() {
@@ -318,24 +273,29 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   // ──────────────────────────────────────────────────────────────────────────
 
   void _onScroll() {
-    // 기존 페이지네이션 로직
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
       _loadMoreMessages();
     }
 
-    // 추가: 맨 아래로 가기 버튼 노출 로직 (바닥에서 200px 이상 떨어지면 노출)
-    bool isBottom = _scrollController.offset <= 200; // reverse: true 이므로 offset이 작을수록 바닥
+    // reverse: true 이므로 offset이 작을수록 바닥
+    bool isBottom = _scrollController.offset <= 200;
     if (_showScrollToBottom == isBottom) {
       setState(() {
         _showScrollToBottom = !isBottom;
       });
     }
+
+    // 바닥에 도달하면 배너 자동 닫기
+    if (isBottom && _newMessagePreviewText != null) {
+      _dismissPreviewBanner();
+    }
   }
 
   void _jumpToBottom() {
+    _dismissPreviewBanner();
     _scrollController.animateTo(
-      0, // reverse: true이므로 0이 가장 하단입니다.
+      0,
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
     );
@@ -420,6 +380,61 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
+  // 새 메시지 배너
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /// 메시지 타입에 맞는 미리보기 텍스트 반환
+  String _getPreviewText(Map<String, dynamic> data, AppLocalizations l) {
+    final type = data['type'] as String? ?? 'text';
+    switch (type) {
+      case 'image':
+        return '📷 ${l.attachPhoto}';
+      case 'video':
+        return '🎥 ${l.attachVideo}';
+      case 'audio':
+        return '🎙️ ${l.attachAudio}';
+      case 'file':
+        return '📄 ${data['file_name'] as String? ?? l.attachFile}';
+      case 'location':
+        return '📍 ${l.attachLocation}';
+      case 'contact':
+        return '👤 ${l.attachContact}';
+      default:
+        return data['text'] as String? ?? '';
+    }
+  }
+
+  /// 새 메시지 배너를 표시하거나 갱신
+  void _showPreviewBanner(Map<String, dynamic> data, AppLocalizations l) {
+    final sender = data['sender_name'] as String? ?? '';
+    final text = _getPreviewText(data, l);
+
+    // 같은 발신자면 텍스트만 갱신, 다른 발신자면 발신자도 갱신
+    final sameSender = _newMessagePreviewSender == sender;
+
+    setState(() {
+      if (!sameSender) _newMessagePreviewSender = sender;
+      _newMessagePreviewText = text;
+    });
+
+    // 기존 타이머 취소 후 새로 시작 (중첩 방지)
+    _previewTimer?.cancel();
+    _previewTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) _dismissPreviewBanner();
+    });
+  }
+
+  void _dismissPreviewBanner() {
+    _previewTimer?.cancel();
+    if (mounted) {
+      setState(() {
+        _newMessagePreviewText = null;
+        _newMessagePreviewSender = null;
+      });
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
   // 액션
   // ──────────────────────────────────────────────────────────────────────────
 
@@ -457,7 +472,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     await batch.commit();
 
     if (mounted) {
-      // ChatProvider 캐시도 업데이트
       context.read<ChatProvider>().updatePinnedMessage(widget.roomId, pinData);
       setState(() {
         _roomMeta = _roomMeta == null
@@ -1226,23 +1240,40 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 color: colorScheme.primary),
           Expanded(
             child: Stack(
+              clipBehavior: Clip.none,
               children: [
                 _buildMessageList(l, colorScheme),
-                
+
                 // 맨 아래로 가기 버튼
                 if (_showScrollToBottom)
                   Positioned(
                     right: 16,
                     bottom: 16,
-                    child: GestureDetector(                      
-                      child: FloatingActionButton.small(
-                        onPressed: _jumpToBottom,
-                        backgroundColor: colorScheme.surface.withOpacity(0.9),
-                        elevation: 2, // 그림자가 너무 없으면 안 보일 수 있으니 2 정도 권장
-                        child: Icon(Icons.keyboard_arrow_down, color: colorScheme.primary),
-                      ),
+                    child: FloatingActionButton.small(
+                      onPressed: _jumpToBottom,
+                      backgroundColor: colorScheme.surface.withOpacity(0.9),
+                      elevation: 2,
+                      child: Icon(Icons.keyboard_arrow_down,
+                          color: colorScheme.primary),
                     ),
                   ),
+
+                // 새 메시지 미리보기 배너
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeOutCubic,
+                  left: 16,
+                  // 스크롤 버튼과 겹치지 않도록 right에 여유
+                  right: _showScrollToBottom ? 60 : 16,
+                  bottom: _newMessagePreviewText != null ? 16 : -80,
+                  child: AnimatedOpacity(
+                    opacity: _newMessagePreviewText != null ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 200),
+                    child: _newMessagePreviewText != null
+                        ? _buildNewMessageBanner(colorScheme)
+                        : const SizedBox.shrink(),
+                  ),
+                ),
               ],
             ),
           ),
@@ -1250,6 +1281,62 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           if (_showAttachPanel && !_isSearching)
             _buildAttachPanel(colorScheme, l),
         ],
+      ),
+    );
+  }
+
+  /// 새 메시지 미리보기 배너 위젯
+  Widget _buildNewMessageBanner(ColorScheme colorScheme) {
+    return GestureDetector(
+      onTap: _jumpToBottom,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: colorScheme.inverseSurface.withOpacity(0.88),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.keyboard_arrow_down,
+                color: colorScheme.onInverseSurface, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_newMessagePreviewSender?.isNotEmpty ?? false)
+                    Text(
+                      _newMessagePreviewSender!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onInverseSurface.withOpacity(0.65),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  Text(
+                    _newMessagePreviewText ?? '',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colorScheme.onInverseSurface,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1341,7 +1428,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   Widget _buildMessageList(AppLocalizations l, ColorScheme colorScheme) {
-    // 잔상 방지: 현재 표시 중인 roomId와 widget.roomId가 다르면 로딩 표시
     if (_displayingRoomId != widget.roomId) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -1363,14 +1449,37 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 }
                 final messages = messagesSnap.data?.docs ?? [];
 
-                if (messages.isNotEmpty &&
-                    _lastStreamDoc?.id != messages.last.id) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) {
-                      setState(() => _lastStreamDoc = messages.last);
+                // ── _lastStreamDoc 업데이트 & 새 메시지 배너 감지 ──────────────
+                if (messages.isNotEmpty) {
+                  final isNewMessage = _lastStreamDoc != null &&
+                      _lastStreamDoc!.id != messages.last.id;
+
+                  // _lastStreamDoc 갱신
+                  if (_lastStreamDoc?.id != messages.last.id) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() => _lastStreamDoc = messages.last);
+                      }
+                    });
+                  }
+
+                  // 새 메시지 배너: 위에서 보고 있을 때 + 타인 메시지일 때만
+                  if (isNewMessage && _showScrollToBottom) {
+                    final latestData =
+                        messages.first.data() as Map<String, dynamic>;
+                    final isSystem =
+                        latestData['is_system'] as bool? ?? false;
+                    final senderId =
+                        latestData['sender_id'] as String? ?? '';
+
+                    if (!isSystem && senderId != _currentUserId) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) _showPreviewBanner(latestData, l);
+                      });
                     }
-                  });
+                  }
                 }
+                // ─────────────────────────────────────────────────────────────
 
                 final streamIds = messages.map((d) => d.id).toSet();
                 final uniqueOlder = _olderMessages
