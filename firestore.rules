@@ -10,6 +10,13 @@ service cloud.firestore {
       return request.auth.uid == uid;
     }
 
+    function canHideChatMessage(roomId) {
+      let room = get(/databases/$(database)/documents/chat_rooms/$(roomId)).data;
+      let isGroup = room.keys().hasAll(['ref_group_id']) && room.ref_group_id != null;
+      let member = isGroup ? get(/databases/$(database)/documents/groups/$(room.ref_group_id)/members/$(request.auth.uid)).data : null;
+      return isGroup && member != null && (member.role == 'owner' || member.permissions.can_create_sub_chat == true);
+    }
+
     // ── 유저 ────────────────────────────────────────────────────────────────
     match /users/{uid} {
       allow read: if isLoggedIn();
@@ -42,10 +49,17 @@ service cloud.firestore {
         request.auth.uid in resource.data.member_ids;
 
       match /messages/{messageId} {
-        allow read, write: if isLoggedIn() &&
+        allow read, create, delete: if isLoggedIn() &&
           request.auth.uid in
             get(/databases/$(database)/documents/chat_rooms/$(roomId))
               .data.member_ids;
+              
+        allow update: if isLoggedIn() &&
+          request.auth.uid in get(/databases/$(database)/documents/chat_rooms/$(roomId)).data.member_ids &&
+          (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['is_hidden', 'hidden_by', 'hidden_at']) ||
+            canHideChatMessage(roomId)
+          );
       }
       match /room_members/{memberId} {
         allow read: if isLoggedIn() &&

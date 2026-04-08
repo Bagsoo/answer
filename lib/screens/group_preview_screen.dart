@@ -6,6 +6,7 @@ import '../providers/user_provider.dart';
 import '../l10n/app_localizations.dart';
 import 'group_detail_screen.dart';
 import 'group_tabs/group_type_category_data.dart';
+import 'user_profile_detail_screen.dart';
 
 class GroupPreviewScreen extends StatefulWidget {
   final Map<String, dynamic> group;
@@ -102,6 +103,41 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(name),
+        actions: [
+          if (group['owner_id'] != null && group['owner_id'].toString().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 16.0),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => UserProfileDetailScreen(
+                      uid: group['owner_id'],
+                      displayName: group['owner_name'] ?? 'Owner',
+                      photoUrl: group['owner_photo_url'],
+                    ),
+                  ));
+                },
+                child: Row(
+                  children: [
+                    Text(
+                      group['owner_name'] ?? 'Owner',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(width: 8),
+                    CircleAvatar(
+                      radius: 14,
+                      backgroundImage: (group['owner_photo_url'] != null && group['owner_photo_url'].isNotEmpty)
+                          ? NetworkImage(group['owner_photo_url'])
+                          : null,
+                      child: (group['owner_photo_url'] == null || group['owner_photo_url'].isEmpty)
+                          ? const Icon(Icons.person, size: 16)
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),

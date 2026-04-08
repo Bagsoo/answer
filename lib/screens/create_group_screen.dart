@@ -115,6 +115,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           ? GeoPoint(_locationLat!, _locationLng!)
           : null,
       locationName: _locationName,
+      ownerName: displayName,
+      ownerPhotoUrl: context.read<UserProvider>().photoUrl ?? '',
     );
 
     if (!mounted) return;

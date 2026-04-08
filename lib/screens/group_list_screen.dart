@@ -53,7 +53,6 @@ class _GroupListScreenState extends State<GroupListScreen>
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) return;
       LocalPreferencesService.setInt(_tabKey, _tabController.index);
-      // 추천 탭 선택 시 처음 한 번만 로드
       if (_tabController.index == 1 && !_recommendLoaded) {
         _loadRecommendations();
       }
@@ -192,56 +191,18 @@ class _GroupListScreenState extends State<GroupListScreen>
     _tabController.animateTo(0);
   }
 
-  Future<void> _onJoinPressed(Map<String, dynamic> group) async {
-    final l = AppLocalizations.of(context);
-    final groupService = context.read<GroupService>();
-    final requireApproval = group['require_approval'] ?? false;
-    final groupId = group['id'];
-    final memberCount = group['member_count'] ?? 1;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) =>
-          const Center(child: CircularProgressIndicator()),
-    );
-
-    final userProvider = context.read<UserProvider>();
-    final result = await groupService.requestToJoin(
-      groupId,
-      requireApproval,
-      group['name'] ?? '',
-      group['type'] ?? 'club',
-      group['category'] ?? '',
-      memberCount,
-      userProvider.name,
-      userProvider.phoneNumber,
-      userProvider.photoUrl ?? '',
-    );
-
-    if (!mounted) return;
-    Navigator.pop(context);
-
-    if (result == 'ok') {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-            requireApproval ? l.joinRequestSent : l.joinedSuccess),
+  void _handleGroupTap(Map<String, dynamic> group, bool isAlreadyJoined) {
+    if (isAlreadyJoined) {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => GroupDetailScreen(
+          groupId: group['id'] as String,
+          groupName: group['name'] as String? ?? 'Unknown',
+        ),
       ));
-      setState(() {
-        _searchQuery = '';
-        _searchController.clear();
-        _searchResults = [];
-      });
-      _tabController.animateTo(0);
-    } else if (result == 'full') {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l.groupFull)));
-    } else if (result == 'banned') {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l.bannedFromGroup)));
     } else {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l.joinFailed)));
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => GroupPreviewScreen(group: group),
+      ));
     }
   }
 
@@ -285,7 +246,6 @@ class _GroupListScreenState extends State<GroupListScreen>
     );
   }
 
-  // ── 내 그룹 탭 ────────────────────────────────────────────────────────────
   Widget _buildMyGroupsTab(AppLocalizations l, ColorScheme cs) {
     if (_joinedLoading && _joinedGroups.isEmpty) {
       return const Center(child: CircularProgressIndicator());
@@ -312,7 +272,6 @@ class _GroupListScreenState extends State<GroupListScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           JoinedGroupTile(group: g),
-          // 마지막 아이템 제외하고 Divider
           if (i < _joinedGroups.length - 1) const Divider(height: 1),
         ],
       );
@@ -324,7 +283,6 @@ class _GroupListScreenState extends State<GroupListScreen>
     );
   }
 
-  // ── 추천 탭 ──────────────────────────────────────────────────────────────
   Widget _buildRecommendTab(
     Set<String> joinedIds,
     AppLocalizations l,
@@ -340,12 +298,10 @@ class _GroupListScreenState extends State<GroupListScreen>
 
     final recommendWidgets = _recommendedGroups.map<Widget>((group) {
       final isJoined = joinedIds.contains(group['id'] as String? ?? '');
-      return _RecommendGroupTile(
+      return ExploreGroupTile(
         group: group,
         isAlreadyJoined: isJoined,
-        onJoinPressed: () => _onJoinPressed(group),
-        l: l,
-        cs: cs,
+        onTap: () => _handleGroupTap(group, isJoined),
       );
     }).toList();
 
@@ -357,7 +313,6 @@ class _GroupListScreenState extends State<GroupListScreen>
       child: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
-          // 위치/관심사 미설정 안내 배너
           if (!hasLocation || !hasInterests)
             _RecommendSetupBanner(
               hasLocation: hasLocation,
@@ -389,7 +344,6 @@ class _GroupListScreenState extends State<GroupListScreen>
     );
   }
 
-  // ── 검색 탭 ──────────────────────────────────────────────────────────────
   Widget _buildDiscoverTab(
       Set<String> joinedIds, AppLocalizations l, ColorScheme cs) {
     return Column(
@@ -448,11 +402,11 @@ class _GroupListScreenState extends State<GroupListScreen>
                           itemCount: _searchResults.length,
                           itemBuilder: (context, i) {
                             final group = _searchResults[i];
-                            return DiscoverGroupTile(
+                            final isJoined = joinedIds.contains(group['id'] as String? ?? '');
+                            return ExploreGroupTile(
                               group: group,
-                              isAlreadyJoined: joinedIds
-                                  .contains(group['id'] as String? ?? ''),
-                              onJoinPressed: () => _onJoinPressed(group),
+                              isAlreadyJoined: isJoined,
+                              onTap: () => _handleGroupTap(group, isJoined),
                             );
                           },
                           separatorBuilder: (_, __) =>
@@ -464,7 +418,6 @@ class _GroupListScreenState extends State<GroupListScreen>
   }
 }
 
-// ── 위치/관심사 미설정 안내 배너 ──────────────────────────────────────────────
 class _RecommendSetupBanner extends StatelessWidget {
   final bool hasLocation;
   final bool hasInterests;
@@ -533,122 +486,6 @@ class _RecommendSetupBanner extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ── 추천 그룹 타일 ────────────────────────────────────────────────────────────
-class _RecommendGroupTile extends StatelessWidget {
-  final Map<String, dynamic> group;
-  final bool isAlreadyJoined;
-  final VoidCallback onJoinPressed;
-  final AppLocalizations l;
-  final ColorScheme cs;
-
-  const _RecommendGroupTile({
-    required this.group,
-    required this.isAlreadyJoined,
-    required this.onJoinPressed,
-    required this.l,
-    required this.cs,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final name = group['name'] as String? ?? l.unknown;
-    final type = group['type'] as String? ?? '';
-    final category = group['category'] as String? ?? '';
-    final memberCount = (group['member_count'] as num?)?.toInt() ?? 0;
-    final requireApproval = group['require_approval'] as bool? ?? false;
-    final imageUrl = group['group_profile_image'] as String? ?? '';
-    final distanceKm = group['distance_km'] as String?;
-    final typeLabel = GroupTypeCategoryData.localizeType(type, l);
-    final categoryLabel = GroupTypeCategoryData.localizeKey(category, l);
-
-    return ListTile(
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: CircleAvatar(
-        radius: 24,
-        backgroundColor: cs.secondaryContainer,
-        backgroundImage:
-            imageUrl.isNotEmpty ? NetworkImage(imageUrl) : null,
-        child: imageUrl.isEmpty
-            ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: cs.onSecondaryContainer))
-            : null,
-      ),
-      title: Text(name,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('$typeLabel · $categoryLabel',
-              style: TextStyle(
-                  fontSize: 12, color: cs.onSurface.withOpacity(0.6))),
-          Row(children: [
-            Icon(Icons.people_outline,
-                size: 12, color: cs.onSurface.withOpacity(0.4)),
-            const SizedBox(width: 3),
-            Text('$memberCount',
-                style: TextStyle(
-                    fontSize: 11,
-                    color: cs.onSurface.withOpacity(0.5))),
-            if (distanceKm != null) ...[
-              const SizedBox(width: 8),
-              Icon(Icons.place_outlined,
-                  size: 12, color: cs.primary.withOpacity(0.6)),
-              const SizedBox(width: 3),
-              Text('${distanceKm}km',
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: cs.primary.withOpacity(0.7))),
-            ],
-          ]),
-        ],
-      ),
-      trailing: isAlreadyJoined
-          ? Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.check_circle, size: 14, color: cs.primary),
-                const SizedBox(width: 4),
-                Text(l.alreadyJoined,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: cs.primary)),
-              ]),
-            )
-          : ElevatedButton(
-              onPressed: onJoinPressed,
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    requireApproval ? cs.tertiary : cs.primary,
-                foregroundColor:
-                    requireApproval ? cs.onTertiary : cs.onPrimary,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20)),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
-              ),
-              child: Text(
-                requireApproval ? l.requestJoin : l.joinNow,
-                style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600),
-              ),
-            ),
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => GroupPreviewScreen(group: group),
-      )),
     );
   }
 }

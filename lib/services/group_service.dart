@@ -35,6 +35,8 @@ class GroupService {
     bool allowPlanUpgrade = true,
     GeoPoint? location,
     String locationName = '',
+    String ownerName = '',
+    String ownerPhotoUrl = '',
   }) async {
     if (currentUserId.isEmpty) return null;
 
@@ -62,6 +64,8 @@ class GroupService {
       'allow_plan_upgrade': allowPlanUpgrade,
       'created_at': FieldValue.serverTimestamp(),
       'searchable_keywords': keywords,
+      'owner_name': ownerName,
+      'owner_photo_url': ownerPhotoUrl,
     });
 
     batch.set(groupDoc.collection('members').doc(currentUserId), {
@@ -926,7 +930,7 @@ class GroupService {
 
   // ── 방장 위임 ──────────────────────────────────────────────────────────────
   Future<bool> transferOwnership(
-      String groupId, String newOwnerUid) async {
+      String groupId, String newOwnerUid, String newOwnerName, String newOwnerPhotoUrl) async {
     if (currentUserId.isEmpty) return false;
     try {
       final batch = _db.batch();
@@ -956,7 +960,11 @@ class GroupService {
         {'role': 'member'},
       );
       batch.update(
-          _db.collection('groups').doc(groupId), {'owner_id': newOwnerUid});
+          _db.collection('groups').doc(groupId), {
+            'owner_id': newOwnerUid,
+            'owner_name': newOwnerName,
+            'owner_photo_url': newOwnerPhotoUrl,
+          });
 
       final chatSnap = await _db
           .collection('chat_rooms')

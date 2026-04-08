@@ -895,8 +895,33 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     BuildContext context,
     Map<String, dynamic> data,
     String messageId,
-  ) {
+  ) async {
     final colorScheme = Theme.of(context).colorScheme;
+
+    bool canHideMessage = false;
+    final rType = _roomMeta?.roomType;
+    if ((rType == 'group_all' || rType == 'group_sub') &&
+        _roomMeta?.refGroupId != null) {
+      if (_roomMeta?.myRole == 'owner') {
+        canHideMessage = true;
+      } else {
+        try {
+          final doc = await FirebaseFirestore.instance
+              .collection('groups')
+              .doc(_roomMeta!.refGroupId)
+              .collection('members')
+              .doc(_currentUserId)
+              .get();
+          final perms = doc.data()?['permissions'] as Map<String, dynamic>?;
+          if (perms?['can_create_sub_chat'] == true) {
+            canHideMessage = true;
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: colorScheme.surface,
@@ -908,6 +933,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         messageId: messageId,
         isMe: data['sender_id'] == _currentUserId,
         roomId: widget.roomId,
+        canHideMessage: canHideMessage,
+        onHide: () => _hideMessage(messageId),
         onReply: () => setState(() {
           _replyToId = messageId;
           _replyToData = data;
@@ -917,6 +944,55 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         onMemo: () => _showChatMemoSheet(context, data, messageId),
       ),
     );
+  }
+
+  Future<void> _hideMessage(String messageId) async {
+    final l = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.hideMessage),
+        content: Text(l.hideMessageConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            child: Text(l.hideMessage),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final db = FirebaseFirestore.instance;
+      final roomRef = db.collection('chat_rooms').doc(widget.roomId);
+      await roomRef.collection('messages').doc(messageId).update({
+        'is_system': true,
+        'is_hidden': true,
+        'hidden_by': _currentUserId,
+        'hidden_at': FieldValue.serverTimestamp(),
+      });
+
+      final lastMsgsSnap = await roomRef
+          .collection('messages')
+          .orderBy('created_at', descending: true)
+          .limit(1)
+          .get();
+      if (lastMsgsSnap.docs.isNotEmpty && lastMsgsSnap.docs.first.id == messageId) {
+        await roomRef.update({'last_message': l.messageHidden});
+      }
+    } catch (e) {
+      debugPrint('Failed to hide message: $e');
+    }
   }
 
   void _showChatMemoSheet(
@@ -1577,7 +1653,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             colorScheme: colorScheme,
           ),
         if (isSystem && data['type'] != 'poll')
-          SystemMessage(text: data['text'] ?? '', colorScheme: colorScheme)
+          SystemMessage(
+            text: data['is_hidden'] == true
+                ? AppLocalizations.of(context).messageHidden
+                : data['text'] ?? '',
+            colorScheme: colorScheme,
+          )
         else if (data['type'] == 'poll')
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

@@ -850,7 +850,7 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
     setState(() => _processing = true);
     final success = await context
         .read<GroupService>()
-        .transferOwnership(widget.groupId, widget.uid);
+        .transferOwnership(widget.groupId, widget.uid, widget.displayName, widget.photoUrl);
     if (!mounted) return;
     setState(() => _processing = false);
     Navigator.pop(context);

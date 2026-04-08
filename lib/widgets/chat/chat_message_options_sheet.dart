@@ -14,6 +14,8 @@ class ChatMessageOptionsSheet extends StatelessWidget {
   final VoidCallback onReply;
   final VoidCallback onPin;
   final VoidCallback onMemo;
+  final bool canHideMessage;
+  final VoidCallback? onHide;
 
   const ChatMessageOptionsSheet({
     super.key,
@@ -24,6 +26,8 @@ class ChatMessageOptionsSheet extends StatelessWidget {
     required this.onReply,
     required this.onPin,
     required this.onMemo,
+    this.canHideMessage = false,
+    this.onHide,
   });
 
   @override
@@ -132,6 +136,17 @@ class ChatMessageOptionsSheet extends StatelessWidget {
                       otherText: otherText,
                     ),
                   );
+                },
+              ),
+            if (canHideMessage)
+              ListTile(
+                leading: Icon(Icons.visibility_off_outlined,
+                    color: colorScheme.error),
+                title: Text(l.hideMessage,
+                    style: TextStyle(color: colorScheme.error)),
+                onTap: () {
+                  Navigator.pop(context);
+                  if (onHide != null) onHide!();
                 },
               ),
             const SizedBox(height: 8),

@@ -54,17 +54,17 @@ class JoinedGroupTile extends StatelessWidget {
   }
 }
 
-// ── 검색 결과 그룹 타일 ────────────────────────────────────────────────────────
-class DiscoverGroupTile extends StatelessWidget {
+// ── 탐색/추천 그룹 타일 ────────────────────────────────────────────────────────
+class ExploreGroupTile extends StatelessWidget {
   final Map<String, dynamic> group;
   final bool isAlreadyJoined;
-  final VoidCallback onJoinPressed;
+  final VoidCallback onTap;
 
-  const DiscoverGroupTile({
+  const ExploreGroupTile({
     super.key,
     required this.group,
     required this.isAlreadyJoined,
-    required this.onJoinPressed,
+    required this.onTap,
   });
 
   @override
@@ -75,8 +75,8 @@ class DiscoverGroupTile extends StatelessWidget {
     final type = group['type'] as String? ?? '';
     final category = group['category'] as String? ?? '';
     final memberCount = (group['member_count'] as num?)?.toInt() ?? 1;
-    final requireApproval = group['require_approval'] as bool? ?? false;
     final imageUrl = group['group_profile_image'] as String? ?? '';
+    final distanceKm = group['distance_km'] as String?;
     final likes = List<String>.from(group['likes'] as List? ?? []);
 
     final typeLabel = GroupTypeCategoryData.localizeType(type, l);
@@ -106,7 +106,23 @@ class DiscoverGroupTile extends StatelessWidget {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('${l.type}: $typeLabel  •  ${l.category}: $categoryLabel'),
+          Row(
+            children: [
+              Text('${l.type}: $typeLabel  •  ${l.category}: $categoryLabel',
+                  style: TextStyle(
+                      fontSize: 12, color: colorScheme.onSurface.withOpacity(0.6))),
+              if (distanceKm != null) ...[
+                const SizedBox(width: 8),
+                Icon(Icons.place_outlined,
+                    size: 12, color: colorScheme.primary.withOpacity(0.6)),
+                const SizedBox(width: 3),
+                Text('${distanceKm}km',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: colorScheme.primary.withOpacity(0.7))),
+              ],
+            ],
+          ),
           if (likes.isNotEmpty)
             Row(children: [
               Icon(Icons.favorite,
@@ -140,40 +156,9 @@ class DiscoverGroupTile extends StatelessWidget {
                         color: colorScheme.primary)),
               ]),
             )
-          : ElevatedButton(
-              onPressed: onJoinPressed,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: requireApproval
-                    ? colorScheme.tertiary
-                    : colorScheme.primary,
-                foregroundColor: requireApproval
-                    ? colorScheme.onTertiary
-                    : colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20)),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
-              ),
-              child: Text(
-                requireApproval ? l.requestJoin : l.joinNow,
-                style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600),
-              ),
-            ),
-      onTap: () {
-        if (isAlreadyJoined) {
-          Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => GroupDetailScreen(
-              groupId: group['id'] as String,
-              groupName: name,
-            ),
-          ));
-        } else {
-          Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => GroupPreviewScreen(group: group),
-          ));
-        }
-      },
+          : Icon(Icons.chevron_right,
+              color: colorScheme.onSurface.withOpacity(0.4)),
+      onTap: onTap,
     );
   }
 }
