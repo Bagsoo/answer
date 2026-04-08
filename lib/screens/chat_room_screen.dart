@@ -935,6 +935,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         roomId: widget.roomId,
         canHideMessage: canHideMessage,
         onHide: () => _hideMessage(messageId),
+        onEdit: () => _editMessage(messageId, data['text'] as String? ?? ''),
+        onDelete: () => _deleteMessage(messageId),
         onReply: () => setState(() {
           _replyToId = messageId;
           _replyToData = data;
@@ -992,6 +994,106 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       }
     } catch (e) {
       debugPrint('Failed to hide message: $e');
+    }
+  }
+
+  Future<void> _deleteMessage(String messageId) async {
+    final l = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.deleteMessage),
+        content: Text(l.deleteMessageConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            child: Text(l.deleteMessage),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final db = FirebaseFirestore.instance;
+      final roomRef = db.collection('chat_rooms').doc(widget.roomId);
+      await roomRef.collection('messages').doc(messageId).update({
+        'is_deleted': true,
+        'deleted_at': FieldValue.serverTimestamp(),
+      });
+
+      final lastMsgsSnap = await roomRef
+          .collection('messages')
+          .orderBy('created_at', descending: true)
+          .limit(1)
+          .get();
+      if (lastMsgsSnap.docs.isNotEmpty && lastMsgsSnap.docs.first.id == messageId) {
+        await roomRef.update({'last_message': l.messageDeleted});
+      }
+    } catch (e) {
+      debugPrint('Failed to delete message: $e');
+    }
+  }
+
+  Future<void> _editMessage(String messageId, String oldText) async {
+    final l = AppLocalizations.of(context);
+    final textController = TextEditingController(text: oldText);
+
+    final newText = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.editMessageTitle),
+        content: TextField(
+          controller: textController,
+          maxLines: null,
+          autofocus: true,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, textController.text.trim()),
+            child: Text(l.edit),
+          ),
+        ],
+      ),
+    );
+
+    if (newText == null || newText.isEmpty || newText == oldText) return;
+
+    try {
+      final db = FirebaseFirestore.instance;
+      final roomRef = db.collection('chat_rooms').doc(widget.roomId);
+      await roomRef.collection('messages').doc(messageId).update({
+        'text': newText,
+        'edited': true,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      final lastMsgsSnap = await roomRef
+          .collection('messages')
+          .orderBy('created_at', descending: true)
+          .limit(1)
+          .get();
+      if (lastMsgsSnap.docs.isNotEmpty && lastMsgsSnap.docs.first.id == messageId) {
+        await roomRef.update({'last_message': newText});
+      }
+    } catch (e) {
+      debugPrint('Failed to edit message: $e');
     }
   }
 
@@ -1672,7 +1774,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         else if (storedPhoto.isNotEmpty)
           _buildBubble(
             context: context,
-            data: data,
+            data: data['is_deleted'] == true ? {...data, 'text': l.messageDeleted, 'type': 'text'} : data,
             msgId: msgId,
             photoUrl: storedPhoto,
             isContinuous: isContinuous,
@@ -1687,7 +1789,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 : Future.value({'photo': '', 'name': ''}),
             builder: (ctx, snap) => _buildBubble(
               context: context,
-              data: data,
+              data: data['is_deleted'] == true ? {...data, 'text': l.messageDeleted, 'type': 'text'} : data,
               msgId: msgId,
               photoUrl: snap.data?['photo'] as String? ?? '',
               isContinuous: isContinuous,

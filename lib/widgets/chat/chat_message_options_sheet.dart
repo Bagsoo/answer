@@ -16,6 +16,8 @@ class ChatMessageOptionsSheet extends StatelessWidget {
   final VoidCallback onMemo;
   final bool canHideMessage;
   final VoidCallback? onHide;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const ChatMessageOptionsSheet({
     super.key,
@@ -28,6 +30,8 @@ class ChatMessageOptionsSheet extends StatelessWidget {
     required this.onMemo,
     this.canHideMessage = false,
     this.onHide,
+    this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -116,6 +120,27 @@ class ChatMessageOptionsSheet extends StatelessWidget {
                 Share.share(text);
               },
             ),
+            if (isMe && data['is_deleted'] != true && data['is_hidden'] != true) ...[
+              if (data['type'] == 'text')
+                ListTile(
+                  leading: Icon(Icons.edit_outlined,
+                      color: colorScheme.onSurface.withOpacity(0.7)),
+                  title: Text(l.editMessage),
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (onEdit != null) onEdit!();
+                  },
+                ),
+              ListTile(
+                leading: Icon(Icons.delete_outline,
+                    color: colorScheme.error),
+                title: Text(l.deleteMessage, style: TextStyle(color: colorScheme.error)),
+                onTap: () {
+                  Navigator.pop(context);
+                  if (onDelete != null) onDelete!();
+                },
+              ),
+            ],
             if (!isMe)
               ListTile(
                 leading:

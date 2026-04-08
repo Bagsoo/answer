@@ -772,9 +772,11 @@ class _MessageBubbleState extends State<MessageBubble>
         ? '${text.substring(0, _collapseThreshold)}...'
         : text;
 
+    final isEdited = widget.data['edited'] == true;
+    final l = AppLocalizations.of(context);
     final timeStr = createdAt != null
         ? '${createdAt.toDate().hour.toString().padLeft(2, '0')}:'
-            '${createdAt.toDate().minute.toString().padLeft(2, '0')}'
+            '${createdAt.toDate().minute.toString().padLeft(2, '0')}${isEdited ? ' ${l.messageEdited}' : ''}'
         : '';
 
     final topPadding = isContinuous ? 2.0 : 8.0;

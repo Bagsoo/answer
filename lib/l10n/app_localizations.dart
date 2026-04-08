@@ -209,10 +209,16 @@ class AppLocalizations {
   String get collapse => _s.collapse;
   String get showMore => _s.showMore;
 
-  // ── 메시지 가리기 ──────────────────────────────────────────────────────────────
+  // ── 메시지 숨기기, 삭제 및 수정 ──────────────────────────────────────────────────────────────
   String get messageHidden => _s.messageHidden;
   String get hideMessage => _s.hideMessage;
   String get hideMessageConfirm => _s.hideMessageConfirm;
+  String get messageDeleted => _s.messageDeleted;
+  String get deleteMessage => _s.deleteMessage;
+  String get deleteMessageConfirm => _s.deleteMessageConfirm;
+  String get editMessage => _s.editMessage;
+  String get messageEdited => _s.messageEdited;
+  String get editMessageTitle => _s.editMessageTitle;
 
   // ── 데스크톱 모드 ──
   String get selectFriendHint => _s.selectFriendHint;
@@ -876,6 +882,12 @@ abstract class _AppStrings {
   String get messageHidden;
   String get hideMessage;
   String get hideMessageConfirm;
+  String get messageDeleted;
+  String get deleteMessage;
+  String get deleteMessageConfirm;
+  String get editMessage;
+  String get messageEdited;
+  String get editMessageTitle;
 
   // ── 데스크톱 모드 ──
   String get selectFriendHint;
@@ -1561,7 +1573,12 @@ class _EnStrings extends _AppStrings {
   @override String get messageHidden => 'Message has been hidden.';
   @override String get hideMessage => 'Hide message';
   @override String get hideMessageConfirm => 'Hide this message from everyone?';
-
+  @override String get messageDeleted => 'Message deleted.';
+  @override String get deleteMessage => 'Delete message';
+  @override String get deleteMessageConfirm => 'Delete this message?';
+  @override String get editMessage => 'Edit message';
+  @override String get messageEdited => '(edited)';
+  @override String get editMessageTitle => 'Edit Message';
   // ── 데스크톱 모드 ──
   @override String get selectFriendHint => 'Select a friend';
   @override String get selectMemoHint => 'Select a memo';
@@ -2222,6 +2239,12 @@ class _KoStrings extends _AppStrings {
   @override String get messageHidden => '가려진 메시지입니다.';
   @override String get hideMessage => '메시지 가리기';
   @override String get hideMessageConfirm => '이 메시지를 모든 사용자가 볼 수 없도록 숨기시겠습니까?';
+  @override String get messageDeleted => '삭제된 메시지입니다.';
+  @override String get deleteMessage => '메시지 삭제';
+  @override String get deleteMessageConfirm => '이 메시지를 삭제하시겠습니까?';
+  @override String get editMessage => '메시지 수정';
+  @override String get messageEdited => '(수정됨)';
+  @override String get editMessageTitle => '메시지 수정';
 
   // ── 번역 ──
   @override String get translate => '번역';
@@ -2884,6 +2907,12 @@ class _JaStrings extends _AppStrings {
   @override String get messageHidden => 'メッセージが非表示にされました。';
   @override String get hideMessage => 'メッセージを非表示';
   @override String get hideMessageConfirm => 'このメッセージを非表示にしますか？';
+  @override String get messageDeleted => '削除されたメッセージです。';
+  @override String get deleteMessage => 'メッセージを削除';
+  @override String get deleteMessageConfirm => 'このメッセージを削除しますか？';
+  @override String get editMessage => 'メッセージを編集';
+  @override String get messageEdited => '(編集済み)';
+  @override String get editMessageTitle => 'メッセージの編集';
 
   // ── 데스크톱 모드 ──
   @override String get selectFriendHint => '友達を選択してください';
