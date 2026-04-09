@@ -904,32 +904,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     Map<String, dynamic> data,
     String messageId,
   ) async {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    bool canHideMessage = false;
-    final rType = _roomMeta?.roomType;
-    if ((rType == 'group_all' || rType == 'group_sub') &&
-        _roomMeta?.refGroupId != null) {
-      if (_roomMeta?.myRole == 'owner') {
-        canHideMessage = true;
-      } else {
-        try {
-          final doc = await FirebaseFirestore.instance
-              .collection('groups')
-              .doc(_roomMeta!.refGroupId)
-              .collection('members')
-              .doc(_currentUserId)
-              .get();
-          final perms = doc.data()?['permissions'] as Map<String, dynamic>?;
-          if (perms?['can_create_sub_chat'] == true) {
-            canHideMessage = true;
-          }
-        } catch (_) {}
-      }
-    }
+    final isDesktopLayout = MediaQuery.sizeOf(context).width > 700;
+    final canHideMessage = await _resolveCanHideMessage();
 
     if (!mounted) return;
 
+    if (isDesktopLayout || _getMessageRect(messageId) != null) {
+      _showAnchoredMessageOptions(
+        context,
+        data,
+        messageId,
+        canHideMessage: canHideMessage,
+      );
+      return;
+    }
+
+    final colorScheme = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
       backgroundColor: colorScheme.surface,
@@ -953,6 +943,157 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         onPin: () => _pinMessage(data, messageId),
         onMemo: () => _showChatMemoSheet(context, data, messageId),
       ),
+    );
+  }
+
+  Future<bool> _resolveCanHideMessage() async {
+    bool canHideMessage = false;
+    final rType = _roomMeta?.roomType;
+    if ((rType == 'group_all' || rType == 'group_sub') &&
+        _roomMeta?.refGroupId != null) {
+      if (_roomMeta?.myRole == 'owner') {
+        canHideMessage = true;
+      } else {
+        try {
+          final doc = await FirebaseFirestore.instance
+              .collection('groups')
+              .doc(_roomMeta!.refGroupId)
+              .collection('members')
+              .doc(_currentUserId)
+              .get();
+          final perms = doc.data()?['permissions'] as Map<String, dynamic>?;
+          if (perms?['can_create_sub_chat'] == true) {
+            canHideMessage = true;
+          }
+        } catch (_) {}
+      }
+    }
+    return canHideMessage;
+  }
+
+  Rect? _getMessageRect(String messageId) {
+    final key = _messageKeys[messageId];
+    final ctx = key?.currentContext;
+    if (ctx == null) return null;
+    final render = ctx.findRenderObject();
+    if (render is! RenderBox || !render.attached) return null;
+    final origin = render.localToGlobal(Offset.zero);
+    return origin & render.size;
+  }
+
+  double _estimateMessageMenuHeight(
+    Map<String, dynamic> data, {
+    required bool isMe,
+    required bool canHideMessage,
+  }) {
+    var itemCount = 5;
+    if (isMe && data['is_deleted'] != true && data['is_hidden'] != true) {
+      if (data['type'] == 'text') itemCount += 1;
+      itemCount += 1;
+    }
+    if (!isMe) itemCount += 1;
+    if (canHideMessage) itemCount += 1;
+
+    final hasPreview = (data['text'] as String? ?? '').trim().isNotEmpty;
+    return (itemCount * 56) + (hasPreview ? 84 : 20);
+  }
+
+  void _showAnchoredMessageOptions(
+    BuildContext context,
+    Map<String, dynamic> data,
+    String messageId, {
+    required bool canHideMessage,
+  }) {
+    final rect = _getMessageRect(messageId);
+    if (rect == null) return;
+
+    final size = MediaQuery.sizeOf(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    final isMe = data['sender_id'] == _currentUserId;
+    final menuWidth = (size.width - 24).clamp(240.0, 320.0).toDouble();
+    final estimatedHeight = _estimateMessageMenuHeight(
+      data,
+      isMe: isMe,
+      canHideMessage: canHideMessage,
+    );
+    final maxTop = (size.height - estimatedHeight - 12).clamp(12.0, size.height);
+    final showBelow = rect.center.dy < size.height * 0.58;
+    final left = (isMe ? rect.right - menuWidth : rect.left)
+        .clamp(12.0, size.width - menuWidth - 12.0)
+        .toDouble();
+    final top = (showBelow ? rect.bottom + 8 : rect.top - estimatedHeight - 8)
+        .clamp(12.0, maxTop)
+        .toDouble();
+
+    showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'message-options',
+      barrierColor: Colors.black.withOpacity(0.22),
+      pageBuilder: (dialogContext, _, __) => Stack(
+        children: [
+          Positioned(
+            left: left,
+            top: top,
+            width: menuWidth,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: size.height * 0.72,
+                ),
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.16),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: ChatMessageOptionsSheet(
+                    data: data,
+                    messageId: messageId,
+                    isMe: isMe,
+                    roomId: widget.roomId,
+                    canHideMessage: canHideMessage,
+                    showDragHandle: false,
+                    onHide: () => _hideMessage(messageId),
+                    onEdit: () =>
+                        _editMessage(messageId, data['text'] as String? ?? ''),
+                    onDelete: () => _deleteMessage(messageId),
+                    onReply: () => setState(() {
+                      _replyToId = messageId;
+                      _replyToData = data;
+                      _showAttachPanel = false;
+                    }),
+                    onPin: () => _pinMessage(data, messageId),
+                    onMemo: () => _showChatMemoSheet(context, data, messageId),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      transitionDuration: const Duration(milliseconds: 160),
+      transitionBuilder: (context, animation, _, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.96, end: 1).animate(curved),
+            child: child,
+          ),
+        );
+      },
     );
   }
 
@@ -1820,8 +1961,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     required ColorScheme colorScheme,
     required AppLocalizations l,
   }) {
+    final isDesktopLayout = MediaQuery.sizeOf(context).width > 700;
+
     return GestureDetector(
-      onLongPress: () => _showMessageOptions(context, data, msgId),
+      behavior: HitTestBehavior.translucent,
+      onTap: isDesktopLayout ? () => _showMessageOptions(context, data, msgId) : null,
+      onLongPress:
+          isDesktopLayout ? null : () => _showMessageOptions(context, data, msgId),
       child: MessageBubble(
         data: {...data, 'sender_photo_url': photoUrl},
         isMe: data['sender_id'] == _currentUserId,

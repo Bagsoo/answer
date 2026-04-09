@@ -19,6 +19,8 @@ class ChatMessageOptionsSheet extends StatelessWidget {
   final VoidCallback? onHide;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final bool showDragHandle;
+  final bool showMessagePreview;
 
   const ChatMessageOptionsSheet({
     super.key,
@@ -33,6 +35,8 @@ class ChatMessageOptionsSheet extends StatelessWidget {
     this.onHide,
     this.onEdit,
     this.onDelete,
+    this.showDragHandle = true,
+    this.showMessagePreview = true,
   });
 
   @override
@@ -46,16 +50,17 @@ class ChatMessageOptionsSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              margin: const EdgeInsets.only(top: 10, bottom: 8),
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: colorScheme.onSurface.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(2),
+            if (showDragHandle)
+              Container(
+                margin: const EdgeInsets.only(top: 10, bottom: 8),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: colorScheme.onSurface.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            if (text.isNotEmpty)
+            if (showMessagePreview && text.isNotEmpty)
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
