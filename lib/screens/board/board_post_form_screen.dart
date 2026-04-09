@@ -188,6 +188,7 @@ class _BoardPostFormScreenState extends State<BoardPostFormScreen> {
             SnackBar(content: Text(ok ? l.postSaved : l.postSaveFailed)));
         if (ok) {
           _shouldPersistDraft = false;
+          _draftDebounce?.cancel();
           await _clearDraft();
           Navigator.pop(context);
         }
