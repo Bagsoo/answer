@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:any_link_preview/any_link_preview.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:google_mlkit_language_id/google_mlkit_language_id.dart';
 import 'package:google_mlkit_translation/google_mlkit_translation.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:linkify/linkify.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
@@ -42,6 +45,11 @@ class MessageBubble extends StatefulWidget {
 class _MessageBubbleState extends State<MessageBubble>
     with SingleTickerProviderStateMixin {
   static const int _collapseThreshold = 200;
+  static const LinkifyOptions _linkifyOptions = LinkifyOptions(
+    looseUrl: true,
+    defaultToHttps: true,
+    humanize: false,
+  );
 
   // ── 번역 상태 ──────────────────────────────────────────────────────────────
   String? _translatedText;
@@ -133,14 +141,16 @@ class _MessageBubbleState extends State<MessageBubble>
     if (_languageChecked) return;
     _languageChecked = true;
 
+    final textForDetection = _extractTranslatableText(text);
+
     // 너무 짧은 텍스트는 감지 정확도가 낮으므로 스킵
-    if (text.trim().length < 4) return;
+    if (textForDetection.length < 4) return;
 
     final myLocale = context.read<UserProvider>().locale;
 
     try {
       final languageIdentifier = LanguageIdentifier(confidenceThreshold: _minConfidence);
-      final result = await languageIdentifier.identifyLanguage(text);
+      final result = await languageIdentifier.identifyLanguage(textForDetection);
       languageIdentifier.close();
 
       // 'und' = 감지 불가 (undetermined)
@@ -171,10 +181,16 @@ class _MessageBubbleState extends State<MessageBubble>
 
     final myLocale = context.read<UserProvider>().locale;
     final targetLang = _myTranslateLanguage(myLocale);
+    final textForTranslation = _extractTranslatableText(text);
+
+    if (textForTranslation.length < 4) {
+      if (mounted) setState(() => _translating = false);
+      return;
+    }
 
     try {
       final languageIdentifier = LanguageIdentifier(confidenceThreshold: _minConfidence);
-      final sourceLangCode = await languageIdentifier.identifyLanguage(text);
+      final sourceLangCode = await languageIdentifier.identifyLanguage(textForTranslation);
       languageIdentifier.close();
 
       final sourceLang = _toTranslateLanguage(sourceLangCode);
@@ -203,7 +219,7 @@ class _MessageBubbleState extends State<MessageBubble>
         await modelManager.downloadModel(targetCode);
       }
 
-      final translated = await translator.translateText(text);
+      final translated = await translator.translateText(textForTranslation);
       translator.close();
 
       if (mounted) {
@@ -218,11 +234,47 @@ class _MessageBubbleState extends State<MessageBubble>
     }
   }
 
+  String _extractTranslatableText(String text) {
+    final elements = linkify(text, options: _linkifyOptions);
+    final buffer = StringBuffer();
+
+    for (final element in elements) {
+      if (element is UrlElement || element is EmailElement) {
+        continue;
+      }
+      final value = element.text.trim();
+      if (value.isEmpty) continue;
+      if (buffer.isNotEmpty) {
+        buffer.write(' ');
+      }
+      buffer.write(value);
+    }
+
+    return buffer.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
   // ── 검색 키워드 하이라이트 텍스트 ────────────────────────────────────────
   Widget _buildMessageText(String text, ColorScheme colorScheme) {
     final query = widget.searchQuery;
+    final textStyle = TextStyle(
+      color: colorScheme.onSurface,
+      fontSize: 14,
+      height: 1.4,
+    );
+    final linkStyle = textStyle.copyWith(
+      color: colorScheme.primary,
+      decoration: TextDecoration.underline,
+      fontWeight: FontWeight.w600,
+    );
+
     if (query.isEmpty) {
-      return Text(text, style: TextStyle(color: colorScheme.onSurface));
+      return Linkify(
+        text: text,
+        options: _linkifyOptions,
+        style: textStyle,
+        linkStyle: linkStyle,
+        onOpen: _handleLinkOpen,
+      );
     }
     final lowerText = text.toLowerCase();
     final lowerQuery = query.toLowerCase();
@@ -247,8 +299,111 @@ class _MessageBubbleState extends State<MessageBubble>
     }
     return RichText(
       text: TextSpan(
-        style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
+        style: textStyle,
         children: spans,
+      ),
+    );
+  }
+
+  Future<void> _handleLinkOpen(LinkableElement link) async {
+    final uri = _normalizeUri(link.url);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Uri? _normalizeUri(String rawUrl) {
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) return null;
+
+    final direct = Uri.tryParse(trimmed);
+    if (direct != null && direct.hasScheme) {
+      return direct;
+    }
+
+    return Uri.tryParse('https://$trimmed');
+  }
+
+  String? _extractPreviewUrl(String text) {
+    final elements = linkify(text, options: _linkifyOptions);
+    for (final element in elements) {
+      if (element is UrlElement) {
+        final normalized = _normalizeUri(element.url);
+        if (normalized == null) continue;
+        final normalizedText = normalized.toString();
+        if (AnyLinkPreview.isValidLink(normalizedText)) {
+          return normalizedText;
+        }
+      }
+    }
+    return null;
+  }
+
+  Widget _buildLinkPreview(String text, ColorScheme colorScheme) {
+    final previewUrl = _extractPreviewUrl(text);
+    if (previewUrl == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: AnyLinkPreview(
+          link: previewUrl,
+          displayDirection: UIDirection.uiDirectionVertical,
+          backgroundColor: colorScheme.surface,
+          borderRadius: 12,
+          removeElevation: true,
+          showMultimedia: true,
+          bodyMaxLines: 3,
+          bodyTextOverflow: TextOverflow.ellipsis,
+          titleStyle: TextStyle(
+            color: colorScheme.onSurface,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+          bodyStyle: TextStyle(
+            color: colorScheme.onSurface.withOpacity(0.72),
+            fontSize: 12,
+            height: 1.35,
+          ),
+          errorWidget: const SizedBox.shrink(),
+          placeholderWidget: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withOpacity(0.6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    previewUrl,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colorScheme.onSurface.withOpacity(0.65),
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          onTap: () async {
+            final uri = Uri.parse(previewUrl);
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          },
+        ),
       ),
     );
   }
@@ -707,6 +862,7 @@ class _MessageBubbleState extends State<MessageBubble>
       children: [
         if (replyBox != null) replyBox,
         _buildMessageText(displayText, colorScheme),
+        _buildLinkPreview(text, colorScheme),
         if (isLong) ...[
           const SizedBox(height: 4),
           GestureDetector(

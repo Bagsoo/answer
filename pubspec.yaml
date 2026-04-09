@@ -65,6 +65,9 @@ dependencies:
   intl: ^0.20.2
   provider: ^6.1.5+1
   url_launcher: ^6.3.2
+  flutter_linkify: ^6.0.0
+  linkify: ^5.0.0
+  any_link_preview: ^3.0.3
   google_places_flutter: ^2.1.1
   google_maps_flutter: ^2.9.0
   geocoding: ^3.0.0
