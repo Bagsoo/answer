@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../../providers/user_provider.dart';
 import '../../models/post_block.dart';
 import '../../services/board_service.dart';
+import '../../services/chat_service.dart';
 import '../../services/memo_service.dart';
 import '../../services/report_service.dart';
 import '../../widgets/post/block_viewer.dart';
+import '../../widgets/chat/chat_room_share_sheet.dart';
 import '../report_dialog.dart';
 import 'board_post_form_screen.dart';
 
@@ -260,6 +263,15 @@ class _BoardPostDetailScreenState extends State<BoardPostDetailScreen> {
                 _showBoardMemoSheet(post, l, colorScheme);
               },
             ),
+            ListTile(
+              leading: Icon(Icons.share_outlined,
+                  color: colorScheme.onSurface.withOpacity(0.7)),
+              title: Text(l.shareMessage),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await _sharePostToChat(post);
+              },
+            ),
             if (isOwner)
               ListTile(
                 leading: Icon(Icons.push_pin_outlined,
@@ -331,6 +343,38 @@ class _BoardPostDetailScreenState extends State<BoardPostDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _sharePostToChat(Map<String, dynamic> post) async {
+    final user = context.read<UserProvider>();
+    final chatService = context.read<ChatService>();
+    final messenger = ScaffoldMessenger.of(context);
+    final roomId = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const ChatRoomShareSheet(),
+    );
+    if (roomId == null || !mounted) return;
+
+    await chatService.sendSharedPostMessage(
+      roomId,
+      groupId: widget.groupId,
+      groupName: widget.groupName,
+      boardId: post['board_id'] as String? ?? '',
+      boardName: widget.boardName,
+      boardType: widget.boardType,
+      postId: widget.postId,
+      postTitle: post['title'] as String? ?? '',
+      postContent: post['content'] as String? ?? '',
+      authorName: post['author_name'] as String? ?? '',
+      senderName: user.name,
+      senderPhotoUrl: user.photoUrl,
+    );
+    await chatService.updateLastReadTime(roomId);
+    if (!mounted) return;
+    messenger.showSnackBar(
+      const SnackBar(content: Text('채팅방에 게시글을 공유했습니다.')),
     );
   }
 

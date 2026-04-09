@@ -414,6 +414,164 @@ class ChatService {
     await batch.commit();
   }
 
+  Future<void> sendSharedPostMessage(
+    String roomId, {
+    required String groupId,
+    required String groupName,
+    required String boardId,
+    required String boardName,
+    required String boardType,
+    required String postId,
+    required String postTitle,
+    required String postContent,
+    required String authorName,
+    required String senderName,
+    String? senderPhotoUrl,
+  }) async {
+    final unreadUpdate = await _buildUnreadUpdate(roomId);
+    final batch = _db.batch();
+
+    final msgRef = _db
+        .collection('chat_rooms')
+        .doc(roomId)
+        .collection('messages')
+        .doc();
+
+    batch.set(msgRef, {
+      'sender_id': currentUserId,
+      'sender_name': senderName,
+      'sender_photo_url': senderPhotoUrl ?? '',
+      'text': '',
+      'type': 'shared_post',
+      'group_id': groupId,
+      'group_name': groupName,
+      'board_id': boardId,
+      'board_name': boardName,
+      'board_type': boardType,
+      'post_id': postId,
+      'post_title': postTitle,
+      'post_content': postContent,
+      'post_author_name': authorName,
+      'is_system': false,
+      'created_at': FieldValue.serverTimestamp(),
+    });
+
+    batch.update(_db.collection('chat_rooms').doc(roomId), {
+      'last_message': '📝 $postTitle',
+      'last_time': FieldValue.serverTimestamp(),
+      ...unreadUpdate,
+    });
+
+    await batch.commit();
+  }
+
+  Future<void> sendSharedScheduleMessage(
+    String roomId, {
+    required String groupId,
+    required String groupName,
+    required String scheduleId,
+    required String title,
+    required String description,
+    required Timestamp? startTime,
+    required Timestamp? endTime,
+    required String locationName,
+    required String senderName,
+    String? senderPhotoUrl,
+  }) async {
+    final unreadUpdate = await _buildUnreadUpdate(roomId);
+    final batch = _db.batch();
+
+    final msgRef = _db
+        .collection('chat_rooms')
+        .doc(roomId)
+        .collection('messages')
+        .doc();
+
+    batch.set(msgRef, {
+      'sender_id': currentUserId,
+      'sender_name': senderName,
+      'sender_photo_url': senderPhotoUrl ?? '',
+      'text': '',
+      'type': 'shared_schedule',
+      'group_id': groupId,
+      'group_name': groupName,
+      'schedule_id': scheduleId,
+      'schedule_title': title,
+      'schedule_description': description,
+      'schedule_start_time': startTime,
+      'schedule_end_time': endTime,
+      'schedule_location_name': locationName,
+      'is_system': false,
+      'created_at': FieldValue.serverTimestamp(),
+    });
+
+    batch.update(_db.collection('chat_rooms').doc(roomId), {
+      'last_message': '📅 $title',
+      'last_time': FieldValue.serverTimestamp(),
+      ...unreadUpdate,
+    });
+
+    await batch.commit();
+  }
+
+  Future<void> sendSharedMemoMessage(
+    String roomId, {
+    required String title,
+    required String content,
+    required String source,
+    required String groupName,
+    required String roomName,
+    required String boardName,
+    required String postTitle,
+    required String senderName,
+    required String sourceSenderName,
+    required String authorName,
+    required List<Map<String, dynamic>> attachments,
+    required List<dynamic> blocks,
+    required List<String> mediaTypes,
+    String? senderPhotoUrl,
+  }) async {
+    final unreadUpdate = await _buildUnreadUpdate(roomId);
+    final batch = _db.batch();
+
+    final msgRef = _db
+        .collection('chat_rooms')
+        .doc(roomId)
+        .collection('messages')
+        .doc();
+
+    batch.set(msgRef, {
+      'sender_id': currentUserId,
+      'sender_name': senderName,
+      'sender_photo_url': senderPhotoUrl ?? '',
+      'text': '',
+      'type': 'shared_memo',
+      'memo_title': title,
+      'memo_content': content,
+      'memo_source': source,
+      'memo_group_name': groupName,
+      'memo_room_name': roomName,
+      'memo_board_name': boardName,
+      'memo_post_title': postTitle,
+      'memo_sender_name': sourceSenderName,
+      'memo_author_name': authorName,
+      'memo_attachments': attachments,
+      'memo_blocks': blocks,
+      'memo_media_types': mediaTypes,
+      'is_system': false,
+      'created_at': FieldValue.serverTimestamp(),
+    });
+
+    final preview = title.trim().isNotEmpty ? title.trim() : content.trim();
+    batch.update(_db.collection('chat_rooms').doc(roomId), {
+      'last_message': '🗒 ${preview.isNotEmpty ? preview : '메모'}',
+      'last_time': FieldValue.serverTimestamp(),
+      ...unreadUpdate,
+    });
+
+    await batch.commit();
+  }
+
   // ── 읽음 처리 ─────────────────────────────────────────────────────────────
   Future<void> updateLastReadTime(String roomId) async {
     final batch = _db.batch();

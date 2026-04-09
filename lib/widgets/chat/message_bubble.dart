@@ -10,6 +10,9 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/memo_service.dart';
+import '../../utils/shared_content_navigator.dart';
+import '../post/block_viewer.dart';
 import '../../providers/user_provider.dart';
 import '../../screens/user_profile_detail_screen.dart';
 import 'location_message_bubble.dart';
@@ -556,6 +559,167 @@ class _MessageBubbleState extends State<MessageBubble>
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
   }
 
+  Widget _buildSharedCard({
+    required IconData icon,
+    required Color accentColor,
+    required String label,
+    required String title,
+    required String body,
+    required ColorScheme colorScheme,
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 260),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colorScheme.outline.withOpacity(0.18)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: accentColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: accentColor, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: accentColor,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  if (body.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      body,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurface.withOpacity(0.68),
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (onTap != null) ...[
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right,
+                color: colorScheme.onSurface.withOpacity(0.35),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showSharedMemoPreview() async {
+    final memoData = {
+      'content': widget.data['memo_content'] ?? '',
+      'blocks': widget.data['memo_blocks'] ?? const [],
+      'attachments': widget.data['memo_attachments'] ?? const [],
+    };
+    final blocks = MemoService.blocksFromMemo(memoData);
+    final title = widget.data['memo_title'] as String? ?? '';
+    final source = widget.data['memo_source'] as String? ?? 'direct';
+    final subtitle = switch (source) {
+      'chat' => '💬 ${widget.data['memo_room_name'] as String? ?? ''}',
+      'board' =>
+        '📋 ${widget.data['memo_board_name'] as String? ?? ''} › ${widget.data['memo_post_title'] as String? ?? ''}',
+      _ => '메모 공유',
+    };
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: widget.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.65,
+        minChildSize: 0.4,
+        maxChildSize: 0.92,
+        expand: false,
+        builder: (_, scrollController) => Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: widget.colorScheme.onSurface.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title.trim().isNotEmpty ? title : '공유된 메모',
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: widget.colorScheme.onSurface.withOpacity(0.55),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: SingleChildScrollView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                child: BlockViewer(blocks: blocks),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── 말풍선 내용 빌드 ──────────────────────────────────────────────────────
   Widget _buildBubbleContent({
     required String type,
@@ -851,6 +1015,90 @@ class _MessageBubbleState extends State<MessageBubble>
                 ],
               ),
             ),
+          ),
+        ],
+      );
+    }
+
+    if (type == 'shared_post') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (replyBox != null) replyBox,
+          _buildSharedCard(
+            icon: Icons.article_outlined,
+            accentColor: colorScheme.primary,
+            label: widget.data['board_name'] as String? ?? '게시글 공유',
+            title: widget.data['post_title'] as String? ?? '',
+            body: widget.data['post_content'] as String? ?? '',
+            colorScheme: colorScheme,
+            onTap: () {
+              SharedContentNavigator.openSharedPost(context, widget.data);
+            },
+          ),
+        ],
+      );
+    }
+
+    if (type == 'shared_schedule') {
+      final start = (widget.data['schedule_start_time'] as Timestamp?)?.toDate();
+      final end = (widget.data['schedule_end_time'] as Timestamp?)?.toDate();
+      final locationName =
+          widget.data['schedule_location_name'] as String? ?? '';
+      final bodyParts = <String>[
+        if (start != null)
+          '${start.month}/${start.day} ${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}',
+        if (end != null)
+          '- ${end.hour.toString().padLeft(2, '0')}:${end.minute.toString().padLeft(2, '0')}',
+        if (locationName.isNotEmpty) locationName,
+      ];
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (replyBox != null) replyBox,
+          _buildSharedCard(
+            icon: Icons.event_outlined,
+            accentColor: Colors.teal,
+            label: widget.data['group_name'] as String? ?? '일정 공유',
+            title: widget.data['schedule_title'] as String? ?? '',
+            body: bodyParts.join(' '),
+            colorScheme: colorScheme,
+            onTap: () {
+              SharedContentNavigator.openSharedSchedule(context, widget.data);
+            },
+          ),
+        ],
+      );
+    }
+
+    if (type == 'shared_memo') {
+      final source = widget.data['memo_source'] as String? ?? 'direct';
+      final label = switch (source) {
+        'chat' => widget.data['memo_room_name'] as String? ?? '메모 공유',
+        'board' => widget.data['memo_board_name'] as String? ?? '메모 공유',
+        _ => '메모 공유',
+      };
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (replyBox != null) replyBox,
+          _buildSharedCard(
+            icon: Icons.note_outlined,
+            accentColor: Colors.deepOrange,
+            label: label,
+            title: (widget.data['memo_title'] as String? ?? '').trim().isNotEmpty
+                ? widget.data['memo_title'] as String? ?? ''
+                : '공유된 메모',
+            body: widget.data['memo_content'] as String? ?? '',
+            colorScheme: colorScheme,
+            onTap: () {
+              _showSharedMemoPreview();
+            },
           ),
         ],
       );

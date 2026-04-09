@@ -31,9 +31,20 @@ class MemoTile extends StatelessWidget {
     return cs.onSurface.withOpacity(0.4);
   }
 
-  String _formatDate(Timestamp? ts) {
-    if (ts == null) return '';
-    final d = ts.toDate();
+  DateTime? _asDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    try {
+      final dynamic dynamicValue = value;
+      final result = dynamicValue.toDate();
+      if (result is DateTime) return result;
+    } catch (_) {}
+    return null;
+  }
+
+  String _formatDate(dynamic value) {
+    final d = _asDateTime(value);
+    if (d == null) return '';
     return '${d.year}.${d.month.toString().padLeft(2, '0')}.${d.day.toString().padLeft(2, '0')}';
   }
 
@@ -126,7 +137,7 @@ class MemoTile extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final title = data['title'] as String? ?? '';
     final content = data['content'] as String? ?? '';
-    final updatedAt = data['updated_at'] as Timestamp?;
+    final updatedAt = data['updated_at'];
     final source = data['source'] as String? ?? 'direct';
     final subLabel = _subLabel();
     final sourceColor = _sourceColor(cs);

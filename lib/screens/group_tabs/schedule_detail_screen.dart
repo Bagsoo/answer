@@ -5,11 +5,12 @@ import '../../services/notification_service.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/group_provider.dart';
+import '../../providers/user_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../services/notification_service.dart';
+import '../../services/chat_service.dart';
+import '../../widgets/chat/chat_room_share_sheet.dart';
 import 'schedule_form_screen.dart';
 import '../../widgets/schedule/participant_list_sheet.dart';
-import '../../providers/user_provider.dart';
 
 class ScheduleDetailScreen extends StatelessWidget {
   final String groupId;
@@ -128,6 +129,44 @@ class ScheduleDetailScreen extends StatelessWidget {
       '${dt.year}.${dt.month.toString().padLeft(2, '0')}.${dt.day.toString().padLeft(2, '0')}'
       '  ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 
+  Future<void> _shareToChat(BuildContext context) async {
+    final chatService = context.read<ChatService>();
+    final user = context.read<UserProvider>();
+    final groupName = context.read<GroupProvider>().name;
+    final messenger = ScaffoldMessenger.of(context);
+    final snap = await _ref.get();
+    if (!snap.exists || !context.mounted) return;
+    final data = snap.data() as Map<String, dynamic>;
+
+    final roomId = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const ChatRoomShareSheet(),
+    );
+    if (roomId == null || !context.mounted) return;
+
+    final location = data['location'] as Map<String, dynamic>?;
+
+    await chatService.sendSharedScheduleMessage(
+      roomId,
+      groupId: groupId,
+      groupName: groupName,
+      scheduleId: scheduleId,
+      title: data['title'] as String? ?? '',
+      description: data['description'] as String? ?? '',
+      startTime: data['start_time'] as Timestamp?,
+      endTime: data['end_time'] as Timestamp?,
+      locationName: location?['name'] as String? ?? '',
+      senderName: user.name,
+      senderPhotoUrl: user.photoUrl,
+    );
+    await chatService.updateLastReadTime(roomId);
+    if (!context.mounted) return;
+    messenger.showSnackBar(
+      const SnackBar(content: Text('채팅방에 일정을 공유했습니다.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -140,6 +179,10 @@ class ScheduleDetailScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(l.scheduleDetail),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.share_outlined),
+            onPressed: () => _shareToChat(context),
+          ),
           if (canEdit) ...[
             IconButton(
               icon: const Icon(Icons.edit_outlined),

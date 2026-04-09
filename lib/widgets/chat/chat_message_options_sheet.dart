@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/report_service.dart';
+import '../../utils/message_share_formatter.dart';
 import '../../screens/report_dialog.dart';
 
 class ChatMessageOptionsSheet extends StatelessWidget {
@@ -117,7 +118,8 @@ class ChatMessageOptionsSheet extends StatelessWidget {
               title: Text(l.shareMessage),
               onTap: () {
                 Navigator.pop(context);
-                Share.share(text);
+                final shareText = MessageShareFormatter.format(data, l);
+                Share.share(shareText);
               },
             ),
             if (isMe && data['is_deleted'] != true && data['is_hidden'] != true) ...[

@@ -1,8 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../../providers/user_provider.dart';
+import '../../services/chat_service.dart';
 import '../../services/memo_service.dart';
 import '../../widgets/post/block_viewer.dart';
+import '../chat/chat_room_share_sheet.dart';
 import 'memo_form_sheet.dart';
 import 'memo_navigator.dart';
 
@@ -41,6 +45,17 @@ class MemoDetailSheet extends StatelessWidget {
           (data['attachments'] as List? ?? [])
               .map((e) => Map<String, dynamic>.from(e as Map)));
 
+  DateTime? _asDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    try {
+      final dynamic dynamicValue = value;
+      final result = dynamicValue.toDate();
+      if (result is DateTime) return result;
+    } catch (_) {}
+    return null;
+  }
+
   void _openEditSheet(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     Navigator.pop(context);
@@ -60,6 +75,50 @@ class MemoDetailSheet extends StatelessWidget {
     );
   }
 
+  Future<void> _shareMemoToChat(BuildContext context) async {
+    final user = context.read<UserProvider>();
+    final chatService = context.read<ChatService>();
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final roomId = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const ChatRoomShareSheet(),
+    );
+    if (roomId == null || !context.mounted) return;
+
+    await chatService.sendSharedMemoMessage(
+      roomId,
+      title: data['title'] as String? ?? '',
+      content: data['content'] as String? ?? '',
+      source: data['source'] as String? ?? 'direct',
+      groupName: data['group_name'] as String? ?? '',
+      roomName: data['room_name'] as String? ?? '',
+      boardName: data['board_name'] as String? ?? '',
+      postTitle: data['post_title'] as String? ?? '',
+      senderName: user.name,
+      senderPhotoUrl: user.photoUrl,
+      sourceSenderName: data['sender_name'] as String? ?? '',
+      authorName: (data['author_name'] as String?) ??
+          (data['sender_name'] as String?) ??
+          '',
+      attachments: _attachments,
+      blocks: List<Map<String, dynamic>>.from(
+        (data['blocks'] as List? ?? []).map(
+          (e) => Map<String, dynamic>.from(e as Map),
+        ),
+      ),
+      mediaTypes: List<String>.from(data['media_types'] as List? ?? []),
+    );
+    await chatService.updateLastReadTime(roomId);
+    if (!context.mounted) return;
+    navigator.pop();
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    messenger.showSnackBar(
+      const SnackBar(content: Text('채팅방에 메모를 공유했습니다.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -71,11 +130,11 @@ class MemoDetailSheet extends StatelessWidget {
         ? (data['sender_name'] as String? ?? '')
         : (data['author_name'] as String? ?? '');
     final originalDate = source == 'chat'
-        ? data['original_sent_at'] as Timestamp?
-        : data['original_created_at'] as Timestamp?;
+        ? _asDateTime(data['original_sent_at'])
+        : _asDateTime(data['original_created_at']);
     final dateStr = originalDate != null
         ? () {
-            final d = originalDate.toDate();
+            final d = originalDate;
             return '${d.year}.${d.month.toString().padLeft(2, '0')}.${d.day.toString().padLeft(2, '0')} '
                 '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
           }()
@@ -129,6 +188,12 @@ class MemoDetailSheet extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 4)),
               ),
+            IconButton(
+              icon: Icon(Icons.share_outlined,
+                  size: 18, color: colorScheme.onSurface.withOpacity(0.7)),
+              tooltip: l.shareMessage,
+              onPressed: () => _shareMemoToChat(context),
+            ),
             IconButton(
               icon: Icon(Icons.edit_outlined,
                   size: 18, color: colorScheme.primary),

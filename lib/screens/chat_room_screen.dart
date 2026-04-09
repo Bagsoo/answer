@@ -399,6 +399,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         return '📍 ${l.attachLocation}';
       case 'contact':
         return '👤 ${l.attachContact}';
+      case 'shared_post':
+        return '📝 ${data['post_title'] as String? ?? ''}';
+      case 'shared_schedule':
+        return '📅 ${data['schedule_title'] as String? ?? ''}';
+      case 'shared_memo':
+        final title = data['memo_title'] as String? ?? '';
+        final content = data['memo_content'] as String? ?? '';
+        return '🗒 ${title.isNotEmpty ? title : content}';
       default:
         return data['text'] as String? ?? '';
     }

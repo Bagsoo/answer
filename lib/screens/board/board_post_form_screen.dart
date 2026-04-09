@@ -41,6 +41,7 @@ class _BoardPostFormScreenState extends State<BoardPostFormScreen> {
 
   bool _saving = false;
   bool _draftReady = false;
+  bool _shouldPersistDraft = true;
   Timer? _draftDebounce;
 
   String get currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -70,7 +71,9 @@ class _BoardPostFormScreenState extends State<BoardPostFormScreen> {
   @override
   void dispose() {
     _draftDebounce?.cancel();
-    _persistDraft();
+    if (_shouldPersistDraft) {
+      _persistDraft();
+    }
     _titleCtrl.dispose();
     super.dispose();
   }
@@ -184,6 +187,7 @@ class _BoardPostFormScreenState extends State<BoardPostFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(ok ? l.postSaved : l.postSaveFailed)));
         if (ok) {
+          _shouldPersistDraft = false;
           await _clearDraft();
           Navigator.pop(context);
         }
