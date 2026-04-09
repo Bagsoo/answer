@@ -130,6 +130,31 @@ class MemoService {
     });
   }
 
+  Future<void> memoFromExternal({
+    required String title,
+    required String content,
+    required List<PostBlock> blocks,
+    required List<Map<String, dynamic>> attachments,
+    required List<String> mediaTypes,
+    required String sourceApp,
+    required String sharedMimeType,
+  }) async {
+    final now = FieldValue.serverTimestamp();
+
+    await _memos.add({
+      'title': title,
+      'content': content,
+      'source': 'external',
+      'source_app': sourceApp,
+      'shared_mime_type': sharedMimeType,
+      'blocks': blocks.map((b) => b.toJson()).toList(),
+      'attachments': attachments,
+      'media_types': mediaTypes,
+      'created_at': now,
+      'updated_at': now,
+    });
+  }
+
   // ── 삭제 ──────────────────────────────────────────────────────────────────
   Future<void> deleteMemo(String memoId) async {
     await _memos.doc(memoId).delete();

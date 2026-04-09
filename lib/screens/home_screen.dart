@@ -9,6 +9,7 @@ import '../providers/locale_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/user_provider.dart';
 import '../services/chat_service.dart';
+import '../services/incoming_share_service.dart';
 import '../l10n/app_localizations.dart';
 import 'chat_list_screen.dart' hide GroupListScreen;
 import 'chat_room_screen.dart';
@@ -17,6 +18,7 @@ import 'app_settings_screen.dart';
 import 'friends_screen.dart';
 import 'memo_screen.dart';
 import 'profile_screen.dart';
+import 'incoming_share_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -31,6 +33,14 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   int _unreadCount = 0;
   StreamSubscription<int>? _unreadSub;
+  bool _showingIncomingShare = false;
+  IncomingShareService? _incomingShareService;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _incomingShareService ??= context.read<IncomingShareService>();
+  }
 
   @override
   void initState() {
@@ -43,6 +53,8 @@ class _HomeScreenState extends State<HomeScreen> {
         context.read<ThemeProvider>().loadFromFirestore(),
       ]);
       _subscribeUnread();
+      _incomingShareService?.addListener(_handleIncomingShare);
+      _handleIncomingShare();
     });
   }
 
@@ -65,7 +77,32 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _unreadSub?.cancel();
+    _incomingShareService?.removeListener(_handleIncomingShare);
     super.dispose();
+  }
+
+  void _handleIncomingShare() {
+    if (!mounted || _showingIncomingShare) return;
+    final service = _incomingShareService;
+    if (service == null) return;
+    final payload = service.pendingShare;
+    if (payload == null) return;
+
+    _showingIncomingShare = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final handled = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => IncomingShareScreen(payload: payload),
+          fullscreenDialog: true,
+        ),
+      );
+
+      if (handled == true || handled == null || handled == false) {
+        await service.clearPendingShare();
+      }
+      _showingIncomingShare = false;
+    });
   }
 
   @override

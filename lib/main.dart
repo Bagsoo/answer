@@ -12,6 +12,7 @@ import 'services/block_service.dart';
 import 'services/memo_service.dart';
 import 'services/poll_service.dart';
 import 'services/report_service.dart';
+import 'services/incoming_share_service.dart';
 import 'providers/locale_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/user_provider.dart';
@@ -71,6 +72,9 @@ void main() async {
         Provider<NotificationService>(create: (_) => NotificationService()),
         Provider<PollService>(create: (_) => PollService()),
         Provider<ReportService>(create: (_) => ReportService()),
+        ChangeNotifierProvider<IncomingShareService>(
+          create: (_) => IncomingShareService()..initialize(),
+        ),
       ],
       child: const MessengerApp(),
     ),
