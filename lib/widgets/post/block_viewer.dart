@@ -30,6 +30,7 @@ class BlockViewer extends StatelessWidget {
               style: const TextStyle(fontSize: 15, height: 1.6)),
         );
 
+      case BlockType.drawing:
       case BlockType.image:
         return _ImageBlock(block: block);
 

@@ -252,7 +252,9 @@ class AppLocalizations {
   // ── 게시판 파일 작성 ──────────────────────────────────────────────────────────────
   String get attachPhoto => _s.attachPhoto;
   String get attachVideo => _s.attachVideo;
-  String get attachAudio => _s.attachAudio;  
+  String get attachAudio => _s.attachAudio;
+  String get attachDrawing => _s.attachDrawing;
+  String get handwritingMemo => _s.handwritingMemo;  
 
   // ── 로그인 화면 ──
   String get loginTitle => _s.loginTitle;
@@ -921,7 +923,9 @@ abstract class _AppStrings {
   // ── 게시판 작성 ──
   String get attachPhoto;
   String get attachVideo;
-  String get attachAudio;  
+  String get attachAudio;
+  String get attachDrawing;
+  String get handwritingMemo;  
 
   // ── 로그인 화면 ──
   String get loginTitle;           // 'Welcome' / '환영합니다' / 'ようこそ'
@@ -1611,7 +1615,9 @@ class _EnStrings extends _AppStrings {
   // ── 게시판 작성 ──
   @override String get attachPhoto => 'Photo';
   @override String get attachVideo => 'Video';
-  @override String get attachAudio => 'Audio';  
+  @override String get attachAudio => 'Audio';
+  @override String get attachDrawing => 'Handwriting';
+  @override String get handwritingMemo => 'Handwriting Memo';  
 
   // ── 로그인 화면 ──
   @override String get loginTitle => 'Welcome';
@@ -2279,7 +2285,9 @@ class _KoStrings extends _AppStrings {
   // ── 게시판 작성 ──
   @override String get attachPhoto => '사진';
   @override String get attachVideo => '동영상';
-  @override String get attachAudio => '오디오';  
+  @override String get attachAudio => '오디오';
+  @override String get attachDrawing => 'Handwriting';
+  @override String get handwritingMemo => 'Handwriting Memo';  
 
   // ── 로그인 화면 ──
   @override String get loginTitle => '환영합니다';
@@ -2946,7 +2954,9 @@ class _JaStrings extends _AppStrings {
   // ── 게시판 작성 ──
   @override String get attachPhoto => '写真';
   @override String get attachVideo => '動画';
-  @override String get attachAudio => '音声';  
+  @override String get attachAudio => '音声';
+  @override String get attachDrawing => 'Handwriting';
+  @override String get handwritingMemo => 'Handwriting Memo';  
 
   // ── 로그인 화면 ──
   @override String get loginTitle => 'ようこそ';

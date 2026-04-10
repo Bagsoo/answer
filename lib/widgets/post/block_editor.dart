@@ -7,6 +7,7 @@ import '../../services/storage_service.dart';
 import '../../services/video_service.dart';
 import '../../services/audio_service.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/post/handwriting_canvas_sheet.dart';
 
 /// 블록 에디터 — _blocks를 완전히 내부에서 관리
 /// 부모는 GlobalKey<BlockEditorState>로 getBlocks() 호출만 함
@@ -127,6 +128,8 @@ class BlockEditorState extends State<BlockEditor> {
                 color: Colors.red, onTap: () { Navigator.pop(ctx); _pickVideo(insertIndex); }),
             _PickerTile(icon: Icons.mic_outlined, label: l.attachAudio,
                 color: Colors.orange, onTap: () { Navigator.pop(ctx); _pickAudio(insertIndex); }),
+            _PickerTile(icon: Icons.draw_outlined, label: l.attachDrawing,
+                color: Colors.purple, onTap: () { Navigator.pop(ctx); _openHandwritingCanvas(insertIndex); }),
             _PickerTile(icon: Icons.attach_file, label: l.attachFile,
                 color: cs.primary, onTap: () { Navigator.pop(ctx); _pickFile(insertIndex); }),
             const SizedBox(height: 8),
@@ -153,6 +156,58 @@ class BlockEditorState extends State<BlockEditor> {
       _buildControllers();
     });
     widget.onChanged?.call();
+  }
+
+  // ── 손글씨 ────────────────────────────────────────────────────────────────
+  Future<void> _openHandwritingCanvas(int insertIndex, [PostBlock? initialBlock]) async {
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => HandwritingCanvasSheet(
+        initialVectorJson: initialBlock?.data['vector_data'] as String?,
+      ),
+    );
+
+    if (result != null && mounted) {
+      final file = result['file'] as File;
+      final json = result['json'] as String;
+      final name = file.path.split('/').last;
+
+      if (initialBlock != null) {
+        final pending = PostBlock.drawingPending(file, name, json);
+        _replaceBlock(initialBlock.id, pending);
+        _uploadDrawing(pending.id, file, json);
+      } else {
+        final pending = PostBlock.drawingPending(file, name, json);
+        _insertMediaBlock(insertIndex, pending);
+        _uploadDrawing(pending.id, file, json);
+      }
+    }
+  }
+
+  Future<void> _uploadDrawing(String blockId, File file, String vectorData) async {
+    try {
+      final postId = _getTempPostId();
+      final urls = await _storageService.uploadPostImages(
+        groupId: widget.groupId,
+        postId: postId,
+        files: [file],
+      );
+      if (!mounted) return;
+      final i = _blocks.indexWhere((b) => b.id == blockId);
+      if (i == -1) return;
+      _replaceBlock(blockId, _blocks[i].withUploaded({
+        'url': urls[0],
+        'size': await file.length(),
+        'vector_data': vectorData,
+      }));
+    } catch (e) {
+      if (!mounted) return;
+      final i = _blocks.indexWhere((b) => b.id == blockId);
+      if (i == -1) return;
+      _replaceBlock(blockId, _blocks[i].withUploaded({'error': e.toString()}));
+    }
   }
 
   void _replaceBlock(String blockId, PostBlock uploaded) {
@@ -403,7 +458,7 @@ class _TextBlock extends StatelessWidget {
             focusNode: focusNode,
             onChanged: onChanged,
             maxLines: null,
-            minLines: 2,
+            minLines: 5,
             decoration: InputDecoration(
               hintText: index == 0 ? '내용을 입력하세요...' : '텍스트를 입력하세요...',
               border: InputBorder.none,
@@ -439,10 +494,12 @@ class _MediaBlock extends StatelessWidget {
   final VoidCallback onRemove;
   final ColorScheme colorScheme;
 
+  final VoidCallback? onEdit;
   const _MediaBlock({
     super.key,
     required this.block,
     required this.onRemove,
+    this.onEdit,
     required this.colorScheme,
   });
 
@@ -461,6 +518,20 @@ class _MediaBlock extends StatelessWidget {
             child: _buildPreview(context),
           ),
         ),
+        // 편집 버튼
+        if (onEdit != null)
+          Positioned(
+            top: 16, right: 40,
+            child: GestureDetector(
+              onTap: onEdit,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                    color: Colors.black54, shape: BoxShape.circle),
+                child: const Icon(Icons.edit, size: 16, color: Colors.white),
+              ),
+            ),
+          ),
         // 삭제 버튼
         Positioned(
           top: 16, right: 8,
@@ -681,3 +752,4 @@ class _PickerTile extends StatelessWidget {
     );
   }
 }
+

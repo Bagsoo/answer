@@ -1,6 +1,6 @@
 import 'dart:io';
 
-enum BlockType { text, image, video, audio, file }
+enum BlockType { text, image, video, audio, file, drawing }
 
 class PostBlock {
   final String id;   // 업로드 추적용 고유 ID
@@ -61,6 +61,17 @@ class PostBlock {
           'name': name,
           'mime_type': mimeType,
           'size': size,
+          'uploading': true,
+        },
+      );
+
+  factory PostBlock.drawingPending(File imageFile, String name, String vectorData) =>
+      PostBlock(
+        type: BlockType.drawing,
+        data: {
+          'local_path': imageFile.path,
+          'name': name,
+          'vector_data': vectorData,
           'uploading': true,
         },
       );
