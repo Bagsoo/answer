@@ -101,21 +101,6 @@ class FriendService {
         },
       );
 
-      batch.set(
-        _db
-            .collection('users')
-            .doc(friendUid)
-            .collection('friends')
-            .doc(currentUserId),
-        {
-          'uid': currentUserId,
-          'display_name': myName,
-          'phone_number': myPhoneNumber,
-          'profile_image': myProfileImage,
-          'added_at': FieldValue.serverTimestamp(),
-        },
-      );
-
       await batch.commit();
 
       // 친구 수 캐시 +1
@@ -136,13 +121,6 @@ class FriendService {
           .doc(currentUserId)
           .collection('friends')
           .doc(friendUid),
-    );
-    batch.delete(
-      _db
-          .collection('users')
-          .doc(friendUid)
-          .collection('friends')
-          .doc(currentUserId),
     );
     await batch.commit();
 

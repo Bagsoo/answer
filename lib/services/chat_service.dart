@@ -10,36 +10,9 @@ class ChatService {
   
   String get currentUserId => _auth.currentUser?.uid ?? '';
 
-  Future<List<String>> _loadSearchMemberNames(
-    DocumentReference<Map<String, dynamic>> roomRef,
-    Map<String, dynamic> roomData,
-  ) async {
-    final membersSnap = await roomRef.collection('room_members').get();
-    final names = membersSnap.docs
-        .map((member) => member.data()['display_name'] as String? ?? '')
-        .where((name) => name.isNotEmpty)
-        .toList();
-
-    final memberIds = List<String>.from(roomData['member_ids'] as List? ?? []);
-    if (memberIds.isNotEmpty) {
-      final userSnaps = await Future.wait(
-        memberIds.map((uid) => _db.collection('users').doc(uid).get()),
-      );
-      for (final userDoc in userSnaps) {
-        final userName = userDoc.data()?['name'] as String? ?? '';
-        if (userName.isNotEmpty && !names.contains(userName)) {
-          names.add(userName);
-        }
-      }
-    }
-
-    return names;
-  }
-
   // ── 채팅방 목록 ────────────────────────────────────────────────────────────
   Stream<List<Map<String, dynamic>>> getChatRooms({
     String? refGroupId,
-    bool includeSearchMembers = false,
   }) {
     Query<Map<String, dynamic>> query = _db
         .collection('chat_rooms')
@@ -49,24 +22,14 @@ class ChatService {
       query = query.where('ref_group_id', isEqualTo: refGroupId);
     }
 
-    return query.snapshots().asyncMap((snapshot) async {
-      final rooms = await Future.wait(snapshot.docs.map((doc) async {
+    return query.snapshots().map((snapshot) {
+      final rooms = snapshot.docs.map((doc) {
         final data = {...doc.data(), 'id': doc.id};
         final unreadCounts =
             data['unread_counts'] as Map<String, dynamic>? ?? {};
         data['unread_cnt'] = unreadCounts[currentUserId] as int? ?? 0;
-
-        if (includeSearchMembers) {
-          final searchNames = await _loadSearchMemberNames(doc.reference, data);
-          final name = data['name'] as String? ?? '';
-          if (name.isNotEmpty && !searchNames.contains(name)) {
-            searchNames.add(name);
-          }
-          data['search_member_names'] = searchNames;
-        }
-
         return data;
-      }));
+      }).toList();
 
       rooms.sort((a, b) {
         final aTime = a['last_time'] as Timestamp?;

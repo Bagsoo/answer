@@ -67,7 +67,6 @@ class _ChatsTabState extends State<ChatsTab> {
       body: StreamBuilder<List<Map<String, dynamic>>>(
         stream: context.read<ChatService>().getChatRooms(
               refGroupId: groupId,
-              includeSearchMembers: true,
             ),
         builder: (context, snapshot) {
           if (snapshot.hasError) {

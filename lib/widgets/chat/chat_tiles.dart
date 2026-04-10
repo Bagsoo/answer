@@ -3,25 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../screens/chat_room_screen.dart';
+import '../../utils/user_cache.dart';
 
-// ── 유저 프로필 메모리 캐시 ────────────────────────────────────────────────────
-class UserCache {
-  static final Map<String, Map<String, dynamic>> _cache = {};
-
-  static Future<Map<String, dynamic>> get(String uid) async {
-    if (_cache.containsKey(uid)) return _cache[uid]!;
-    final doc =
-        await FirebaseFirestore.instance.collection('users').doc(uid).get();
-    final data = {
-      'name': doc.data()?['name'] as String? ?? '',
-      'photo': doc.data()?['profile_image'] as String? ?? '',
-    };
-    _cache[uid] = data;
-    return data;
-  }
-
-  static void invalidate(String uid) => _cache.remove(uid);
-}
+// ── 유저 프로필 메모리 캐시 (Micro-batching / DataLoader) ────────────────────────
 
 String _localizedLastMessage(BuildContext context, String lastMessage) {
   final l = AppLocalizations.of(context);

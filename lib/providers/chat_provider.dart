@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../utils/user_cache.dart';
 
 // ── LRU 캐시 ─────────────────────────────────────────────────────────────────
 class _LruCache<K, V> {
@@ -109,11 +110,8 @@ class ChatProvider extends ChangeNotifier {
   final _metaCache = _LruCache<String, RoomMeta>(maxSize: 100);
 
   // 방별 스트림 캐시 - 한 번 연결하면 유지 (최대 20개 방)
-  // 20개 초과 시 가장 오래된 방 스트림 해제
+  // 메시지 로딩 상태 (hasMore) 기록 캐시
   final _roomStates = _LruCache<String, RoomMessageState>(maxSize: 20);
-
-  // 유저 프로필 LRU 캐시 (최대 300명)
-  final _userCache = _LruCache<String, Map<String, dynamic>>(maxSize: 300);
 
   // 전역 채팅방 리스트 스트림 구독
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _roomsSubscription;
@@ -157,13 +155,22 @@ class ChatProvider extends ChangeNotifier {
         .snapshots()
         .listen((snapshot) {
       
+      final Set<String> allMemberUids = {};
+
       final rooms = snapshot.docs.map((doc) {
         final data = {...doc.data(), 'id': doc.id};
         final unreadCounts =
             data['unread_counts'] as Map<String, dynamic>? ?? {};
         data['unread_cnt'] = unreadCounts[_currentUserId] as int? ?? 0;
+        
+        final memberIds = List<String>.from(data['member_ids'] as List? ?? []);
+        allMemberUids.addAll(memberIds);
+
         return data;
       }).toList();
+
+      // 화면에 그리기 전 필요한 유저 프로필 일괄 prefetch
+      UserCache.prefetch(allMemberUids);
 
       rooms.sort((a, b) {
         final aTime = a['last_time'] as Timestamp?;
@@ -338,23 +345,11 @@ class ChatProvider extends ChangeNotifier {
 
   // ── 유저 프로필 ──────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getUserProfile(String uid) async {
-    final cached = _userCache.get(uid);
-    if (cached != null) return cached;
-    try {
-      final doc = await _db.collection('users').doc(uid).get();
-      final data = {
-        'name': doc.data()?['name'] as String? ?? '',
-        'photo': doc.data()?['profile_image'] as String? ?? '',
-      };
-      _userCache.put(uid, data);
-      return data;
-    } catch (e) {
-      return {'name': '', 'photo': ''};
-    }
+    return UserCache.get(uid);
   }
 
   Map<String, dynamic>? getCachedUserProfile(String uid) =>
-      _userCache.get(uid);
+      UserCache.getCached(uid);
 
   // ── PC 모드 인접 방 미리 로드 (선택한 방 주변 방들 preload) ──────────────────
   void preloadAdjacentRooms(List<String> roomIds, String currentRoomId) {
@@ -383,7 +378,6 @@ class ChatProvider extends ChangeNotifier {
     _roomsSubscription?.cancel();
     _metaCache.clear();
     _roomStates.clear();
-    _userCache.clear();
     _visitedRooms.clear();
     _activeRoomId = null;
     _chatRooms = [];
