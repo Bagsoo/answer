@@ -115,6 +115,11 @@ class ChatProvider extends ChangeNotifier {
   // 유저 프로필 LRU 캐시 (최대 300명)
   final _userCache = _LruCache<String, Map<String, dynamic>>(maxSize: 300);
 
+  // 전역 채팅방 리스트 스트림 구독
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _roomsSubscription;
+  List<Map<String, dynamic>> _chatRooms = [];
+  bool _isRoomsLoaded = false;
+
   // 현재 로딩 중인 방 메타 (중복 요청 방지)
   final _loadingMeta = <String>{};
 
@@ -127,6 +132,55 @@ class ChatProvider extends ChangeNotifier {
 
   List<String> get visitedRooms => List.unmodifiable(_visitedRooms);
   String? get activeRoomId => _activeRoomId;
+  List<Map<String, dynamic>> get chatRooms => _chatRooms;
+  bool get isRoomsLoaded => _isRoomsLoaded;
+
+  // ── 초기화 및 전역 스트림 캐싱 ──────────────────────────────────────────────
+  void initialize() {
+    _subscribeToRooms();
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user != null) {
+        _subscribeToRooms();
+      } else {
+        clearAll();
+      }
+    });
+  }
+
+  void _subscribeToRooms() {
+    if (_currentUserId.isEmpty) return;
+    _roomsSubscription?.cancel();
+
+    _roomsSubscription = _db
+        .collection('chat_rooms')
+        .where('member_ids', arrayContains: _currentUserId)
+        .snapshots()
+        .listen((snapshot) {
+      
+      final rooms = snapshot.docs.map((doc) {
+        final data = {...doc.data(), 'id': doc.id};
+        final unreadCounts =
+            data['unread_counts'] as Map<String, dynamic>? ?? {};
+        data['unread_cnt'] = unreadCounts[_currentUserId] as int? ?? 0;
+        return data;
+      }).toList();
+
+      rooms.sort((a, b) {
+        final aTime = a['last_time'] as Timestamp?;
+        final bTime = b['last_time'] as Timestamp?;
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime);
+      });
+
+      _chatRooms = rooms;
+      _isRoomsLoaded = true;
+      notifyListeners();
+    }, onError: (e) {
+      debugPrint('ChatProvider _subscribeToRooms error: $e');
+    });
+  }
 
   // ── 방 선택 (PC 모드) ────────────────────────────────────────────────────────
   void selectRoom(String roomId) {
@@ -326,11 +380,20 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void clearAll() {
+    _roomsSubscription?.cancel();
     _metaCache.clear();
     _roomStates.clear();
     _userCache.clear();
     _visitedRooms.clear();
     _activeRoomId = null;
+    _chatRooms = [];
+    _isRoomsLoaded = false;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _roomsSubscription?.cancel();
+    super.dispose();
   }
 }

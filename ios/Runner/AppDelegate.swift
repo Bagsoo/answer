@@ -5,11 +5,34 @@ import google_mobile_ads
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+  private var eventSink: FlutterEventSink?
+  private let suiteName = "group.com.answer.app"
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     
+    let controller : FlutterViewController = window?.rootViewController as! FlutterViewController
+    let shareChannel = FlutterMethodChannel(name: "com.answer.messenger/share",
+                                              binaryMessenger: controller.binaryMessenger)
+    let eventChannel = FlutterEventChannel(name: "com.answer.messenger/share_events",
+                                             binaryMessenger: controller.binaryMessenger)
+    
+    shareChannel.setMethodCallHandler({
+      (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
+      if (call.method == "getInitialSharedPayload") {
+        result(self.getSharedPayload())
+      } else if (call.method == "clearSharedPayload") {
+        self.clearSharedPayload()
+        result(nil)
+      } else {
+        result(FlutterMethodNotImplemented)
+      }
+    })
+    
+    eventChannel.setStreamHandler(self)
+
     if let apiKey = Bundle.main.object(forInfoDictionaryKey: "GoogleMapsApiKey") as? String {
         GMSServices.provideAPIKey(apiKey)
     }
@@ -23,9 +46,45 @@ import google_mobile_ads
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
+  override func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
+    if url.scheme == "messenger-share" {
+        if let payload = getSharedPayload() {
+            eventSink?(payload)
+        }
+        return true
+    }
+    return super.application(app, open: url, options: options)
+  }
+
+  private func getSharedPayload() -> [String: Any]? {
+    if let userDefaults = UserDefaults(suiteName: suiteName) {
+        return userDefaults.dictionary(forKey: "incoming_share_payload")
+    }
+    return nil
+  }
+
+  private func clearSharedPayload() {
+    if let userDefaults = UserDefaults(suiteName: suiteName) {
+        userDefaults.removeObject(forKey: "incoming_share_payload")
+        userDefaults.synchronize()
+    }
+  }
+
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
   }
+}
+
+extension AppDelegate: FlutterStreamHandler {
+    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+        self.eventSink = events
+        return nil
+    }
+    
+    func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        self.eventSink = nil
+        return nil
+    }
 }
 
 class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {

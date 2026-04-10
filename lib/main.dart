@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'services/chat_service.dart';
 import 'services/auth_service.dart';
 import 'services/group_service.dart';
@@ -54,16 +55,19 @@ void main() async {
   await dotenv.load(fileName: '.env');
   NotificationService().init(); // await 없이 — 네트워크 없어도 앱 시작 블로킹 안 함
   MobileAds.instance.initialize();
+  
+  final prefs = await SharedPreferences.getInstance();
 
   runApp(
     MultiProvider(
       providers: [
+        Provider<SharedPreferences>.value(value: prefs),
         ChangeNotifierProvider<AuthService>(create: (_) => AuthService()),
         // LocaleProvider, ThemeProvider는 생성자에서 SharedPreferences 즉시 로드
         ChangeNotifierProvider<LocaleProvider>(create: (_) => LocaleProvider()),
         ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
         ChangeNotifierProvider<UserProvider>(create: (_) => UserProvider()),
-        ChangeNotifierProvider<ChatProvider>(create: (_) => ChatProvider()),
+        ChangeNotifierProvider<ChatProvider>(create: (_) => ChatProvider()..initialize()),
         Provider<ChatService>(create: (_) => ChatService()),
         Provider<GroupService>(create: (_) => GroupService()),
         Provider<FriendService>(create: (_) => FriendService()),

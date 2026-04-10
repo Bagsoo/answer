@@ -6,6 +6,7 @@ import '../services/chat_service.dart';
 import '../services/friend_service.dart';
 import '../services/local_preferences_service.dart';
 import '../providers/user_provider.dart';
+import '../providers/chat_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/chat/chat_tiles.dart';
 import '../widgets/chat/chats_section.dart';
@@ -21,23 +22,11 @@ class ChatListScreen extends StatefulWidget {
 }
 
 class _ChatListScreenState extends State<ChatListScreen> {
-  SharedPreferences? _prefs;
   final TextEditingController _filterController = TextEditingController();
   bool _isFiltering = false;
   String _filterQuery = '';
 
   String get _myUid => FirebaseAuth.instance.currentUser?.uid ?? '';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadPrefs();
-  }
-
-  Future<void> _loadPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) setState(() => _prefs = prefs);
-  }
 
   @override
   void dispose() {
@@ -151,31 +140,23 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final chatService = context.watch<ChatService>();
+    final chatProvider = context.watch<ChatProvider>();
+    final prefs = context.read<SharedPreferences>();
     final l = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
-
-    // prefs 로드 전 로딩
-    if (_prefs == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showNewChatSheet(context),
         child: const Icon(Icons.edit_outlined),
       ),
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: chatService.getChatRooms(includeSearchMembers: true),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+      body: Builder(
+        builder: (context) {
+          if (!chatProvider.isRoomsLoaded && chatProvider.chatRooms.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
 
-          final allRooms = snapshot.data ?? [];
+          final allRooms = chatProvider.chatRooms;
           final rooms = allRooms
               .where((room) => _matchesRoom(room, _filterQuery))
               .toList();
@@ -251,7 +232,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               totalUnread: totalUnread,
               colorScheme: colorScheme,
               myUid: _myUid,
-              prefs: _prefs!,
+              prefs: prefs,
               onRoomSelected: widget.onRoomSelected,
             );
           }).toList();
@@ -266,7 +247,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     totalUnread: privateUnread,
                     colorScheme: colorScheme,
                     myUid: _myUid,
-                    prefs: _prefs!,
+                    prefs: prefs,
                     onRoomSelected: widget.onRoomSelected,
                   ),
                 ];
