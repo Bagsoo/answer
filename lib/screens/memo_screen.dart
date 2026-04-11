@@ -95,7 +95,7 @@ class _MemoScreenState extends State<MemoScreen> {
     return blocks.map((b) {
       final bMap = Map<String, dynamic>.from(b as Map);
       final type = bMap['type'] as String?;
-      if (type == 'image' || type == 'video') {
+      if (type == 'image' || type == 'video' || type == 'drawing') {
         final d = Map<String, dynamic>.from(bMap['data'] as Map? ?? {});
         return {
           'type': type,

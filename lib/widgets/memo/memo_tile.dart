@@ -55,13 +55,13 @@ class MemoTile extends StatelessWidget {
   List<String> get _mediaTypes =>
       List<String>.from(data['media_types'] as List? ?? []);
 
-  // 첫 번째 이미지 URL
+  // 첫 번째 이미지/손글씨 PNG URL
   String? get _firstImageUrl {
     final rawBlocks = data['blocks'] as List?;
     if (rawBlocks != null) {
       for (final b in rawBlocks) {
         final bMap = Map<String, dynamic>.from(b as Map);
-        if (bMap['type'] == 'image') {
+        if (bMap['type'] == 'image' || bMap['type'] == 'drawing') {
           final url = (bMap['data'] as Map?)?['url'] as String?;
           if (url != null && url.isNotEmpty) return url;
         }
@@ -222,6 +222,7 @@ class MemoTile extends StatelessWidget {
 
 // ── 미디어 미리보기 위젯 ──────────────────────────────────────────────────────
 class _MediaPreview extends StatelessWidget {
+  static const double _previewHeight = 88;
   final String? previewUrl;
   final bool isVideoThumb;
   final List<String> mediaTypes;
@@ -247,7 +248,7 @@ class _MediaPreview extends StatelessWidget {
             child: Image.network(
               previewUrl!,
               width: double.infinity,
-              height: 110,
+              height: _previewHeight,
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => _chips(),
             ),
@@ -297,6 +298,7 @@ class _MediaPreview extends StatelessWidget {
 
   IconData _icon(String type) {
     switch (type) {
+      case 'drawing': return Icons.draw_outlined;
       case 'image': return Icons.image_outlined;
       case 'video': return Icons.videocam_outlined;
       case 'audio': return Icons.mic_outlined;
@@ -306,6 +308,7 @@ class _MediaPreview extends StatelessWidget {
 
   Color _color(String type) {
     switch (type) {
+      case 'drawing': return Colors.indigo;
       case 'image': return Colors.green;
       case 'video': return Colors.red;
       case 'audio': return Colors.orange;

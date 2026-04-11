@@ -420,6 +420,9 @@ class BlockEditorState extends State<BlockEditor> {
             key: ValueKey(block.id),
             block: block,
             onRemove: () => _removeBlock(i),
+            onEdit: block.type == BlockType.drawing
+                ? () => _openHandwritingCanvas(i, block)
+                : null,
             colorScheme: cs,
           );
         }
@@ -570,6 +573,7 @@ class _MediaBlock extends StatelessWidget {
 
   Widget _buildPreview(BuildContext context) {
     switch (block.type) {
+      case BlockType.drawing:
       case BlockType.image:
         final localPath = block.localPath;
         final url = block.url;

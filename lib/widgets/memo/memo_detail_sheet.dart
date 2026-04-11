@@ -69,6 +69,11 @@ class MemoDetailSheet extends StatelessWidget {
         memoId: memoId,
         initialTitle: data['title'] as String? ?? '', 
         initialContent: data['content'] as String? ?? '',
+        initialBlocks: List<Map<String, dynamic>>.from(
+          (data['blocks'] as List? ?? []).map(
+            (e) => Map<String, dynamic>.from(e as Map),
+          ),
+        ),
         initialAttachments: _attachments,
         service: service,
       ),

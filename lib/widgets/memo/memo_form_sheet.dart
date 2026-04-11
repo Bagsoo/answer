@@ -9,6 +9,7 @@ class MemoFormSheet extends StatefulWidget {
   final String initialTitle;
   final String initialContent;
   final List<Map<String, dynamic>> initialAttachments;
+  final List<Map<String, dynamic>> initialBlocks;
   final MemoService service;
 
   const MemoFormSheet({
@@ -17,6 +18,7 @@ class MemoFormSheet extends StatefulWidget {
     this.initialTitle = '',
     required this.initialContent,
     this.initialAttachments = const [],
+    this.initialBlocks = const [],
     required this.service,
   });
 
@@ -39,6 +41,7 @@ class _MemoFormSheetState extends State<MemoFormSheet> {
     _titleCtrl.text = widget.initialTitle;
     if (widget.memoId != null) {
       _initialBlocks = MemoService.blocksFromMemo({
+        'blocks': widget.initialBlocks,
         'content': widget.initialContent,
         'attachments': widget.initialAttachments,
       });

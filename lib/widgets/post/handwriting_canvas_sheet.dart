@@ -24,11 +24,20 @@ class DrawingStroke {
         'p': points,
       };
 
-  factory DrawingStroke.fromJson(Map<String, dynamic> json) => DrawingStroke(
-        color: Color(json['c'] as int),
-        size: (json['s'] as num).toDouble(),
-        points: (json['p'] as List).map((e) => List<int>.from(e as List)).toList(),
-      );
+  factory DrawingStroke.fromJson(Map<String, dynamic> json) {
+    return DrawingStroke(
+      color: Color((json['c'] as num).toInt()),
+      size: (json['s'] as num).toDouble(),
+      points: (json['p'] as List).map((e) {
+        final arr = e as List;
+        return [
+          (arr[0] as num).toInt(),
+          (arr[1] as num).toInt(),
+          (arr[2] as num).toInt()
+        ];
+      }).toList(),
+    );
+  }
 }
 
 class HandwritingCanvasSheet extends StatefulWidget {
@@ -66,9 +75,17 @@ class _HandwritingCanvasSheetState extends State<HandwritingCanvasSheet> {
     if (widget.initialVectorJson != null && widget.initialVectorJson!.isNotEmpty) {
       try {
         final list = jsonDecode(widget.initialVectorJson!) as List;
-        _strokes = list.map((e) => DrawingStroke.fromJson(e as Map<String, dynamic>)).toList();
+        _strokes = list
+            .map((e) => DrawingStroke.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
       } catch (e) {
         debugPrint('Failed to parse initial vector json: $e');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('기존 손글씨 데이터를 불러오는데 실패했습니다.')));
+          }
+        });
       }
     }
   }
@@ -199,51 +216,54 @@ class _HandwritingCanvasSheetState extends State<HandwritingCanvasSheet> {
           Container(
             color: cs.surface,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.undo),
-                  onPressed: _strokes.isNotEmpty ? _undo : null,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.redo),
-                  onPressed: _redoStack.isNotEmpty ? _redo : null,
-                ),
-                const Spacer(),
-                ..._colors.map((c) => GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedColor = c;
-                      _isEraser = false;
-                    });
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: 24, height: 24,
-                    decoration: BoxDecoration(
-                      color: c,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: _selectedColor == c && !_isEraser ? cs.primary : Colors.grey.withOpacity(0.5),
-                        width: _selectedColor == c && !_isEraser ? 3 : 1,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.undo),
+                    onPressed: _strokes.isNotEmpty ? _undo : null,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.redo),
+                    onPressed: _redoStack.isNotEmpty ? _redo : null,
+                  ),
+                  const SizedBox(width: 16),
+                  ..._colors.map((c) => GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedColor = c;
+                        _isEraser = false;
+                      });
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
+                      width: 28, height: 28,
+                      decoration: BoxDecoration(
+                        color: c,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _selectedColor == c && !_isEraser ? cs.primary : Colors.grey.withOpacity(0.5),
+                          width: _selectedColor == c && !_isEraser ? 3 : 1,
+                        ),
                       ),
                     ),
+                  )),
+                  const SizedBox(width: 16),
+                  IconButton(
+                    icon: Icon(Icons.edit, color: !_isEraser ? cs.primary : null),
+                    onPressed: () => setState(() => _isEraser = false),
                   ),
-                )),
-                const Spacer(),
-                IconButton(
-                  icon: Icon(Icons.edit, color: !_isEraser ? cs.primary : null),
-                  onPressed: () => setState(() => _isEraser = false),
-                ),
-                IconButton(
-                  icon: Icon(Icons.cleaning_services, color: _isEraser ? cs.primary : null), // eraser icon
-                  onPressed: () => setState(() => _isEraser = true),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                  onPressed: _clear,
-                ),
-              ],
+                  IconButton(
+                    icon: Icon(Icons.cleaning_services, color: _isEraser ? cs.primary : null), // eraser icon
+                    onPressed: () => setState(() => _isEraser = true),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    onPressed: _clear,
+                  ),
+                ],
+              ),
             ),
           ),
           // Canvas
