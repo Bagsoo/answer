@@ -7,15 +7,18 @@ class MemoService {
   final _auth = FirebaseAuth.instance;
 
   String get _uid => _auth.currentUser!.uid;
-  CollectionReference get _memos =>
+  CollectionReference<Map<String, dynamic>> get _memos =>
       _db.collection('users').doc(_uid).collection('memos');
 
   // ── 메모 목록 스트림 ────────────────────────────────────────────────────────
   Stream<QuerySnapshot> memosStream() =>
       _memos.orderBy('updated_at', descending: true).snapshots();
 
+  Stream<DocumentSnapshot<Map<String, dynamic>>> memoStream(String memoId) =>
+      _memos.doc(memoId).snapshots();
+
   // ── 직접 작성 메모 저장/수정 (제목 + 블록 구조) ──────────────────────────
-  Future<void> saveMemo({
+  Future<String> saveMemo({
     String? memoId,
     required String title,       // ← 제목 추가
     required String content,
@@ -40,8 +43,9 @@ class MemoService {
         'attachments': attachments,
         'updated_at': now,
       });
+      return memoId;
     } else {
-      await _memos.add({
+      final doc = await _memos.add({
         'title': title,
         'content': content,
         'source': 'direct',
@@ -51,6 +55,7 @@ class MemoService {
         'created_at': now,
         'updated_at': now,
       });
+      return doc.id;
     }
   }
 

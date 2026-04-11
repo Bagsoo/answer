@@ -160,12 +160,12 @@ class BlockEditorState extends State<BlockEditor> {
 
   // ── 손글씨 ────────────────────────────────────────────────────────────────
   Future<void> _openHandwritingCanvas(int insertIndex, [PostBlock? initialBlock]) async {
-    final result = await showModalBottomSheet<Map<String, dynamic>>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => HandwritingCanvasSheet(
-        initialVectorJson: initialBlock?.data['vector_data'] as String?,
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (ctx) => HandwritingCanvasSheet(
+          initialVectorJson: initialBlock?.data['vector_data'] as String?,
+        ),
       ),
     );
 

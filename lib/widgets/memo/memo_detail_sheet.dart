@@ -57,8 +57,14 @@ class MemoDetailSheet extends StatelessWidget {
   }
 
   void _openEditSheet(BuildContext context) {
+    _showEditSheet(context, closeCurrent: true);
+  }
+
+  void _showEditSheet(BuildContext context, {required bool closeCurrent}) {
     final colorScheme = Theme.of(context).colorScheme;
-    Navigator.pop(context);
+    if (closeCurrent) {
+      Navigator.pop(context);
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -81,6 +87,11 @@ class MemoDetailSheet extends StatelessWidget {
   }
 
   Future<void> _shareMemoToChat(BuildContext context) async {
+    await _shareMemoToChatInternal(context, closeCurrent: true);
+  }
+
+  Future<void> _shareMemoToChatInternal(BuildContext context,
+      {required bool closeCurrent}) async {
     final user = context.read<UserProvider>();
     final chatService = context.read<ChatService>();
     final messenger = ScaffoldMessenger.of(context);
@@ -117,11 +128,146 @@ class MemoDetailSheet extends StatelessWidget {
     );
     await chatService.updateLastReadTime(roomId);
     if (!context.mounted) return;
-    navigator.pop();
+    if (closeCurrent) {
+      navigator.pop();
+    }
     await Future<void>.delayed(const Duration(milliseconds: 120));
     messenger.showSnackBar(
       const SnackBar(content: Text('채팅방에 메모를 공유했습니다.')),
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final source = data['source'] as String? ?? 'direct';
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      expand: false,
+      builder: (_, scrollCtrl) => _MemoDetailContent(
+        data: data,
+        service: service,
+        memoId: memoId,
+        scrollController: scrollCtrl,
+        showDragHandle: true,
+        isDesktopPane: false,
+        onEdit: () => _openEditSheet(context),
+        onNavigateToSource: source == 'direct'
+            ? null
+            : () => _navigateToSource(context),
+        onShare: () => _shareMemoToChat(context),
+      ),
+    );
+  }
+
+  void _navigateToSource(BuildContext context) {
+    navigateToMemoSource(context, data, popFirst: true);
+  }
+}
+
+class MemoDetailPane extends StatelessWidget {
+  final String memoId;
+  final Map<String, dynamic>? initialData;
+  final MemoService service;
+  final VoidCallback? onEditRequested;
+
+  const MemoDetailPane({
+    super.key,
+    required this.memoId,
+    this.initialData,
+    required this.service,
+    this.onEditRequested,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: service.memoStream(memoId),
+      builder: (context, snapshot) {
+        final streamData = snapshot.data?.data();
+        final data = streamData ?? initialData;
+        if (data == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final sheet = MemoDetailSheet(
+          memoId: memoId,
+          data: data,
+          service: service,
+        );
+
+        return _MemoDetailContent(
+          data: data,
+          service: service,
+          memoId: memoId,
+          isDesktopPane: true,
+          showDragHandle: false,
+          onEdit: onEditRequested ??
+              () => sheet._showEditSheet(context, closeCurrent: false),
+          onNavigateToSource: (data['source'] as String? ?? 'direct') == 'direct'
+              ? null
+              : () => navigateToMemoSource(context, data, popFirst: false),
+          onShare: () => sheet._shareMemoToChatInternal(
+                context,
+                closeCurrent: false,
+              ),
+        );
+      },
+    );
+  }
+}
+
+class _MemoDetailContent extends StatelessWidget {
+  final String memoId;
+  final Map<String, dynamic> data;
+  final MemoService service;
+  final ScrollController? scrollController;
+  final bool showDragHandle;
+  final bool isDesktopPane;
+  final VoidCallback onEdit;
+  final VoidCallback? onNavigateToSource;
+  final VoidCallback onShare;
+
+  const _MemoDetailContent({
+    required this.memoId,
+    required this.data,
+    required this.service,
+    required this.onEdit,
+    required this.onShare,
+    this.onNavigateToSource,
+    this.scrollController,
+    required this.showDragHandle,
+    required this.isDesktopPane,
+  });
+
+  DateTime? _asDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    try {
+      final dynamic dynamicValue = value;
+      final result = dynamicValue.toDate();
+      if (result is DateTime) return result;
+    } catch (_) {}
+    return null;
+  }
+
+  Color _sourceColor(ColorScheme colorScheme) {
+    final source = data['source'] as String? ?? 'direct';
+    if (source == 'chat') return colorScheme.primary;
+    if (source == 'board') return colorScheme.tertiary;
+    return colorScheme.onSurface.withOpacity(0.4);
+  }
+
+  String _subLabel(AppLocalizations l) {
+    final source = data['source'] as String? ?? 'direct';
+    if (source == 'chat') {
+      return '💬 ${data['room_name'] ?? ''} · ${data['sender_name'] ?? ''}';
+    }
+    if (source == 'board') {
+      return '📋 ${data['board_name'] ?? ''} › ${data['post_title'] ?? ''}';
+    }
+    return '';
   }
 
   @override
@@ -147,22 +293,20 @@ class MemoDetailSheet extends StatelessWidget {
 
     final blocks = MemoService.blocksFromMemo(data);
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.6,
-      minChildSize: 0.4,
-      maxChildSize: 0.92,
-      expand: false,
-      builder: (_, scrollCtrl) => Column(children: [
-        Container(
-          margin: const EdgeInsets.only(top: 12, bottom: 8),
-          width: 36, height: 4,
-          decoration: BoxDecoration(
-            color: colorScheme.onSurface.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(2),
+    return Container(
+      color: isDesktopPane ? colorScheme.surface : null,
+      child: Column(children: [
+        if (showDragHandle)
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            width: 36, height: 4,
+            decoration: BoxDecoration(
+              color: colorScheme.onSurface.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
-        ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 8, 4),
+          padding: EdgeInsets.fromLTRB(16, showDragHandle ? 0 : 16, 8, 4),
           child: Row(children: [
             Expanded(
               child: source == 'direct'
@@ -177,9 +321,9 @@ class MemoDetailSheet extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis),
             ),
-            if (source != 'direct')
+            if (onNavigateToSource != null)
               TextButton.icon(
-                onPressed: () => _navigateToSource(context),
+                onPressed: onNavigateToSource,
                 icon: Icon(
                     source == 'chat'
                         ? Icons.chat_bubble_outline
@@ -197,13 +341,13 @@ class MemoDetailSheet extends StatelessWidget {
               icon: Icon(Icons.share_outlined,
                   size: 18, color: colorScheme.onSurface.withOpacity(0.7)),
               tooltip: l.shareMessage,
-              onPressed: () => _shareMemoToChat(context),
+              onPressed: onShare,
             ),
             IconButton(
               icon: Icon(Icons.edit_outlined,
                   size: 18, color: colorScheme.primary),
               tooltip: l.editMemo,
-              onPressed: () => _openEditSheet(context),
+              onPressed: onEdit,
             ),
           ]),
         ),
@@ -233,16 +377,12 @@ class MemoDetailSheet extends StatelessWidget {
         const Divider(height: 16),
         Expanded(
           child: SingleChildScrollView(
-            controller: scrollCtrl,
+            controller: scrollController,
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
             child: BlockViewer(blocks: blocks),
           ),
         ),
       ]),
     );
-  }
-
-  void _navigateToSource(BuildContext context) {
-    navigateToMemoSource(context, data, popFirst: true);
   }
 }

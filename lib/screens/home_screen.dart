@@ -10,6 +10,7 @@ import '../providers/theme_provider.dart';
 import '../providers/user_provider.dart';
 import '../services/chat_service.dart';
 import '../services/incoming_share_service.dart';
+import '../services/memo_service.dart';
 import '../l10n/app_localizations.dart';
 import 'chat_list_screen.dart' hide GroupListScreen;
 import 'chat_room_screen.dart';
@@ -19,6 +20,8 @@ import 'friends_screen.dart';
 import 'memo_screen.dart';
 import 'profile_screen.dart';
 import 'incoming_share_screen.dart';
+import '../widgets/memo/memo_detail_sheet.dart';
+import '../widgets/memo/memo_form_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,6 +38,11 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription<int>? _unreadSub;
   bool _showingIncomingShare = false;
   IncomingShareService? _incomingShareService;
+  String? _activeMemoId;
+  Map<String, dynamic>? _activeMemoData;
+  bool _isEditingMemo = false;
+  String? _editingMemoId;
+  Map<String, dynamic>? _editingMemoData;
 
   @override
   void didChangeDependencies() {
@@ -182,6 +190,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _currentIndex == 1
                   ? _buildDesktopChatArea(
                       context, visitedRooms, activeRoomId, l)
+                  : _currentIndex == 2
+                      ? _buildDesktopMemoArea(context, l)
                   : _buildDesktopOtherTab(context, l),
             ),
           ],
@@ -202,7 +212,32 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         );
       case 2:
-        return const MemoScreen();
+        return MemoScreen(
+          isDesktopMode: true,
+          selectedMemoId: _activeMemoId,
+          onCreateRequested: () {
+            setState(() {
+              _isEditingMemo = true;
+              _editingMemoId = null;
+              _editingMemoData = null;
+            });
+          },
+          onMemoSelected: (memoId, data) {
+            if (!mounted) return;
+            if (_isEditingMemo) {
+              setState(() {
+                _isEditingMemo = false;
+                _editingMemoId = null;
+                _editingMemoData = null;
+              });
+            }
+            if (_activeMemoId == memoId) return;
+            setState(() {
+              _activeMemoId = memoId;
+              _activeMemoData = data;
+            });
+          },
+        );
       case 3:
         return GroupListScreen();
       default:
@@ -276,6 +311,90 @@ class _HomeScreenState extends State<HomeScreen> {
           fontSize: 16,
         ),
       ),
+    );
+  }
+
+  Widget _buildDesktopMemoArea(
+    BuildContext context,
+    AppLocalizations l,
+  ) {
+    if (_isEditingMemo) {
+      final data = _editingMemoData;
+      return MemoFormSheet(
+        memoId: _editingMemoId,
+        initialTitle: data?['title'] as String? ?? '',
+        initialContent: data?['content'] as String? ?? '',
+        initialBlocks: List<Map<String, dynamic>>.from(
+          ((data?['blocks'] as List?) ?? []).map(
+            (e) => Map<String, dynamic>.from(e as Map),
+          ),
+        ),
+        initialAttachments: List<Map<String, dynamic>>.from(
+          ((data?['attachments'] as List?) ?? []).map(
+            (e) => Map<String, dynamic>.from(e as Map),
+          ),
+        ),
+        service: context.read<MemoService>(),
+        embedded: true,
+        onCancel: () {
+          setState(() {
+            _isEditingMemo = false;
+            _editingMemoId = null;
+            _editingMemoData = null;
+          });
+        },
+        onSaved: (savedId) {
+          setState(() {
+            _isEditingMemo = false;
+            _activeMemoId = savedId;
+            _activeMemoData =
+                _editingMemoId == savedId ? _editingMemoData : null;
+            _editingMemoId = null;
+            _editingMemoData = null;
+          });
+        },
+      );
+    }
+
+    final memoId = _activeMemoId;
+    if (memoId == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.note_outlined,
+                size: 64,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withOpacity(0.2)),
+            const SizedBox(height: 16),
+            Text(
+              l.selectMemoHint,
+              style: TextStyle(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withOpacity(0.4),
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return MemoDetailPane(
+      memoId: memoId,
+      initialData: _activeMemoData,
+      service: context.read<MemoService>(),
+      onEditRequested: () {
+        setState(() {
+          _isEditingMemo = true;
+          _editingMemoId = memoId;
+          _editingMemoData = _activeMemoData;
+        });
+      },
     );
   }
 

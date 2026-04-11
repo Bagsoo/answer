@@ -9,7 +9,18 @@ import '../widgets/memo/memo_form_sheet.dart';
 import '../widgets/memo/memo_section.dart';
 
 class MemoScreen extends StatefulWidget {
-  const MemoScreen({super.key});
+  final bool isDesktopMode;
+  final String? selectedMemoId;
+  final void Function(String? memoId, Map<String, dynamic>? data)? onMemoSelected;
+  final VoidCallback? onCreateRequested;
+
+  const MemoScreen({
+    super.key,
+    this.isDesktopMode = false,
+    this.selectedMemoId,
+    this.onMemoSelected,
+    this.onCreateRequested,
+  });
 
   @override
   State<MemoScreen> createState() => _MemoScreenState();
@@ -217,6 +228,11 @@ class _MemoScreenState extends State<MemoScreen> {
                       }).toList();
 
                 if (filteredItems.isEmpty) {
+                  if (widget.isDesktopMode && widget.onMemoSelected != null) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      widget.onMemoSelected!(null, null);
+                    });
+                  }
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -235,6 +251,15 @@ class _MemoScreenState extends State<MemoScreen> {
                 final directItems = filteredItems
               .where((i) => i.source == 'direct')
               .toList();
+
+                if (widget.isDesktopMode &&
+                    widget.onMemoSelected != null &&
+                    !filteredItems.any((i) => i.id == widget.selectedMemoId)) {
+                  final target = filteredItems.first;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    widget.onMemoSelected!(target.id, target.data);
+                  });
+                }
 
                 final Map<String, GroupMemoGroup> groupMap = {};
                 for (final item in filteredItems) {
@@ -258,11 +283,21 @@ class _MemoScreenState extends State<MemoScreen> {
                       .toList(),
                   service: service,
                   prefs: _prefs!,
+                  selectedMemoId: widget.selectedMemoId,
+                  onMemoTap: widget.isDesktopMode
+                      ? (memoId, data) =>
+                          widget.onMemoSelected?.call(memoId, data)
+                      : null,
                 ),
               ...groupMap.values.map((group) => GroupMemoSection(
                     group: group,
                     service: service,
                     prefs: _prefs!,
+                    selectedMemoId: widget.selectedMemoId,
+                    onMemoTap: widget.isDesktopMode
+                        ? (memoId, data) =>
+                            widget.onMemoSelected?.call(memoId, data)
+                        : null,
                   )),
                   ],
                 );
@@ -272,7 +307,13 @@ class _MemoScreenState extends State<MemoScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showNewMemoSheet(context, service),
+        onPressed: () {
+          if (widget.isDesktopMode && widget.onCreateRequested != null) {
+            widget.onCreateRequested!();
+          } else {
+            _showNewMemoSheet(context, service);
+          }
+        },
         child: const Icon(Icons.edit_outlined),
       ),
     );

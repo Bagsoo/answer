@@ -11,6 +11,9 @@ class MemoFormSheet extends StatefulWidget {
   final List<Map<String, dynamic>> initialAttachments;
   final List<Map<String, dynamic>> initialBlocks;
   final MemoService service;
+  final bool embedded;
+  final VoidCallback? onCancel;
+  final ValueChanged<String>? onSaved;
 
   const MemoFormSheet({
     super.key,
@@ -20,6 +23,9 @@ class MemoFormSheet extends StatefulWidget {
     this.initialAttachments = const [],
     this.initialBlocks = const [],
     required this.service,
+    this.embedded = false,
+    this.onCancel,
+    this.onSaved,
   });
 
   @override
@@ -84,14 +90,18 @@ class _MemoFormSheetState extends State<MemoFormSheet> {
     setState(() => _saving = true);
 
     try {
-      await widget.service.saveMemo(
+      final savedId = await widget.service.saveMemo(
         memoId: widget.memoId,
         title: title,
         content: plainText,
         blocks: blocks,
       );
       if (mounted) {
-        Navigator.pop(context);
+        if (widget.embedded) {
+          widget.onSaved?.call(savedId);
+        } else {
+          Navigator.pop(context);
+        }
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(l.memoSaved)));
       }
@@ -110,31 +120,42 @@ class _MemoFormSheetState extends State<MemoFormSheet> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: widget.embedded
+          ? EdgeInsets.zero
+          : EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.88,
+          maxHeight: widget.embedded
+              ? double.infinity
+              : MediaQuery.of(context).size.height * 0.88,
         ),
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: widget.embedded ? MainAxisSize.max : MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // ── 핸들 바 ───────────────────────────────────────────────
-            Center(
-              child: Container(
-                width: 36, height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: colorScheme.onSurface.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(2),
+            if (!widget.embedded)
+              Center(
+                child: Container(
+                  width: 36, height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.onSurface.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
 
             // ── 헤더 ──────────────────────────────────────────────────
             Row(children: [
+              if (widget.embedded && widget.onCancel != null)
+                IconButton(
+                  onPressed: widget.onCancel,
+                  icon: const Icon(Icons.close),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: l.cancel,
+                ),
               Expanded(
                 child: Text(
                   widget.memoId != null ? l.editMemo : l.newMemo,

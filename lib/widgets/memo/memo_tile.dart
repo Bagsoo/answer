@@ -9,12 +9,16 @@ class MemoTile extends StatelessWidget {
   final String memoId;
   final Map<String, dynamic> data;
   final MemoService service;
+  final bool isSelected;
+  final VoidCallback? onTapOverride;
 
   const MemoTile({
     super.key,
     required this.memoId,
     required this.data,
     required this.service,
+    this.isSelected = false,
+    this.onTapOverride,
   });
 
   String _subLabel() {
@@ -150,7 +154,9 @@ class MemoTile extends StatelessWidget {
     final isVideoThumb = imageUrl == null && videoThumb != null;
 
     return Column(children: [
-      ListTile(
+      Container(
+        color: isSelected ? cs.primary.withOpacity(0.08) : null,
+        child: ListTile(
         contentPadding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           // 제목 (direct만)
@@ -213,7 +219,8 @@ class MemoTile extends StatelessWidget {
             onPressed: () => _confirmDelete(context, l, cs),
           ),
         ]),
-        onTap: () => _showDetailSheet(context, cs),
+        onTap: onTapOverride ?? () => _showDetailSheet(context, cs),
+        ),
       ),
       const Divider(height: 1, indent: 16),
     ]);

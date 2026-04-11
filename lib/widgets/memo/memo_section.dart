@@ -11,12 +11,16 @@ class DirectMemoSection extends StatefulWidget {
   final List<QueryDocumentSnapshot> memos;
   final MemoService service;
   final SharedPreferences prefs;
+  final String? selectedMemoId;
+  final void Function(String memoId, Map<String, dynamic> data)? onMemoTap;
 
   const DirectMemoSection({
     super.key,
     required this.memos,
     required this.service,
     required this.prefs,
+    this.selectedMemoId,
+    this.onMemoTap,
   });
 
   @override
@@ -94,6 +98,13 @@ class _DirectMemoSectionState extends State<DirectMemoSection> {
                         memoId: d.id,
                         data: d.data() as Map<String, dynamic>,
                         service: widget.service,
+                        isSelected: widget.selectedMemoId == d.id,
+                        onTapOverride: widget.onMemoTap == null
+                            ? null
+                            : () => widget.onMemoTap!(
+                                  d.id,
+                                  d.data() as Map<String, dynamic>,
+                                ),
                       )),
                   const Divider(height: 1),
                 ]),
@@ -112,12 +123,16 @@ class GroupMemoSection extends StatefulWidget {
   final GroupMemoGroup group;
   final MemoService service;
   final SharedPreferences prefs;
+  final String? selectedMemoId;
+  final void Function(String memoId, Map<String, dynamic> data)? onMemoTap;
 
   const GroupMemoSection({
     super.key,
     required this.group,
     required this.service,
     required this.prefs,
+    this.selectedMemoId,
+    this.onMemoTap,
   });
 
   @override
@@ -201,6 +216,10 @@ class _GroupMemoSectionState extends State<GroupMemoSection> {
                         memoId: entry.id,
                         data: entry.data,
                         service: widget.service,
+                        isSelected: widget.selectedMemoId == entry.id,
+                        onTapOverride: widget.onMemoTap == null
+                            ? null
+                            : () => widget.onMemoTap!(entry.id, entry.data),
                       )),
                   const Divider(height: 1),
                 ]),
