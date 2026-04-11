@@ -18,8 +18,16 @@ import 'package:cached_network_image/cached_network_image.dart';
 const _kAllTag = '__ALL__';
 
 class MembersTab extends StatefulWidget {
-  // groupId는 GroupProvider에서 가져오므로 파라미터 불필요
-  const MembersTab({super.key});
+  final bool isDesktopMode;
+  final String? selectedMemberId;
+  final ValueChanged<Map<String, dynamic>>? onMemberSelected;
+
+  const MembersTab({
+    super.key,
+    this.isDesktopMode = false,
+    this.selectedMemberId,
+    this.onMemberSelected,
+  });
 
   @override
   State<MembersTab> createState() => _MembersTabState();
@@ -433,72 +441,108 @@ class _MembersTabState extends State<MembersTab> {
                     final isOwner = role == 'owner';
                     final isMe = uid == gp.currentUserId;
 
-                    return ListTile(
-                      onTap: () => _showMemberProfile(
-                        context, uid, displayName, role, perms,
-                        memberTags, isMe, canManagePerms,
-                        myRole, myPerms, groupId, l, colorScheme, photoUrl,
-                      ),
-                      leading: CircleAvatar(
-                        backgroundColor: isOwner
-                            ? colorScheme.primary
-                            : colorScheme.surfaceContainerHighest,
-                        backgroundImage: (photoUrl != null && photoUrl.isNotEmpty) 
-                          ? CachedNetworkImageProvider(photoUrl) 
-                          : null,                        
-                        child: (photoUrl == null || photoUrl.isEmpty) ?
-                        Text(
-                          displayName.isNotEmpty
-                              ? displayName[0].toUpperCase()
-                              : '?',
-                          style: TextStyle(
-                            color: isOwner
-                                ? colorScheme.onPrimary
-                                : colorScheme.onSurface,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ) : null,
-                      ),
-                      title: Text(
-                        isMe ? '$displayName (${l.me})' : displayName,
-                        style: TextStyle(
-                          fontWeight:
-                              isOwner ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isOwner ? l.roleOwner : l.roleMember,
-                            style: TextStyle(
-                              color: isOwner
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurface.withOpacity(0.5),
-                              fontSize: 12,
-                            ),
-                          ),
-                          if (memberTags.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 3),
-                              child: Wrap(
-                                spacing: 4,
-                                runSpacing: 2,
-                                children: memberTags.map((tag) {
-                                  final isHighlighted = tag == _selectedTag;
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: isHighlighted
-                                          ? colorScheme.primary
-                                              .withOpacity(0.15)
-                                          : colorScheme
-                                              .surfaceContainerHighest,
-                                      borderRadius:
-                                          BorderRadius.circular(4),
+                    final memberPayload = {
+                      ...data,
+                      'uid': uid,
+                      'display_name': displayName,
+                      'role': role,
+                      'permissions': perms,
+                      'tags': memberTags,
+                      'is_me': isMe,
+                      'can_manage_perms': canManagePerms,
+                      'photo_url': photoUrl,
+                      'group_id': groupId,
+                    };
+
+                    return Container(
+                      color: widget.selectedMemberId == uid
+                          ? colorScheme.primary.withOpacity(0.08)
+                          : null,
+                      child: ListTile(
+                        onTap:
+                            widget.isDesktopMode &&
+                                    widget.onMemberSelected != null
+                                ? () => widget.onMemberSelected!(memberPayload)
+                                : () => _showMemberProfile(
+                                      context,
+                                      uid,
+                                      displayName,
+                                      role,
+                                      perms,
+                                      memberTags,
+                                      isMe,
+                                      canManagePerms,
+                                      myRole,
+                                      myPerms,
+                                      groupId,
+                                      l,
+                                      colorScheme,
+                                      photoUrl,
                                     ),
-                                    child: Text(tag,
+                        leading: CircleAvatar(
+                          backgroundColor: isOwner
+                              ? colorScheme.primary
+                              : colorScheme.surfaceContainerHighest,
+                          backgroundImage: photoUrl.isNotEmpty
+                              ? CachedNetworkImageProvider(photoUrl)
+                              : null,
+                          child: photoUrl.isEmpty
+                              ? Text(
+                                  displayName.isNotEmpty
+                                      ? displayName[0].toUpperCase()
+                                      : '?',
+                                  style: TextStyle(
+                                    color: isOwner
+                                        ? colorScheme.onPrimary
+                                        : colorScheme.onSurface,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        title: Text(
+                          isMe ? '$displayName (${l.me})' : displayName,
+                          style: TextStyle(
+                            fontWeight:
+                                isOwner ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isOwner ? l.roleOwner : l.roleMember,
+                              style: TextStyle(
+                                color: isOwner
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurface.withOpacity(0.5),
+                                fontSize: 12,
+                              ),
+                            ),
+                            if (memberTags.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 3),
+                                child: Wrap(
+                                  spacing: 4,
+                                  runSpacing: 2,
+                                  children: memberTags.map((tag) {
+                                    final isHighlighted = tag == _selectedTag;
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 1,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isHighlighted
+                                            ? colorScheme.primary
+                                                .withOpacity(0.15)
+                                            : colorScheme
+                                                .surfaceContainerHighest,
+                                        borderRadius:
+                                            BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        tag,
                                         style: TextStyle(
                                           fontSize: 10,
                                           color: isHighlighted
@@ -508,25 +552,34 @@ class _MembersTabState extends State<MembersTab> {
                                           fontWeight: isHighlighted
                                               ? FontWeight.bold
                                               : FontWeight.normal,
-                                        )),
-                                  );
-                                }).toList(),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
+                        trailing: isOwner
+                            ? Icon(
+                                Icons.star_rounded,
+                                color: colorScheme.primary,
+                                size: 18,
+                              )
+                            : isMe
+                                ? null
+                                : canManagePerms
+                                    ? Icon(
+                                        Icons.manage_accounts_outlined,
+                                        color: colorScheme.onSurface
+                                            .withOpacity(0.4),
+                                      )
+                                    : Icon(
+                                        Icons.chevron_right,
+                                        color: colorScheme.onSurface
+                                            .withOpacity(0.3),
+                                      ),
                       ),
-                      trailing: isOwner
-                          ? Icon(Icons.star_rounded,
-                              color: colorScheme.primary, size: 18)
-                          : isMe
-                              ? null
-                              : canManagePerms
-                                  ? Icon(Icons.manage_accounts_outlined,
-                                      color: colorScheme.onSurface
-                                          .withOpacity(0.4))
-                                  : Icon(Icons.chevron_right,
-                                      color: colorScheme.onSurface
-                                          .withOpacity(0.3)),
                     );
                   },
                   separatorBuilder: (_, __) =>

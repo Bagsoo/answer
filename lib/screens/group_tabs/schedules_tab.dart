@@ -9,7 +9,16 @@ import 'schedule_form_screen.dart';
 import 'schedule_detail_screen.dart';
 
 class SchedulesTab extends StatefulWidget {
-  const SchedulesTab({super.key});
+  final bool isDesktopMode;
+  final String? selectedScheduleId;
+  final ValueChanged<Map<String, dynamic>>? onScheduleSelected;
+
+  const SchedulesTab({
+    super.key,
+    this.isDesktopMode = false,
+    this.selectedScheduleId,
+    this.onScheduleSelected,
+  });
 
   @override
   State<SchedulesTab> createState() => _SchedulesTabState();
@@ -260,6 +269,9 @@ class _SchedulesTabState extends State<SchedulesTab> {
                                         groupId: groupId,
                                         currentUserId: currentUserId,
                                         canCreateSchedule: canCreateSchedule,
+                                        isDesktopMode: widget.isDesktopMode,
+                                        selectedScheduleId: widget.selectedScheduleId,
+                                        onScheduleSelected: widget.onScheduleSelected,
                                       ),
                           ),
                         ],
@@ -293,6 +305,9 @@ class _SchedulesTabState extends State<SchedulesTab> {
                           groupId: groupId,
                           currentUserId: currentUserId,
                           canCreateSchedule: canCreateSchedule,
+                          isDesktopMode: widget.isDesktopMode,
+                          selectedScheduleId: widget.selectedScheduleId,
+                          onScheduleSelected: widget.onScheduleSelected,
                         ),
                 ),
             ],
@@ -309,12 +324,18 @@ class _ScheduleList extends StatelessWidget {
   final String groupId;
   final String currentUserId;
   final bool canCreateSchedule;
+  final bool isDesktopMode;
+  final String? selectedScheduleId;
+  final ValueChanged<Map<String, dynamic>>? onScheduleSelected;
 
   const _ScheduleList({
     required this.schedules,
     required this.groupId,
     required this.currentUserId,
     required this.canCreateSchedule,
+    this.isDesktopMode = false,
+    this.selectedScheduleId,
+    this.onScheduleSelected,
   });
 
   @override
@@ -334,8 +355,20 @@ class _ScheduleList extends StatelessWidget {
         final isUpcoming =
             start != null && start.isAfter(DateTime.now());
 
-        return ListTile(
+        return Container(
+          color: selectedScheduleId == (s['id'] as String? ?? '')
+              ? colorScheme.primary.withOpacity(0.08)
+              : null,
+          child: ListTile(
           onTap: () {
+            if (isDesktopMode && onScheduleSelected != null) {
+              onScheduleSelected!({
+                ...s,
+                'can_edit': canCreateSchedule ||
+                    s['created_by'] == currentUserId,
+              });
+              return;
+            }
             final gp = context.read<GroupProvider>();
             Navigator.of(context).push(
               MaterialPageRoute(
@@ -403,6 +436,7 @@ class _ScheduleList extends StatelessWidget {
                 )
               : null,
           trailing: _RsvpBadge(rsvp: myRsvp, colorScheme: colorScheme),
+          ),
         );
       },
       separatorBuilder: (_, __) => const Divider(height: 1, indent: 72),
