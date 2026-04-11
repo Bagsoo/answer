@@ -19,7 +19,16 @@ import 'dart:convert';
 import '../utils/ad_interleaver.dart';
 
 class GroupListScreen extends StatefulWidget {
-  const GroupListScreen({super.key});
+  final bool isDesktopMode;
+  final String? selectedGroupId;
+  final void Function(Map<String, dynamic> group)? onGroupSelected;
+
+  const GroupListScreen({
+    super.key,
+    this.isDesktopMode = false,
+    this.selectedGroupId,
+    this.onGroupSelected,
+  });
 
   @override
   State<GroupListScreen> createState() => _GroupListScreenState();
@@ -193,6 +202,10 @@ class _GroupListScreenState extends State<GroupListScreen>
 
   void _handleGroupTap(Map<String, dynamic> group, bool isAlreadyJoined) {
     if (isAlreadyJoined) {
+      if (widget.isDesktopMode && widget.onGroupSelected != null) {
+        widget.onGroupSelected!(group);
+        return;
+      }
       Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => GroupDetailScreen(
           groupId: group['id'] as String,
@@ -266,12 +279,27 @@ class _GroupListScreenState extends State<GroupListScreen>
       );
     }
 
+    if (widget.isDesktopMode &&
+        widget.onGroupSelected != null &&
+        !_joinedGroups.any((g) => (g['id'] as String?) == widget.selectedGroupId)) {
+      final first = _joinedGroups.first;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onGroupSelected!(first);
+      });
+    }
+
     final groupWidgets = _joinedGroups.indexed.map<Widget>((entry) {
       final (i, g) = entry;
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          JoinedGroupTile(group: g),
+          JoinedGroupTile(
+            group: g,
+            isSelected: widget.selectedGroupId == (g['id'] as String? ?? ''),
+            onTapOverride: widget.isDesktopMode
+                ? () => _handleGroupTap(g, true)
+                : null,
+          ),
           if (i < _joinedGroups.length - 1) const Divider(height: 1),
         ],
       );

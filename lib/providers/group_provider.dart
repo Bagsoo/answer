@@ -9,7 +9,10 @@ import 'package:flutter/material.dart';
 class GroupProvider extends ChangeNotifier {
   final String groupId;
 
-  GroupProvider(this.groupId) {
+  GroupProvider(this.groupId, {Map<String, dynamic>? initialData}) {
+    if (initialData != null) {
+      _applySeed(initialData);
+    }
     _init();
   }
 
@@ -106,6 +109,16 @@ class GroupProvider extends ChangeNotifier {
 
   StreamSubscription? _groupSub;
   StreamSubscription? _memberSub;
+
+  void _applySeed(Map<String, dynamic> d) {
+    name = d['name'] as String? ?? name;
+    type = d['type'] as String? ?? type;
+    category = d['category'] as String? ?? category;
+    memberCount = (d['member_count'] as num?)?.toInt() ?? memberCount;
+    profileImageUrl = d['group_profile_image'] as String? ?? profileImageUrl;
+    likes = List<String>.from(d['likes'] as List? ?? likes);
+    _loaded = true;
+  }
 
   void _init() {
     final db = FirebaseFirestore.instance;

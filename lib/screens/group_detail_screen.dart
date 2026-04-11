@@ -11,14 +11,18 @@ import 'group_tabs/group_profile_screen.dart';
 class GroupDetailScreen extends StatelessWidget {
   final String groupId;
   final String groupName;
+  final Map<String, dynamic>? initialGroupData;
 
   const GroupDetailScreen(
-      {super.key, required this.groupId, required this.groupName});
+      {super.key,
+      required this.groupId,
+      required this.groupName,
+      this.initialGroupData});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => GroupProvider(groupId),
+      create: (_) => GroupProvider(groupId, initialData: initialGroupData),
       child: _GroupDetailBody(groupName: groupName),
     );
   }

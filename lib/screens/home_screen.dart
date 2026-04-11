@@ -15,6 +15,7 @@ import '../l10n/app_localizations.dart';
 import 'chat_list_screen.dart' hide GroupListScreen;
 import 'chat_room_screen.dart';
 import 'group_list_screen.dart';
+import 'group_detail_screen.dart';
 import 'app_settings_screen.dart';
 import 'friends_screen.dart';
 import 'memo_screen.dart';
@@ -43,6 +44,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isEditingMemo = false;
   String? _editingMemoId;
   Map<String, dynamic>? _editingMemoData;
+  String? _activeGroupId;
+  String? _activeGroupName;
+  final Map<String, Map<String, dynamic>> _desktopVisitedGroups = {};
 
   @override
   void didChangeDependencies() {
@@ -192,6 +196,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       context, visitedRooms, activeRoomId, l)
                   : _currentIndex == 2
                       ? _buildDesktopMemoArea(context, l)
+                  : _currentIndex == 3
+                      ? _buildDesktopGroupArea(context, l)
                   : _buildDesktopOtherTab(context, l),
             ),
           ],
@@ -239,7 +245,22 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         );
       case 3:
-        return GroupListScreen();
+        return GroupListScreen(
+          isDesktopMode: true,
+          selectedGroupId: _activeGroupId,
+          onGroupSelected: (group) {
+            final groupId = group['id'] as String? ?? '';
+            final groupName = group['name'] as String? ?? '';
+            if (groupId.isEmpty || groupName.isEmpty) return;
+            if (!mounted) return;
+            if (_activeGroupId == groupId) return;
+            setState(() {
+              _activeGroupId = groupId;
+              _activeGroupName = groupName;
+              _desktopVisitedGroups[groupId] = Map<String, dynamic>.from(group);
+            });
+          },
+        );
       default:
         return const SizedBox();
     }
@@ -395,6 +416,57 @@ class _HomeScreenState extends State<HomeScreen> {
           _editingMemoData = _activeMemoData;
         });
       },
+    );
+  }
+
+  Widget _buildDesktopGroupArea(
+    BuildContext context,
+    AppLocalizations l,
+  ) {
+    final groupId = _activeGroupId;
+    final groupName = _activeGroupName;
+    if (groupId == null || groupName == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.groups_outlined,
+                size: 64,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withOpacity(0.2)),
+            const SizedBox(height: 16),
+            Text(
+              l.selectGroupHint,
+              style: TextStyle(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withOpacity(0.4),
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final visitedIds = _desktopVisitedGroups.keys.toList();
+    final activeIndex = visitedIds.indexOf(groupId);
+
+    return IndexedStack(
+      index: activeIndex < 0 ? 0 : activeIndex,
+      children: visitedIds
+          .map(
+            (id) => GroupDetailScreen(
+              key: ValueKey(id),
+              groupId: id,
+              groupName: (_desktopVisitedGroups[id]?['name'] as String?) ?? '',
+              initialGroupData: _desktopVisitedGroups[id],
+            ),
+          )
+          .toList(),
     );
   }
 

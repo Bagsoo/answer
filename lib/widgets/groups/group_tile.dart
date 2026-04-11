@@ -8,8 +8,15 @@ import '../../screens/group_tabs/group_type_category_data.dart';
 // ── 가입된 그룹 타일 ───────────────────────────────────────────────────────────
 class JoinedGroupTile extends StatelessWidget {
   final Map<String, dynamic> group;
+  final bool isSelected;
+  final VoidCallback? onTapOverride;
 
-  const JoinedGroupTile({super.key, required this.group});
+  const JoinedGroupTile({
+    super.key,
+    required this.group,
+    this.isSelected = false,
+    this.onTapOverride,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -25,31 +32,37 @@ class JoinedGroupTile extends StatelessWidget {
     final typeLabel = GroupTypeCategoryData.localizeType(type, l);
     final categoryLabel = GroupTypeCategoryData.localizeKey(category, l);
 
-    return ListTile(
-      leading: GroupAvatarSync(
-        groupName: name,
-        imageUrl: imageUrl,
-        radius: 22,
-        fallbackIcon: Icons.business,
-        backgroundColor: colorScheme.primaryContainer,
-        foregroundColor: colorScheme.onPrimaryContainer,
-      ),
-      title: Row(children: [
-        Flexible(
-          child: Text(name,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+    return Container(
+      color: isSelected ? colorScheme.primary.withOpacity(0.08) : null,
+      child: ListTile(
+        leading: GroupAvatarSync(
+          groupName: name,
+          imageUrl: imageUrl,
+          radius: 22,
+          fallbackIcon: Icons.business,
+          backgroundColor: colorScheme.primaryContainer,
+          foregroundColor: colorScheme.onPrimaryContainer,
         ),
-        const SizedBox(width: 8),
-        _MemberBadge(count: memberCount, color: colorScheme.primaryContainer),
-      ]),
-      subtitle: Text('${l.type}: $typeLabel  •  ${l.category}: $categoryLabel'),
-      trailing: Icon(Icons.chevron_right,
-          color: colorScheme.onSurface.withOpacity(0.4)),
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => GroupDetailScreen(groupId: groupId, groupName: name),
-      )),
+        title: Row(children: [
+          Flexible(
+            child: Text(name,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(width: 8),
+          _MemberBadge(count: memberCount, color: colorScheme.primaryContainer),
+        ]),
+        subtitle:
+            Text('${l.type}: $typeLabel  •  ${l.category}: $categoryLabel'),
+        trailing: Icon(Icons.chevron_right,
+            color: colorScheme.onSurface.withOpacity(0.4)),
+        onTap: onTapOverride ??
+            () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) =>
+                      GroupDetailScreen(groupId: groupId, groupName: name),
+                )),
+      ),
     );
   }
 }
