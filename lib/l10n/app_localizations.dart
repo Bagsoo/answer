@@ -67,6 +67,9 @@ class AppLocalizations {
   String get roleOwner => _s.roleOwner;
   String get roleMember => _s.roleMember;
   String get unknown => _s.unknown;
+  String get deletedUser => _s.deletedUser;
+  String get deletedGroup => _s.deletedGroup;
+  String get deletedGroupMessage => _s.deletedGroupMessage;
   String get name => _s.name;
   String get settingsTitle => _s.settingsTitle;
   String get settingsLanguage => _s.settingsLanguage;
@@ -754,6 +757,9 @@ abstract class _AppStrings {
   String get roleOwner;
   String get roleMember;
   String get unknown;
+  String get deletedUser;
+  String get deletedGroup;
+  String get deletedGroupMessage;
   String get name;
   String get settingsTitle;
   String get settingsLanguage;
@@ -1432,9 +1438,9 @@ class _EnStrings extends _AppStrings {
   @override String get manageJoinRequests => 'Manage Join Requests';
   @override String get leaveGroup => 'Leave Group';
   @override String get deleteGroup => 'Delete Group';
-  @override String get deleteGroupWarning => 'Cannot be undone after deletion.';
+  @override String get deleteGroupWarning => 'Members will lose access, but records will be retained for safety.';
   @override String get leaveGroupConfirm => 'Are you sure you want to leave this group?';
-  @override String get deleteGroupConfirm => 'All members, chats, and data will be permanently deleted.\n\nAre you sure?';
+  @override String get deleteGroupConfirm => 'The group will be hidden from members, but records will be preserved for safety.\n\nAre you sure?';
   @override String get leaveSuccess => 'You have left the group.';
   @override String get leaveFailed => 'Failed to leave the group.';
   @override String get deleteSuccess => 'Group has been deleted.';
@@ -1448,6 +1454,9 @@ class _EnStrings extends _AppStrings {
   @override String get roleOwner => 'owner';
   @override String get roleMember => 'member';
   @override String get unknown => 'Unknown';
+  @override String get deletedUser => 'Deleted User';
+  @override String get deletedGroup => 'Deleted Group';
+  @override String get deletedGroupMessage => 'This group has been deleted.';
   @override String get name => 'Name';
   @override String get settingsTitle => 'Settings';
   @override String get settingsLanguage => 'Language';
@@ -1462,8 +1471,8 @@ class _EnStrings extends _AppStrings {
   @override String get sectionAccount => 'ACCOUNT';
   @override String get logoutConfirm => 'Are you sure you want to log out?';
   @override String get deleteAccount => 'Delete Account';
-  @override String get deleteAccountConfirm => 'All your data will be permanently deleted.';
-  @override String get deleteAccountWarning => 'Permanently delete your account and all data';
+  @override String get deleteAccountConfirm => 'Your account will be deactivated and hidden, while records are preserved for safety.';
+  @override String get deleteAccountWarning => 'Deactivate your account while retaining records for safety';
   @override String get deleteAccountFailed => 'Failed to delete account.';
   @override String get searchMessages => 'Search messages';
   @override String get searchMessagesHint => 'Enter keyword to search...';
@@ -2101,9 +2110,9 @@ class _KoStrings extends _AppStrings {
   @override String get manageJoinRequests => '가입 요청 관리';
   @override String get leaveGroup => '그룹 탈퇴';
   @override String get deleteGroup => '그룹 삭제';
-  @override String get deleteGroupWarning => '삭제 후 복구할 수 없습니다.';
+  @override String get deleteGroupWarning => '멤버 접근은 차단되지만 기록은 안전을 위해 보존됩니다.';
   @override String get leaveGroupConfirm => '정말 이 그룹을 탈퇴하시겠습니까?';
-  @override String get deleteGroupConfirm => '그룹을 삭제하면 모든 데이터가 영구 삭제됩니다.\n\n정말 삭제하시겠습니까?';
+  @override String get deleteGroupConfirm => '그룹은 삭제된 것처럼 처리되지만 기록은 안전을 위해 보존됩니다.\n\n정말 삭제하시겠습니까?';
   @override String get leaveSuccess => '그룹을 탈퇴했습니다.';
   @override String get leaveFailed => '탈퇴에 실패했습니다.';
   @override String get deleteSuccess => '그룹이 삭제되었습니다.';
@@ -2117,6 +2126,9 @@ class _KoStrings extends _AppStrings {
   @override String get roleOwner => '방장';
   @override String get roleMember => '멤버';
   @override String get unknown => '알 수 없음';
+  @override String get deletedUser => '탈퇴한 사용자';
+  @override String get deletedGroup => '삭제된 그룹';
+  @override String get deletedGroupMessage => '삭제된 그룹입니다.';
   @override String get name => '이름';
   @override String get settingsTitle => '설정';
   @override String get settingsLanguage => '언어';
@@ -2131,8 +2143,8 @@ class _KoStrings extends _AppStrings {
   @override String get sectionAccount => '계정';
   @override String get logoutConfirm => '로그아웃 하시겠습니까?';
   @override String get deleteAccount => '회원 탈퇴';
-  @override String get deleteAccountConfirm => '모든 데이터가 영구적으로 삭제됩니다.';
-  @override String get deleteAccountWarning => '계정과 모든 데이터를 영구적으로 삭제합니다';
+  @override String get deleteAccountConfirm => '계정은 비활성화되어 숨겨지지만 기록은 안전을 위해 보존됩니다.';
+  @override String get deleteAccountWarning => '계정을 비활성화하고 기록은 안전을 위해 보존합니다';
   @override String get deleteAccountFailed => '계정 삭제에 실패했습니다.';
   @override String get searchMessages => '메시지 검색';
   @override String get searchMessagesHint => '검색어를 입력하세요...';
@@ -2772,9 +2784,9 @@ class _JaStrings extends _AppStrings {
   @override String get manageJoinRequests => '参加申請を管理';
   @override String get leaveGroup => 'グループを退出';
   @override String get deleteGroup => 'グループを削除';
-  @override String get deleteGroupWarning => '削除後は復元できません。';
+  @override String get deleteGroupWarning => 'メンバーからは見えなくなりますが、記録は安全のため保持されます。';
   @override String get leaveGroupConfirm => '本当にこのグループを退出しますか？';
-  @override String get deleteGroupConfirm => 'グループを削除すると、全データが永久に削除されます。\n\n本当に削除しますか？';
+  @override String get deleteGroupConfirm => 'グループは削除されたように見えますが、記録は安全のため保持されます。\n\n本当に削除しますか？';
   @override String get leaveSuccess => 'グループを退出しました。';
   @override String get leaveFailed => '退出に失敗しました。';
   @override String get deleteSuccess => 'グループが削除されました。';
@@ -2788,6 +2800,9 @@ class _JaStrings extends _AppStrings {
   @override String get roleOwner => 'オーナー';
   @override String get roleMember => 'メンバー';
   @override String get unknown => '不明';
+  @override String get deletedUser => '退会したユーザー';
+  @override String get deletedGroup => '削除されたグループ';
+  @override String get deletedGroupMessage => '削除されたグループです。';
   @override String get name => '名前';
   @override String get settingsTitle => '設定';
   @override String get settingsLanguage => '言語';
@@ -2802,8 +2817,8 @@ class _JaStrings extends _AppStrings {
   @override String get sectionAccount => 'アカウント';
   @override String get logoutConfirm => 'ログアウトしますか？';
   @override String get deleteAccount => 'アカウント削除';
-  @override String get deleteAccountConfirm => 'すべてのデータが完全に削除されます。';
-  @override String get deleteAccountWarning => 'アカウントとすべてのデータを完全に削除します';
+  @override String get deleteAccountConfirm => 'アカウントは無効化されて非表示になりますが、記録は安全のため保持されます。';
+  @override String get deleteAccountWarning => 'アカウントを無効化し、記録は安全のため保持します';
   @override String get deleteAccountFailed => 'アカウントの削除に失敗しました。';
   @override String get searchMessages => 'メッセージを検索';
   @override String get searchMessagesHint => 'キーワードを入力してください...';

@@ -45,8 +45,13 @@ service cloud.firestore {
 
     // ── 채팅방 ──────────────────────────────────────────────────────────────
     match /chat_rooms/{roomId} {
-      allow read: if isLoggedIn() &&
-        request.auth.uid in resource.data.member_ids;
+      allow read: if isLoggedIn() && (
+        request.auth.uid in resource.data.member_ids || 
+        (
+          resource.data.ref_group_id != null && 
+          exists(/databases/$(database)/documents/groups/$(resource.data.ref_group_id)/members/$(request.auth.uid))
+        )
+      );
       allow create: if isLoggedIn();
       allow update: if isLoggedIn() &&
         request.auth.uid in resource.data.member_ids;

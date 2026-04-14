@@ -50,6 +50,7 @@ class GroupService {
 
     batch.set(groupDoc, {
       'name': name,
+      'status': 'active',
       'type': type,
       'category': category,
       'require_approval': requireApproval,
@@ -139,11 +140,17 @@ class GroupService {
         .where('searchable_keywords', arrayContains: lowerQuery)
         .limit(20)
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) {
+        .map((snapshot) => snapshot.docs
+            .map((doc) {
               final data = doc.data();
+              if ((data['status'] as String? ?? 'active') == 'deleted') {
+                return null;
+              }
               data['id'] = doc.id;
               return data;
-            }).toList());
+            })
+            .whereType<Map<String, dynamic>>()
+            .toList());
   }
 
   // ── 그룹 가입 요청 ──────────────────────────────────────────────────────────
@@ -171,6 +178,9 @@ class GroupService {
 
       final groupDoc = await _db.collection('groups').doc(groupId).get();
       final groupData = groupDoc.data();
+      if ((groupData?['status'] as String? ?? 'active') == 'deleted') {
+        return 'error';
+      }
       final memberLimit = groupData?['member_limit'] as int? ?? 50;
       final memberCount =
           groupData?['member_count'] as int? ?? currentMemberCount;
@@ -290,11 +300,17 @@ class GroupService {
           .collection('groups')
           .where(FieldPath.documentId, whereIn: ids)
           .snapshots()
-          .map((groupsSnap) => groupsSnap.docs.map((doc) {
+          .map((groupsSnap) => groupsSnap.docs
+              .map((doc) {
                 final data = doc.data();
+                if ((data['status'] as String? ?? 'active') == 'deleted') {
+                  return null;
+                }
                 data['id'] = doc.id;
                 return data;
-              }).toList());
+              })
+              .whereType<Map<String, dynamic>>()
+              .toList());
     });
   }
 
@@ -362,6 +378,9 @@ class GroupService {
       final groupDoc =
           await _db.collection('groups').doc(groupId).get();
       final groupData = groupDoc.data();
+      if ((groupData?['status'] as String? ?? 'active') == 'deleted') {
+        return 'error';
+      }
       final groupName = groupData?['name'] as String? ?? '';
       final groupType = groupData?['type'] as String? ?? 'club';
       final groupCategory = groupData?['category'] as String? ?? '';

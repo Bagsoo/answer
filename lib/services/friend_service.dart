@@ -60,6 +60,9 @@ class FriendService {
     if (doc.id == currentUserId) return null;
 
     final data = doc.data();
+    if ((data['account_status'] as String? ?? 'active') == 'deleted') {
+      return null;
+    }
     data['uid'] = doc.id;
     return data;
   }

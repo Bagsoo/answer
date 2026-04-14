@@ -156,7 +156,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
     try {
+      await context.read<NotificationService>().deleteFcmToken();
       final db = FirebaseFirestore.instance;
+      final userRef = db.collection('users').doc(uid);
+      final userDoc = await userRef.get();
+      final userData = userDoc.data() ?? {};
       final joinedGroupsSnap = await db
           .collection('users')
           .doc(uid)
@@ -172,16 +176,51 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             .doc(uid));
         batch.update(db.collection('groups').doc(groupId),
             {'member_count': FieldValue.increment(-1)});
+        final chatSnap = await db
+            .collection('chat_rooms')
+            .where('ref_group_id', isEqualTo: groupId)
+            .get();
+        for (final chatDoc in chatSnap.docs) {
+          final memberIds =
+              List<String>.from(chatDoc.data()['member_ids'] as List? ?? []);
+          memberIds.remove(uid);
+          batch.update(chatDoc.reference, {
+            'member_ids': memberIds,
+            'unread_counts.$uid': FieldValue.delete(),
+          });
+          batch.delete(chatDoc.reference.collection('room_members').doc(uid));
+        }
         batch.delete(doc.reference);
       }
-      batch.delete(db.collection('users').doc(uid));
+      batch.set(userRef, {
+        'account_status': 'deleted',
+        'deleted_at': FieldValue.serverTimestamp(),
+        'deleted_by': uid,
+        'search_hidden': true,
+        'retention_snapshot': {
+          'name': userData['name'] as String? ?? '',
+          'phone_number': userData['phone_number'] as String? ?? '',
+          'profile_image': userData['profile_image'] as String? ?? '',
+          'locale': userData['locale'] as String? ?? 'ko',
+          'timezone': userData['timezone'] as String? ?? 'Asia/Seoul',
+          'providers':
+              List<String>.from(userData['providers'] as List? ?? const []),
+          'google_email': userData['google_email'] as String? ?? '',
+          'apple_email': userData['apple_email'] as String? ?? '',
+        },
+        'name': '',
+        'phone_number': '',
+        'profile_image': '',
+        'fcm_token': '',
+      }, SetOptions(merge: true));
       await batch.commit();
 
       if (context.mounted) {
         context.read<LocaleProvider>().reset();
         context.read<ThemeProvider>().reset();
+        await context.read<UserProvider>().clear();
       }
-      await FirebaseAuth.instance.currentUser?.delete();
+      await context.read<AuthService>().signOut();
 
       if (context.mounted) {
         Navigator.of(context, rootNavigator: true)

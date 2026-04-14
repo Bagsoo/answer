@@ -162,7 +162,7 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
     if (_showChatPanel) {
       return ClipRect(
         child: ChatRoomScreen(
-          key: ValueKey('chat_\${_selectedRoomId}'),
+          key: ValueKey('chat_${_selectedRoomId}'),
           roomId: _selectedRoomId!,
           isDesktopMode: true,
           onClosePanel: () => setState(() => _selectedRoomId = null),
@@ -175,12 +175,33 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
   @override
   Widget build(BuildContext context) {
     final loaded = context.select<GroupProvider, bool>((gp) => gp.loaded);
+    final isDeleted = context.select<GroupProvider, bool>((gp) => gp.isDeleted);
     final colorScheme = Theme.of(context).colorScheme;
     final isDesktopMode = MediaQuery.sizeOf(context).width >= 900;
 
     if (!loaded) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (isDeleted) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(AppLocalizations.of(context).deletedGroup),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              AppLocalizations.of(context).deletedGroupMessage,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: colorScheme.onSurface.withOpacity(0.7),
+              ),
+            ),
+          ),
+        ),
       );
     }
 

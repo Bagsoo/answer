@@ -506,8 +506,8 @@ class _CreateSubChatSheetState extends State<_CreateSubChatSheet> {
                         ),
                       ),
                     ),
-                    title: Text(
-                        isMe ? '$displayName (\${l.me})' : displayName),
+                    title:
+                        Text(isMe ? '$displayName (${l.me})' : displayName),
                     subtitle:
                         Text(member['role'] as String? ?? 'member'),
                     activeColor: colorScheme.primary,

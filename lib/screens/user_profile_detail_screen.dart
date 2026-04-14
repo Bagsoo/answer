@@ -28,6 +28,7 @@ class UserProfileDetailScreen extends StatefulWidget {
 class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
   bool _isFriend = false;
   bool _isBlocked = false;
+  bool _isDeleted = false;
   bool _loading = true;
   String _phoneNumber = '';
 
@@ -55,7 +56,12 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
       setState(() {
         _isFriend = results[0] as bool;
         _isBlocked = results[1] as bool;
-        _phoneNumber = userDoc.data()?['phone_number'] as String? ?? '';
+        _isDeleted =
+            (userDoc.data()?['account_status'] as String? ?? 'active') ==
+                'deleted';
+        _phoneNumber = _isDeleted
+            ? ''
+            : userDoc.data()?['phone_number'] as String? ?? '';
         _loading = false;
       });
     }
@@ -69,6 +75,7 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
 
   // ── DM 보내기 ─────────────────────────────────────────────────────────────
   Future<void> _openDm() async {
+    if (_isDeleted) return;
     final friendService = context.read<FriendService>();
     final myName = context.read<UserProvider>().name;
     final roomId = await friendService.getOrCreateDmRoom(
@@ -82,6 +89,7 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
 
   // ── 친구 추가 ─────────────────────────────────────────────────────────────
   Future<void> _addFriend() async {
+    if (_isDeleted) return;
     final l = AppLocalizations.of(context);
     final friendService = context.read<FriendService>();
     final myName = context.read<UserProvider>().name;
@@ -178,7 +186,7 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
-    final name = widget.displayName;
+    final name = _isDeleted ? l.deletedUser : widget.displayName;
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';    
 
     return Scaffold(
@@ -246,7 +254,9 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
   // ── 다른 유저 프로필 ───────────────────────────────────────────────────────
   Widget _buildOtherProfile(
       ColorScheme colorScheme, AppLocalizations l, String initial) {
-    final hasPhoto = widget.photoUrl != null && widget.photoUrl!.isNotEmpty;
+    final displayName = _isDeleted ? l.deletedUser : widget.displayName;
+    final hasPhoto =
+        !_isDeleted && widget.photoUrl != null && widget.photoUrl!.isNotEmpty;
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -274,7 +284,7 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
           const SizedBox(height: 16),
 
           // ── 이름 ────────────────────────────────────────────────────────
-          Text(widget.displayName,
+          Text(displayName,
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           if (_phoneNumber.isNotEmpty) ...[
             const SizedBox(height: 6),
@@ -330,7 +340,7 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
           const SizedBox(height: 36),
 
           // ── 액션 버튼들 ──────────────────────────────────────────────────
-          if (!_isBlocked) ...[
+          if (!_isDeleted && !_isBlocked) ...[
             // DM 보내기
             _ActionButton(
               icon: Icons.chat_bubble_outline,
@@ -364,14 +374,16 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
           ],
 
           // 차단하기 / 차단 해제
-          _ActionButton(
-            icon: _isBlocked ? Icons.lock_open_outlined : Icons.block_outlined,
-            label: _isBlocked ? l.unblockUser : l.blockUser,
-            color: _isBlocked
-                ? colorScheme.primary
-                : colorScheme.error,
-            onTap: _isBlocked ? _unblockUser : _blockUser,
-          ),
+          if (!_isDeleted)
+            _ActionButton(
+              icon:
+                  _isBlocked ? Icons.lock_open_outlined : Icons.block_outlined,
+              label: _isBlocked ? l.unblockUser : l.blockUser,
+              color: _isBlocked
+                  ? colorScheme.primary
+                  : colorScheme.error,
+              onTap: _isBlocked ? _unblockUser : _blockUser,
+            ),
 
           const SizedBox(height: 32),
         ],

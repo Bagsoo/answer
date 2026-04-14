@@ -57,11 +57,16 @@ class UserCache {
             .get();
 
         for (final doc in snap.docs) {
+          final isDeleted =
+              (doc.data()['account_status'] as String? ?? 'active') == 'deleted';
           final data = {
-            'name': doc.data()['name'] as String? ??
-                doc.data()['display_name'] as String? ??
-                '',
-            'photo': doc.data()['profile_image'] as String? ?? '',
+            'name': isDeleted
+                ? ''
+                : doc.data()['name'] as String? ??
+                    doc.data()['display_name'] as String? ??
+                    '',
+            'photo': isDeleted ? '' : doc.data()['profile_image'] as String? ?? '',
+            'is_deleted': isDeleted,
           };
           _cache[doc.id] = data;
           _inFlight[doc.id]?.complete(data);
@@ -71,7 +76,7 @@ class UserCache {
         // DB에 존재하지 않는 유저 처리 방어 로직
         for (final uid in chunk) {
           if (_inFlight.containsKey(uid)) {
-            final empty = {'name': '', 'photo': ''};
+            final empty = {'name': '', 'photo': '', 'is_deleted': false};
             _cache[uid] = empty;
             _inFlight[uid]?.complete(empty);
             _inFlight.remove(uid);
@@ -81,7 +86,7 @@ class UserCache {
         // 네트워크 장애 시 안전판 (무한 대기 방지)
         for (final uid in chunk) {
           if (_inFlight.containsKey(uid)) {
-            final empty = {'name': '', 'photo': ''};
+            final empty = {'name': '', 'photo': '', 'is_deleted': false};
             _cache[uid] = empty;
             _inFlight[uid]?.complete(empty);
             _inFlight.remove(uid);

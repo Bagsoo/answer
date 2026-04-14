@@ -21,6 +21,7 @@ class GroupProvider extends ChangeNotifier {
   String type = '';
   String category = '';
   String plan = '';
+  String status = 'active';
   String ownerId = '';
   String profileImageUrl = '';
   int memberCount = 0;
@@ -51,6 +52,7 @@ class GroupProvider extends ChangeNotifier {
   bool get isOwner => myRole == 'owner';
   bool get isLiked => likes.contains(currentUserId);
   bool get isPaidPlan => plan == 'plus' || plan == 'pro';
+  bool get isDeleted => status == 'deleted';
 
   bool get canPostSchedule =>
       isOwner || myPerms['can_post_schedule'] == true;
@@ -114,6 +116,7 @@ class GroupProvider extends ChangeNotifier {
     name = d['name'] as String? ?? name;
     type = d['type'] as String? ?? type;
     category = d['category'] as String? ?? category;
+    status = d['status'] as String? ?? status;
     memberCount = (d['member_count'] as num?)?.toInt() ?? memberCount;
     profileImageUrl = d['group_profile_image'] as String? ?? profileImageUrl;
     likes = List<String>.from(d['likes'] as List? ?? likes);
@@ -133,6 +136,7 @@ class GroupProvider extends ChangeNotifier {
       name = d['name'] as String? ?? '';
       type = d['type'] as String? ?? '';
       category = d['category'] as String? ?? '';
+      status = d['status'] as String? ?? 'active';
       plan = d['plan'] as String? ?? 'free';
       ownerId = d['owner_id'] as String? ?? '';
       memberCount = d['member_count'] as int? ?? 0;

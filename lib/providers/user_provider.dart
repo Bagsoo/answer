@@ -83,6 +83,10 @@ class UserProvider extends ChangeNotifier {
     final doc  = await _db.collection('users').doc(_uid).get();
     final data = doc.data();
     if (data == null) return;
+    if ((data['account_status'] as String? ?? 'active') == 'deleted') {
+      await clear();
+      return;
+    }
 
     final name      = data['name']          as String? ?? '';
     final phone     = data['phone_number']  as String? ?? '';
@@ -272,20 +276,13 @@ class UserProvider extends ChangeNotifier {
   Future<void> deleteAccount() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    final snap = await _db
-        .collection('users').doc(uid).collection('joined_groups').get();
-    final batch = _db.batch();
-    for (final doc in snap.docs) {
-      final groupId = doc.id;
-      batch.delete(_db.collection('groups').doc(groupId)
-          .collection('members').doc(uid));
-      batch.update(_db.collection('groups').doc(groupId),
-          {'member_count': FieldValue.increment(-1)});
-      batch.delete(doc.reference);
-    }
-    batch.delete(_db.collection('users').doc(uid));
-    await batch.commit();
-    await FirebaseAuth.instance.currentUser?.delete();
+    await _db.collection('users').doc(uid).set({
+      'account_status': 'deleted',
+      'deleted_at': FieldValue.serverTimestamp(),
+      'deleted_by': uid,
+      'search_hidden': true,
+    }, SetOptions(merge: true));
+    await FirebaseAuth.instance.signOut();
     await clear();
   }
 }

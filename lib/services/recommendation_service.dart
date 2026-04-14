@@ -43,6 +43,7 @@ class RecommendationService {
       if (joinedIds.contains(doc.id)) continue;
 
       final data = doc.data();
+      if ((data['status'] as String? ?? 'active') == 'deleted') continue;
       data['id'] = doc.id;
 
       // 점수 계산

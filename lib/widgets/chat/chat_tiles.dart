@@ -47,6 +47,7 @@ class DmTile extends StatefulWidget {
 class _DmTileState extends State<DmTile> {
   String _otherName = '';
   String _otherPhoto = '';
+  bool _otherDeleted = false;
   bool _loaded = false;
 
   @override
@@ -71,6 +72,7 @@ class _DmTileState extends State<DmTile> {
       setState(() {
         _otherName = data['name'] as String? ?? '';
         _otherPhoto = data['photo'] as String? ?? '';
+        _otherDeleted = data['is_deleted'] == true;
         _loaded = true;
       });
     }
@@ -79,13 +81,17 @@ class _DmTileState extends State<DmTile> {
   @override
   Widget build(BuildContext context) {
     final cs = widget.colorScheme;
+    final l = AppLocalizations.of(context);
     final roomId = widget.room['id'] as String;
     final lastMessage = _localizedLastMessage(
       context,
       widget.room['last_message'] as String? ?? '',
     );
     final unreadCnt = widget.room['unread_cnt'] as int? ?? 0;
-    final hasPhoto = _otherPhoto.isNotEmpty;
+    final hasPhoto = _otherPhoto.isNotEmpty && !_otherDeleted;
+    final displayName = _otherDeleted
+        ? l.deletedUser
+        : (_otherName.isNotEmpty ? _otherName : '...');
 
     return ListTile(
       contentPadding: const EdgeInsets.only(left: 16, right: 16),
@@ -98,7 +104,10 @@ class _DmTileState extends State<DmTile> {
         child: hasPhoto
             ? null
             : _loaded
-                ? (_otherName.isNotEmpty
+                ? (_otherDeleted
+                    ? Icon(Icons.person_off_outlined,
+                        color: cs.onTertiaryContainer, size: 22)
+                    : _otherName.isNotEmpty
                     ? Text(_otherName[0].toUpperCase(),
                         style: TextStyle(
                             fontWeight: FontWeight.bold,
@@ -107,7 +116,7 @@ class _DmTileState extends State<DmTile> {
                 : Icon(Icons.person, color: cs.onTertiaryContainer, size: 22),
       ),
       title: Text(
-        _loaded ? (_otherName.isNotEmpty ? _otherName : '...') : '...',
+        _loaded ? displayName : '...',
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
             fontWeight: unreadCnt > 0 ? FontWeight.bold : FontWeight.normal),
@@ -202,7 +211,8 @@ class _GroupDirectAvatarState extends State<GroupDirectAvatar> {
           final data = entry.value;
           final photoUrl = data['photo'] as String? ?? '';
           final name = data['name'] as String? ?? '';
-          final hasPhoto = photoUrl.isNotEmpty;
+          final isDeleted = data['is_deleted'] == true;
+          final hasPhoto = photoUrl.isNotEmpty && !isDeleted;
 
           final positions = [
             const Offset(0, 0),
@@ -224,14 +234,20 @@ class _GroupDirectAvatarState extends State<GroupDirectAvatar> {
               onBackgroundImageError: hasPhoto ? (_, __) {} : null,
               child: hasPhoto
                   ? null
-                  : Text(
-                      name.isNotEmpty ? name[0].toUpperCase() : '?',
-                      style: TextStyle(
-                        fontSize: radius * 0.65,
-                        fontWeight: FontWeight.bold,
-                        color: cs.onPrimaryContainer,
-                      ),
-                    ),
+                  : isDeleted
+                      ? Icon(
+                          Icons.person_off_outlined,
+                          size: radius * 0.95,
+                          color: cs.onPrimaryContainer,
+                        )
+                      : Text(
+                          name.isNotEmpty ? name[0].toUpperCase() : '?',
+                          style: TextStyle(
+                            fontSize: radius * 0.65,
+                            fontWeight: FontWeight.bold,
+                            color: cs.onPrimaryContainer,
+                          ),
+                        ),
             ),
           );
         }).toList(),

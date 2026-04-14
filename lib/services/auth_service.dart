@@ -49,7 +49,9 @@ class AuthService extends ChangeNotifier {
   Future<void> _checkAndSetRegisteredUser(String uid) async {
     try {
       final doc = await _db.collection('users').doc(uid).get();
-      final registered = doc.exists;
+      final data = doc.data();
+      final registered = doc.exists &&
+          (data?['account_status'] as String? ?? 'active') == 'active';
 
       _isRegisteredUser = registered;
       notifyListeners();
@@ -161,20 +163,31 @@ class AuthService extends ChangeNotifier {
         .firstOrNull;
     final now = FieldValue.serverTimestamp();
     try {
-      await _db.collection('users').doc(user.uid).set({
+      final userRef = _db.collection('users').doc(user.uid);
+      final existingDoc = await userRef.get();
+      final existingData = existingDoc.data();
+      final wasDeleted =
+          (existingData?['account_status'] as String? ?? 'active') == 'deleted';
+
+      await userRef.set({
         'phone_number': user.phoneNumber ?? '',
         'name': name,
         'locale': locale,
         'timezone': timezone,
         'total_unread': 0,
-        'created_at': now,
+        'created_at': existingData?['created_at'] ?? now,
         'last_login': now,
+        'account_status': 'active',
+        'deleted_at': null,
+        'deleted_by': null,
+        'search_hidden': false,
         // Google 로그인이면 Google 프로필 사진 자동 저장
         'profile_image': user.photoURL ?? '',
         'fcm_token': '',
         'providers': providers,
         'google_email': googleData?.email ?? '',
         'apple_email': appleData?.email ?? '',
+        'reactivated_at': wasDeleted ? now : null,
         // 약관 동의 정보 추가
         'agreements': {
           'terms': {
@@ -188,7 +201,7 @@ class AuthService extends ChangeNotifier {
             'version': '1.0',
           },
         },
-      });
+      }, SetOptions(merge: true));
 
       _isRegisteredUser = true;
       _pendingDisplayName = null;

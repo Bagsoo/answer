@@ -712,14 +712,25 @@ class _SettingsTabState extends State<SettingsTab> {
             .doc(uid)
             .collection('joined_groups')
             .doc(groupId));
-        batch.delete(doc.reference);
       }
       final chatSnap = await db
           .collection('chat_rooms')
           .where('ref_group_id', isEqualTo: groupId)
           .get();
-      for (final doc in chatSnap.docs) batch.delete(doc.reference);
-      batch.delete(db.collection('groups').doc(groupId));
+      for (final doc in chatSnap.docs) {
+        batch.update(doc.reference, {
+          'status': 'group_deleted',
+          'deleted_at': FieldValue.serverTimestamp(),
+          'deleted_by': currentUserId,
+          'member_ids': <String>[],
+          'unread_counts': <String, dynamic>{},
+        });
+      }
+      batch.update(db.collection('groups').doc(groupId), {
+        'status': 'deleted',
+        'deleted_at': FieldValue.serverTimestamp(),
+        'deleted_by': currentUserId,
+      });
       await batch.commit();
       if (context.mounted) {
         Navigator.of(context).popUntil((route) => route.isFirst);
