@@ -149,10 +149,10 @@ class _LoginScreenState extends State<LoginScreen> {
               Image.asset(
                 'assets/images/answer_logo.png',
                 height: 160,
-                errorBuilder: (_, __, ___) => const Icon(
+                errorBuilder: (_, __, ___) => Icon(
                     Icons.chat_bubble_rounded,
                     size: 80,
-                    color: Colors.amber),
+                    color: Theme.of(context).colorScheme.primary),
               ),
               const SizedBox(height: 0),
               Text(
@@ -174,9 +174,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       const Icon(Icons.g_mobiledata, size: 24),
                 ),
                 label: l.loginWithGoogle,
-                backgroundColor: Colors.white,
-                textColor: Colors.black87,
-                borderColor: Colors.grey.shade300,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                textColor: Theme.of(context).colorScheme.onSurface,
+                borderColor: Theme.of(context).colorScheme.outlineVariant,
               ),
 
               const SizedBox(height: 12),
@@ -187,9 +187,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 icon: const Icon(Icons.apple,
                     size: 22, color: Colors.white),
                 label: l.loginWithApple,
-                backgroundColor: Colors.black,
+                backgroundColor: Theme.of(context).colorScheme.inverseSurface,
                 textColor: Colors.white,
-                borderColor: Colors.black,
+                borderColor: Theme.of(context).colorScheme.inverseSurface,
                 disabled: true,
               ),
 
@@ -202,7 +202,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Text(l.loginOr,
                       style: TextStyle(
-                          color: Colors.grey.shade500, fontSize: 13)),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 13)),
                 ),
                 const Expanded(child: Divider()),
               ]),
@@ -234,7 +235,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ElevatedButton(
                   onPressed: _isLoading ? null : _sendSms,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.amber,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: _isLoading
@@ -243,10 +243,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           height: 20,
                           child: CircularProgressIndicator(
                               strokeWidth: 2))
-                      : Text(l.loginSendSms,
-                          style: const TextStyle(
-                              color: Colors.black87,
-                              fontWeight: FontWeight.bold)),
+                      : Text(l.loginSendSms),
                 ),
               ] else ...[
                 TextField(
@@ -262,7 +259,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ElevatedButton(
                   onPressed: _isLoading ? null : _verifyOtp,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.amber,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: _isLoading
@@ -271,10 +267,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           height: 20,
                           child: CircularProgressIndicator(
                               strokeWidth: 2))
-                      : Text(l.loginVerify,
-                          style: const TextStyle(
-                              color: Colors.black87,
-                              fontWeight: FontWeight.bold)),
+                      : Text(l.loginVerify),
                 ),
                 TextButton(
                   onPressed: () => setState(() {
@@ -305,7 +298,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.grey.shade500,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   height: 1.5,
                 ),
               ),

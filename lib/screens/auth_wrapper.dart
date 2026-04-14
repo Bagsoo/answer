@@ -21,8 +21,12 @@ class AuthWrapper extends StatelessWidget {
       return const LoginScreen();
     } else if (isRegistered == null) {
       // 2. Checking Firestore... Show loading
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: Colors.amber)),
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
       );
     } else if (isRegistered == false) {
       // 3. Logged in, but document doesn't exist -> Show Registration
