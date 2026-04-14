@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:open_filex/open_filex.dart';
 import '../../models/post_block.dart';
+import '../common/link_text.dart';
 
 /// 블록 뷰어 — PostBlock 리스트를 읽기 전용으로 표시
 class BlockViewer extends StatelessWidget {
@@ -26,8 +27,10 @@ class BlockViewer extends StatelessWidget {
         if (text.isEmpty) return const SizedBox(height: 4);
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Text(text,
-              style: const TextStyle(fontSize: 15, height: 1.6)),
+          child: LinkText(
+            text: text,
+            style: const TextStyle(fontSize: 15, height: 1.6),
+          ),
         );
 
       case BlockType.drawing:

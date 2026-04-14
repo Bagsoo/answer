@@ -12,6 +12,7 @@ import '../../services/memo_service.dart';
 import '../../services/report_service.dart';
 import '../../widgets/post/block_viewer.dart';
 import '../../widgets/chat/chat_room_share_sheet.dart';
+import '../../widgets/common/link_text.dart';
 import '../report_dialog.dart';
 import 'board_post_form_screen.dart';
 
@@ -648,12 +649,14 @@ class _BoardPostDetailScreenState extends State<BoardPostDetailScreen> {
                                             ),
                                           ]),
                                           const SizedBox(height: 2),
-                                          Text(
-                                              comment['content']
-                                                      as String? ??
-                                                  '',
-                                              style: const TextStyle(
-                                                  fontSize: 14)),
+                                          LinkText(
+                                            text: comment['content']
+                                                    as String? ??
+                                                '',
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
