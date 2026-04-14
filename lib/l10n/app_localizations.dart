@@ -62,6 +62,7 @@ class AppLocalizations {
   String get confirm => _s.confirm;
   String get delete => _s.delete;
   String get save => _s.save;
+  String get close => _s.close;
   String get loading => _s.loading;
   String get roleOwner => _s.roleOwner;
   String get roleMember => _s.roleMember;
@@ -748,6 +749,7 @@ abstract class _AppStrings {
   String get confirm;
   String get delete;
   String get save;
+  String get close;
   String get loading;
   String get roleOwner;
   String get roleMember;
@@ -1441,6 +1443,7 @@ class _EnStrings extends _AppStrings {
   @override String get confirm => 'Confirm';
   @override String get delete => 'Delete';
   @override String get save => 'Save';
+  @override String get close => 'Close';
   @override String get loading => 'Loading...';
   @override String get roleOwner => 'owner';
   @override String get roleMember => 'member';
@@ -2109,6 +2112,7 @@ class _KoStrings extends _AppStrings {
   @override String get confirm => '확인';
   @override String get delete => '삭제';
   @override String get save => '저장';
+  @override String get close => '닫기';
   @override String get loading => '로딩 중...';
   @override String get roleOwner => '방장';
   @override String get roleMember => '멤버';
@@ -2779,6 +2783,7 @@ class _JaStrings extends _AppStrings {
   @override String get confirm => '確認';
   @override String get delete => '削除';
   @override String get save => '保存';
+  @override String get close => '閉じる';
   @override String get loading => '読み込み中...';
   @override String get roleOwner => 'オーナー';
   @override String get roleMember => 'メンバー';

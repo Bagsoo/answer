@@ -18,6 +18,7 @@ import '../services/video_service.dart';
 import '../services/file_service.dart';
 import '../services/audio_service.dart';
 import '../services/local_preferences_service.dart';
+import '../utils/user_cache.dart';
 import 'chat_room_more/chat_room_participants_screen.dart';
 import 'chat_room_more/chat_room_invite_screen.dart';
 import 'chat_room_more/notices_screen.dart';
@@ -40,8 +41,9 @@ class ChatRoomScreen extends StatefulWidget {
   final String roomId;
   final String? initialScrollToMessageId;
   final bool isDesktopMode;
+  final VoidCallback? onClosePanel;
   const ChatRoomScreen(
-      {super.key, required this.roomId, this.initialScrollToMessageId, this.isDesktopMode = false});
+      {super.key, required this.roomId, this.initialScrollToMessageId, this.isDesktopMode = false, this.onClosePanel});
 
   @override
   State<ChatRoomScreen> createState() => _ChatRoomScreenState();
@@ -123,14 +125,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final chatProvider = context.read<ChatProvider>();
 
     chatService.currentRoomId = widget.roomId;
-
-    if (widget.isDesktopMode) {
-      _messagesStream = chatProvider.getMessageStream(widget.roomId);
-      _membersStream = chatProvider.getMemberStream(widget.roomId);
-    } else {
-      _messagesStream = chatService.getMessages(widget.roomId);
-      _membersStream = chatService.getRoomMembers(widget.roomId);
-    }
+    chatProvider.selectRoom(widget.roomId);
+    _messagesStream = chatProvider.getMessageStream(widget.roomId);
+    _membersStream = chatProvider.getMemberStream(widget.roomId);
     chatService.updateLastReadTime(widget.roomId);
 
     _loadRoomMeta();
@@ -262,10 +259,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         'last_time': FieldValue.serverTimestamp(),
       });
     }
-  }
-
-  Future<Map<String, dynamic>> _getUserProfile(String uid) async {
-    return await context.read<ChatProvider>().getUserProfile(uid);
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -1459,10 +1452,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         : (meta?.roomName ?? '');
     final otherUserPhoto = meta?.otherUserPhoto ?? '';
     final hasOtherPhoto = otherUserPhoto.isNotEmpty;
+    final isDesktopPanel = widget.isDesktopMode && widget.onClosePanel != null;
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
+        automaticallyImplyLeading: !isDesktopPanel,
         leading: isDm
             ? Padding(
                 padding: const EdgeInsets.all(10),
@@ -1550,7 +1545,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 ],
               ),
         titleSpacing: _isSearching ? 0 : null,
-        actions: _buildAppBarActions(l, colorScheme),
+        actions: [
+          ..._buildAppBarActions(l, colorScheme),
+          if (isDesktopPanel)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: widget.onClosePanel,
+                tooltip: l.close,
+              ),
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -1759,6 +1765,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    final chatProvider = context.read<ChatProvider>();
+    final cachedMembers = chatProvider.getCachedMembers(widget.roomId);
+    final cachedMessages = chatProvider.getCachedMessages(widget.roomId);
+
     return StreamBuilder<Set<String>>(
       stream: context.read<BlockService>().getBlockedUidSet(),
       builder: (context, blockedSnap) {
@@ -1766,15 +1776,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         return StreamBuilder<QuerySnapshot>(
           stream: _membersStream,
           builder: (context, membersSnap) {
-            final members = membersSnap.data?.docs ?? [];
+            final members = membersSnap.data?.docs ?? cachedMembers;
             return StreamBuilder<QuerySnapshot>(
               stream: _messagesStream,
               builder: (context, messagesSnap) {
                 if (messagesSnap.connectionState == ConnectionState.waiting &&
-                    messagesSnap.data == null) {
+                    messagesSnap.data == null &&
+                    cachedMessages.isEmpty) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                final messages = messagesSnap.data?.docs ?? [];
+                final messages = messagesSnap.data?.docs ?? cachedMessages;
 
                 // ── _lastStreamDoc 업데이트 & 새 메시지 배너 감지 ──────────────
                 if (messages.isNotEmpty) {
@@ -1819,6 +1830,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   final isSystem = data['is_system'] as bool? ?? false;
                   return isSystem || !blockedUids.contains(senderId);
                 }).toList();
+
+                final senderIds = allMessages
+                    .map((doc) => (doc.data() as Map<String, dynamic>)['sender_id']
+                        as String? ??
+                        '')
+                    .where((uid) => uid.isNotEmpty)
+                    .toSet();
+                if (senderIds.isNotEmpty) {
+                  UserCache.prefetch(senderIds);
+                }
 
                 if (allMessages.isEmpty && _uploadingMessages.isEmpty) {
                   return Center(
@@ -1892,6 +1913,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final isContinuous = _isContinuous(allMessages, index);
     final senderId = data['sender_id'] as String? ?? '';
     final storedPhoto = data['sender_photo_url'] as String? ?? '';
+    final cachedProfile = senderId.isNotEmpty
+        ? context.read<ChatProvider>().getCachedUserProfile(senderId)
+        : null;
+    final resolvedPhoto =
+        storedPhoto.isNotEmpty ? storedPhoto : cachedProfile?['photo'] as String? ?? '';
 
     _messageKeys.putIfAbsent(msgId, () => GlobalKey());
 
@@ -1925,27 +1951,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             context: context,
             data: data['is_deleted'] == true ? {...data, 'text': l.messageDeleted, 'type': 'text'} : data,
             msgId: msgId,
-            photoUrl: storedPhoto,
+            photoUrl: resolvedPhoto,
             isContinuous: isContinuous,
             members: members,
             colorScheme: colorScheme,
             l: l,
           )
         else
-          FutureBuilder<Map<String, dynamic>>(
-            future: senderId.isNotEmpty
-                ? _getUserProfile(senderId)
-                : Future.value({'photo': '', 'name': ''}),
-            builder: (ctx, snap) => _buildBubble(
-              context: context,
-              data: data['is_deleted'] == true ? {...data, 'text': l.messageDeleted, 'type': 'text'} : data,
-              msgId: msgId,
-              photoUrl: snap.data?['photo'] as String? ?? '',
-              isContinuous: isContinuous,
-              members: members,
-              colorScheme: colorScheme,
-              l: l,
-            ),
+          _buildBubble(
+            context: context,
+            data: data['is_deleted'] == true ? {...data, 'text': l.messageDeleted, 'type': 'text'} : data,
+            msgId: msgId,
+            photoUrl: resolvedPhoto,
+            isContinuous: isContinuous,
+            members: members,
+            colorScheme: colorScheme,
+            l: l,
           ),
       ],
     );

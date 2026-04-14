@@ -81,24 +81,40 @@ class RoomMessageState {
   final Stream<QuerySnapshot> messageStream;
   final Stream<QuerySnapshot> memberStream;
   final List<QueryDocumentSnapshot> cachedMessages;
+  final List<QueryDocumentSnapshot> cachedMembers;
   final bool isLoaded;
+  final StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+      messageSubscription;
+  final StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+      memberSubscription;
 
   const RoomMessageState({
     required this.messageStream,
     required this.memberStream,
     this.cachedMessages = const [],
+    this.cachedMembers = const [],
     this.isLoaded = false,
+    this.messageSubscription,
+    this.memberSubscription,
   });
 
   RoomMessageState copyWith({
     List<QueryDocumentSnapshot>? cachedMessages,
+    List<QueryDocumentSnapshot>? cachedMembers,
     bool? isLoaded,
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+        messageSubscription,
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+        memberSubscription,
   }) =>
       RoomMessageState(
         messageStream: messageStream,
         memberStream: memberStream,
         cachedMessages: cachedMessages ?? this.cachedMessages,
+        cachedMembers: cachedMembers ?? this.cachedMembers,
         isLoaded: isLoaded ?? this.isLoaded,
+        messageSubscription: messageSubscription ?? this.messageSubscription,
+        memberSubscription: memberSubscription ?? this.memberSubscription,
       );
 }
 
@@ -214,22 +230,23 @@ class ChatProvider extends ChangeNotifier {
     final existing = _roomStates.get(roomId);
     if (existing != null) return existing;
 
-    // 새 스트림 생성 (broadcast로 여러 곳에서 listen 가능)
-    final messageStream = _db
+    final messageQuery = _db
         .collection('chat_rooms')
         .doc(roomId)
         .collection('messages')
         .orderBy('created_at', descending: true)
-        .limit(30)
-        .snapshots()
-        .asBroadcastStream();
-
-    final memberStream = _db
+        .limit(30);
+    final memberQuery = _db
         .collection('chat_rooms')
         .doc(roomId)
         .collection('room_members')
-        .snapshots()
-        .asBroadcastStream();
+        .withConverter<Map<String, dynamic>>(
+          fromFirestore: (snapshot, _) => snapshot.data() ?? const {},
+          toFirestore: (value, _) => value,
+        );
+
+    final messageStream = messageQuery.snapshots().asBroadcastStream();
+    final memberStream = memberQuery.snapshots().asBroadcastStream();
 
     final state = RoomMessageState(
       messageStream: messageStream,
@@ -237,6 +254,67 @@ class ChatProvider extends ChangeNotifier {
     );
 
     _roomStates.put(roomId, state);
+
+    final messageSubscription = messageQuery.snapshots().listen(
+      (snapshot) {
+        final current = _roomStates.get(roomId);
+        if (current == null) return;
+
+        final senderIds = snapshot.docs
+            .map((doc) => doc.data()['sender_id'] as String? ?? '')
+            .where((uid) => uid.isNotEmpty)
+            .toSet();
+        if (senderIds.isNotEmpty) {
+          UserCache.prefetch(senderIds);
+        }
+
+        _roomStates.put(
+          roomId,
+          current.copyWith(
+            cachedMessages: snapshot.docs,
+            isLoaded: true,
+            messageSubscription: current.messageSubscription,
+            memberSubscription: current.memberSubscription,
+          ),
+        );
+      },
+      onError: (e) {
+        debugPrint('ChatProvider message stream error ($roomId): $e');
+      },
+    );
+
+    final memberSubscription = memberQuery.snapshots().listen(
+      (snapshot) {
+        final current = _roomStates.get(roomId);
+        if (current == null) return;
+
+        final memberIds = snapshot.docs.map((doc) => doc.id).toSet();
+        if (memberIds.isNotEmpty) {
+          UserCache.prefetch(memberIds);
+        }
+
+        _roomStates.put(
+          roomId,
+          current.copyWith(
+            cachedMembers: snapshot.docs,
+            isLoaded: true,
+            messageSubscription: current.messageSubscription,
+            memberSubscription: current.memberSubscription,
+          ),
+        );
+      },
+      onError: (e) {
+        debugPrint('ChatProvider member stream error ($roomId): $e');
+      },
+    );
+
+    _roomStates.put(
+      roomId,
+      state.copyWith(
+        messageSubscription: messageSubscription,
+        memberSubscription: memberSubscription,
+      ),
+    );
     return state;
   }
 
@@ -245,6 +323,16 @@ class ChatProvider extends ChangeNotifier {
 
   Stream<QuerySnapshot> getMemberStream(String roomId) =>
       ensureRoomStream(roomId).memberStream;
+
+  List<QueryDocumentSnapshot> getCachedMessages(String roomId) =>
+      _roomStates.get(roomId)?.cachedMessages ?? const [];
+
+  List<QueryDocumentSnapshot> getCachedMembers(String roomId) =>
+      _roomStates.get(roomId)?.cachedMembers ?? const [];
+
+  List<Map<String, dynamic>> getRoomsForGroup(String groupId) => _chatRooms
+      .where((room) => room['ref_group_id'] == groupId)
+      .toList(growable: false);
 
   // ── 룸 메타 ─────────────────────────────────────────────────────────────────
   RoomMeta? getCachedMeta(String roomId) => _metaCache.get(roomId);
@@ -336,6 +424,7 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void invalidateRoom(String roomId) {
+    _disposeRoomState(roomId);
     _metaCache.remove(roomId);
     _roomStates.remove(roomId);
     _visitedRooms.remove(roomId);
@@ -376,6 +465,9 @@ class ChatProvider extends ChangeNotifier {
 
   void clearAll() {
     _roomsSubscription?.cancel();
+    for (final roomId in _roomStates.keys.toList()) {
+      _disposeRoomState(roomId);
+    }
     _metaCache.clear();
     _roomStates.clear();
     _visitedRooms.clear();
@@ -388,6 +480,15 @@ class ChatProvider extends ChangeNotifier {
   @override
   void dispose() {
     _roomsSubscription?.cancel();
+    for (final roomId in _roomStates.keys.toList()) {
+      _disposeRoomState(roomId);
+    }
     super.dispose();
+  }
+
+  void _disposeRoomState(String roomId) {
+    final state = _roomStates.get(roomId);
+    state?.messageSubscription?.cancel();
+    state?.memberSubscription?.cancel();
   }
 }

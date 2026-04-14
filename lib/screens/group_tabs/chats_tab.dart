@@ -4,15 +4,24 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../../providers/chat_provider.dart';
 import '../../providers/group_provider.dart';
-import '../../services/chat_service.dart';
 import '../../widgets/chat/chat_tiles.dart';
 import '../chat_room_screen.dart';
 
 class ChatsTab extends StatefulWidget {
   final String groupName;
+  final bool isDesktopMode;
+  final String? selectedRoomId;
+  final ValueChanged<String>? onRoomSelected;
 
-  const ChatsTab({super.key, required this.groupName});
+  const ChatsTab({
+    super.key, 
+    required this.groupName,
+    this.isDesktopMode = false,
+    this.selectedRoomId,
+    this.onRoomSelected,
+  });
 
   @override
   State<ChatsTab> createState() => _ChatsTabState();
@@ -22,6 +31,7 @@ class _ChatsTabState extends State<ChatsTab> {
   final TextEditingController _filterController = TextEditingController();
   bool _isFiltering = false;
   String _filterQuery = '';
+  final Set<String> _warmedRoomIds = {};
 
   String get currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
 
@@ -51,8 +61,18 @@ class _ChatsTabState extends State<ChatsTab> {
 
     // GroupProvider에서 groupId, 권한 읽기
     final gp = context.watch<GroupProvider>();
+    final chatProvider = context.watch<ChatProvider>();
     final groupId = gp.groupId;
     final canCreateSubChat = gp.canCreateSubChat;
+    final allChats = chatProvider.getRoomsForGroup(groupId);
+    final chats = allChats
+        .where((room) => _matchesRoom(room, _filterQuery))
+        .toList(growable: false);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _warmUpRooms(chatProvider, allChats);
+    });
 
     return Scaffold(
       // FutureBuilder로 권한 확인하던 부분 → GroupProvider로 대체
@@ -64,47 +84,25 @@ class _ChatsTabState extends State<ChatsTab> {
               child: const Icon(Icons.add),
             )
           : null,
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: context.read<ChatService>().getChatRooms(
-              refGroupId: groupId,
-            ),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            debugPrint('ChatsTab Stream Error: \${snapshot.error}');
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text('에러 발생: \${snapshot.error}', textAlign: TextAlign.center),
-              ),
-            );
-          }
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final allChats = snapshot.data ?? [];
-          final chats = allChats
-              .where((room) => _matchesRoom(room, _filterQuery))
-              .toList();
-          if (allChats.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.chat_bubble_outline,
-                      size: 64,
-                      color: colorScheme.onSurface.withOpacity(0.2)),
-                  const SizedBox(height: 16),
-                  Text(l.noChats,
-                      style: TextStyle(
-                          color: colorScheme.onSurface.withOpacity(0.4))),
-                ],
-              ),
-            );
-          }
-
-          return Column(
-            children: [
+      body: !chatProvider.isRoomsLoaded && allChats.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : allChats.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.chat_bubble_outline,
+                          size: 64,
+                          color: colorScheme.onSurface.withOpacity(0.2)),
+                      const SizedBox(height: 16),
+                      Text(l.noChats,
+                          style: TextStyle(
+                              color: colorScheme.onSurface.withOpacity(0.4))),
+                    ],
+                  ),
+                )
+              : Column(
+                  children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
                 child: Row(
@@ -218,6 +216,8 @@ class _ChatsTabState extends State<ChatsTab> {
                           }
 
                           return ListTile(
+                            selected: widget.isDesktopMode && widget.selectedRoomId == roomId,
+                            selectedTileColor: colorScheme.primaryContainer.withOpacity(0.5),
                             leading: avatar,
                             title: Text(name,
                                 style: TextStyle(
@@ -232,21 +232,49 @@ class _ChatsTabState extends State<ChatsTab> {
                             ),
                             trailing: Icon(Icons.chevron_right,
                                 color: colorScheme.onSurface.withOpacity(0.4)),
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => ChatRoomScreen(roomId: roomId),
-                              ),
-                            ),
+                            onTap: () {
+                              final roomIds = allChats
+                                  .map((room) => room['id'] as String)
+                                  .toList(growable: false);
+                              chatProvider.selectRoom(roomId);
+                              chatProvider.preloadAdjacentRooms(roomIds, roomId);
+                              if (widget.isDesktopMode && widget.onRoomSelected != null) {
+                                widget.onRoomSelected!(roomId);
+                              } else {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => ChatRoomScreen(roomId: roomId),
+                                  ),
+                                );
+                              }
+                            },
                           );
                         },
                         separatorBuilder: (_, __) => const Divider(height: 1),
                       ),
               ),
-            ],
-          );
-        },
-      ),
+                  ],
+                ),
     );
+  }
+
+  void _warmUpRooms(
+    ChatProvider chatProvider,
+    List<Map<String, dynamic>> rooms,
+  ) {
+    if (rooms.isEmpty) return;
+
+    final warmTargets = <String>{
+      if (widget.selectedRoomId != null) widget.selectedRoomId!,
+      ...rooms.take(3).map((room) => room['id'] as String),
+    };
+
+    for (final roomId in warmTargets) {
+      if (_warmedRoomIds.contains(roomId)) continue;
+      _warmedRoomIds.add(roomId);
+      chatProvider.ensureRoomStream(roomId);
+      chatProvider.loadRoomMeta(roomId);
+    }
   }
 
   void _showCreateSubChatSheet(BuildContext context, AppLocalizations l,

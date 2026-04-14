@@ -11,6 +11,7 @@ import 'group_tabs/schedule_detail_screen.dart';
 import 'group_tabs/schedules_tab.dart';
 import 'group_tabs/settings_tab.dart';
 import 'user_profile_detail_screen.dart';
+import 'chat_room_screen.dart';
 
 class GroupDetailScreen extends StatelessWidget {
   final String groupId;
@@ -47,11 +48,14 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
   late final TabController _tabController;
   Map<String, dynamic>? _selectedMember;
   Map<String, dynamic>? _selectedSchedule;
+  String? _selectedRoomId;
 
   bool get _showMemberPanel =>
       _tabController.index == 0 && _selectedMember != null;
   bool get _showSchedulePanel =>
       _tabController.index == 2 && _selectedSchedule != null;
+  bool get _showChatPanel =>
+      _tabController.index == 3 && _selectedRoomId != null;
 
   @override
   void initState() {
@@ -155,6 +159,16 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
         onClose: () => setState(() => _selectedSchedule = null),
       );
     }
+    if (_showChatPanel) {
+      return ClipRect(
+        child: ChatRoomScreen(
+          key: ValueKey('chat_\${_selectedRoomId}'),
+          roomId: _selectedRoomId!,
+          isDesktopMode: true,
+          onClosePanel: () => setState(() => _selectedRoomId = null),
+        ),
+      );
+    }
     return null;
   }
 
@@ -193,7 +207,14 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
             ? (schedule) => setState(() => _selectedSchedule = schedule)
             : null,
       ),
-      ChatsTab(groupName: widget.groupName),
+      ChatsTab(
+        groupName: widget.groupName,
+        isDesktopMode: isDesktopMode,
+        selectedRoomId: _selectedRoomId,
+        onRoomSelected: isDesktopMode
+            ? (roomId) => setState(() => _selectedRoomId = roomId)
+            : null,
+      ),
       const SettingsTab(),
     ];
 
@@ -354,7 +375,7 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
                       ? const SizedBox.shrink()
                       : Container(
                           key: ValueKey(
-                            '${_tabController.index}-${_selectedMember?['uid'] ?? _selectedSchedule?['id'] ?? 'panel'}',
+                            '${_tabController.index}-${_selectedMember?['uid'] ?? _selectedSchedule?['id'] ?? _selectedRoomId ?? 'panel'}',
                           ),
                           width: 400,
                           decoration: BoxDecoration(
