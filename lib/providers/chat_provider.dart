@@ -31,8 +31,16 @@ class _LruCache<K, V> {
   }
 
   bool containsKey(K key) => _map.containsKey(key);
-  void remove(K key) { _map.remove(key); _order.remove(key); }
-  void clear() { _map.clear(); _order.clear(); }
+  void remove(K key) {
+    _map.remove(key);
+    _order.remove(key);
+  }
+
+  void clear() {
+    _map.clear();
+    _order.clear();
+  }
+
   Iterable<K> get keys => _map.keys;
 }
 
@@ -48,6 +56,7 @@ class RoomMeta {
   final String otherUserUid;
   final String otherUserName;
   final String otherUserPhoto;
+  final bool otherUserDeleted;
 
   const RoomMeta({
     required this.roomId,
@@ -60,20 +69,22 @@ class RoomMeta {
     this.otherUserUid = '',
     this.otherUserName = '',
     this.otherUserPhoto = '',
+    this.otherUserDeleted = false,
   });
 
   RoomMeta copyWith({Map<String, dynamic>? pinnedMessage}) => RoomMeta(
-        roomId: roomId,
-        refGroupId: refGroupId,
-        roomType: roomType,
-        myRole: myRole,
-        roomName: roomName,
-        groupName: groupName,
-        pinnedMessage: pinnedMessage ?? this.pinnedMessage,
-        otherUserUid: otherUserUid,
-        otherUserName: otherUserName,
-        otherUserPhoto: otherUserPhoto,
-      );
+    roomId: roomId,
+    refGroupId: refGroupId,
+    roomType: roomType,
+    myRole: myRole,
+    roomName: roomName,
+    groupName: groupName,
+    pinnedMessage: pinnedMessage ?? this.pinnedMessage,
+    otherUserUid: otherUserUid,
+    otherUserName: otherUserName,
+    otherUserPhoto: otherUserPhoto,
+    otherUserDeleted: otherUserDeleted,
+  );
 }
 
 // ── 방별 메시지 상태 ───────────────────────────────────────────────────────────
@@ -84,9 +95,9 @@ class RoomMessageState {
   final List<QueryDocumentSnapshot> cachedMembers;
   final bool isLoaded;
   final StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
-      messageSubscription;
+  messageSubscription;
   final StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
-      memberSubscription;
+  memberSubscription;
 
   const RoomMessageState({
     required this.messageStream,
@@ -103,19 +114,17 @@ class RoomMessageState {
     List<QueryDocumentSnapshot>? cachedMembers,
     bool? isLoaded,
     StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
-        messageSubscription,
-    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
-        memberSubscription,
-  }) =>
-      RoomMessageState(
-        messageStream: messageStream,
-        memberStream: memberStream,
-        cachedMessages: cachedMessages ?? this.cachedMessages,
-        cachedMembers: cachedMembers ?? this.cachedMembers,
-        isLoaded: isLoaded ?? this.isLoaded,
-        messageSubscription: messageSubscription ?? this.messageSubscription,
-        memberSubscription: memberSubscription ?? this.memberSubscription,
-      );
+    messageSubscription,
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? memberSubscription,
+  }) => RoomMessageState(
+    messageStream: messageStream,
+    memberStream: memberStream,
+    cachedMessages: cachedMessages ?? this.cachedMessages,
+    cachedMembers: cachedMembers ?? this.cachedMembers,
+    isLoaded: isLoaded ?? this.isLoaded,
+    messageSubscription: messageSubscription ?? this.messageSubscription,
+    memberSubscription: memberSubscription ?? this.memberSubscription,
+  );
 }
 
 // ── ChatProvider ──────────────────────────────────────────────────────────────
@@ -141,8 +150,7 @@ class ChatProvider extends ChangeNotifier {
   final List<String> _visitedRooms = [];
   String? _activeRoomId;
 
-  String get _currentUserId =>
-      FirebaseAuth.instance.currentUser?.uid ?? '';
+  String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   List<String> get visitedRooms => List.unmodifiable(_visitedRooms);
   String? get activeRoomId => _activeRoomId;
@@ -169,40 +177,44 @@ class ChatProvider extends ChangeNotifier {
         .collection('chat_rooms')
         .where('member_ids', arrayContains: _currentUserId)
         .snapshots()
-        .listen((snapshot) {
-      
-      final Set<String> allMemberUids = {};
+        .listen(
+          (snapshot) {
+            final Set<String> allMemberUids = {};
 
-      final rooms = snapshot.docs.map((doc) {
-        final data = {...doc.data(), 'id': doc.id};
-        final unreadCounts =
-            data['unread_counts'] as Map<String, dynamic>? ?? {};
-        data['unread_cnt'] = unreadCounts[_currentUserId] as int? ?? 0;
-        
-        final memberIds = List<String>.from(data['member_ids'] as List? ?? []);
-        allMemberUids.addAll(memberIds);
+            final rooms = snapshot.docs.map((doc) {
+              final data = {...doc.data(), 'id': doc.id};
+              final unreadCounts =
+                  data['unread_counts'] as Map<String, dynamic>? ?? {};
+              data['unread_cnt'] = unreadCounts[_currentUserId] as int? ?? 0;
 
-        return data;
-      }).toList();
+              final memberIds = List<String>.from(
+                data['member_ids'] as List? ?? [],
+              );
+              allMemberUids.addAll(memberIds);
 
-      // 화면에 그리기 전 필요한 유저 프로필 일괄 prefetch
-      UserCache.prefetch(allMemberUids);
+              return data;
+            }).toList();
 
-      rooms.sort((a, b) {
-        final aTime = a['last_time'] as Timestamp?;
-        final bTime = b['last_time'] as Timestamp?;
-        if (aTime == null && bTime == null) return 0;
-        if (aTime == null) return 1;
-        if (bTime == null) return -1;
-        return bTime.compareTo(aTime);
-      });
+            // 화면에 그리기 전 필요한 유저 프로필 일괄 prefetch
+            UserCache.prefetch(allMemberUids);
 
-      _chatRooms = rooms;
-      _isRoomsLoaded = true;
-      notifyListeners();
-    }, onError: (e) {
-      debugPrint('ChatProvider _subscribeToRooms error: $e');
-    });
+            rooms.sort((a, b) {
+              final aTime = a['last_time'] as Timestamp?;
+              final bTime = b['last_time'] as Timestamp?;
+              if (aTime == null && bTime == null) return 0;
+              if (aTime == null) return 1;
+              if (bTime == null) return -1;
+              return bTime.compareTo(aTime);
+            });
+
+            _chatRooms = rooms;
+            _isRoomsLoaded = true;
+            notifyListeners();
+          },
+          onError: (e) {
+            debugPrint('ChatProvider _subscribeToRooms error: $e');
+          },
+        );
   }
 
   // ── 방 선택 (PC 모드) ────────────────────────────────────────────────────────
@@ -372,12 +384,14 @@ class ChatProvider extends ChangeNotifier {
       final roomDoc = results[0] as DocumentSnapshot<Map<String, dynamic>>;
       final memberDoc = results[1] as DocumentSnapshot<Map<String, dynamic>>;
       final roomType = roomDoc.data()?['type'] as String?;
-      final memberIds =
-          List<String>.from(roomDoc.data()?['member_ids'] as List? ?? []);
+      final memberIds = List<String>.from(
+        roomDoc.data()?['member_ids'] as List? ?? [],
+      );
 
       String otherUserUid = '';
       String otherUserName = '';
       String otherUserPhoto = '';
+      bool otherUserDeleted = false;
 
       if (roomType == 'direct') {
         otherUserUid = memberIds.firstWhere(
@@ -388,6 +402,7 @@ class ChatProvider extends ChangeNotifier {
           final profile = await getUserProfile(otherUserUid);
           otherUserName = profile['name'] as String? ?? '';
           otherUserPhoto = profile['photo'] as String? ?? '';
+          otherUserDeleted = profile['is_deleted'] == true;
         }
       }
 
@@ -403,6 +418,7 @@ class ChatProvider extends ChangeNotifier {
         otherUserUid: otherUserUid,
         otherUserName: otherUserName,
         otherUserPhoto: otherUserPhoto,
+        otherUserDeleted: otherUserDeleted,
       );
 
       _metaCache.put(roomId, meta);

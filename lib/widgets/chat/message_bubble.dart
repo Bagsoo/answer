@@ -12,6 +12,7 @@ import 'package:video_player/video_player.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/memo_service.dart';
 import '../../utils/shared_content_navigator.dart';
+import '../../utils/user_display.dart';
 import '../post/block_viewer.dart';
 import '../../providers/user_provider.dart';
 import '../../screens/user_profile_detail_screen.dart';
@@ -76,9 +77,9 @@ class _MessageBubbleState extends State<MessageBubble>
     );
     if (widget.isHighlighted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _highlightController
-            .forward()
-            .then((_) => _highlightController.reverse());
+        _highlightController.forward().then(
+          (_) => _highlightController.reverse(),
+        );
       });
     }
 
@@ -94,9 +95,9 @@ class _MessageBubbleState extends State<MessageBubble>
   void didUpdateWidget(MessageBubble oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isHighlighted && !oldWidget.isHighlighted) {
-      _highlightController
-          .forward()
-          .then((_) => _highlightController.reverse());
+      _highlightController.forward().then(
+        (_) => _highlightController.reverse(),
+      );
     }
   }
 
@@ -111,26 +112,46 @@ class _MessageBubbleState extends State<MessageBubble>
     // ML Kit 언어 감지는 BCP-47 코드 반환 (예: 'ko', 'en', 'ja', 'zh')
     // TranslateLanguage enum과 매핑
     switch (bcp47.split('-').first.toLowerCase()) {
-      case 'ko': return TranslateLanguage.korean;
-      case 'en': return TranslateLanguage.english;
-      case 'ja': return TranslateLanguage.japanese;
-      case 'zh': return TranslateLanguage.chinese;
-      case 'es': return TranslateLanguage.spanish;
-      case 'fr': return TranslateLanguage.french;
-      case 'de': return TranslateLanguage.german;
-      case 'pt': return TranslateLanguage.portuguese;
-      case 'ru': return TranslateLanguage.russian;
-      case 'ar': return TranslateLanguage.arabic;
-      case 'hi': return TranslateLanguage.hindi;
-      case 'id': return TranslateLanguage.indonesian;
-      case 'th': return TranslateLanguage.thai;
-      case 'vi': return TranslateLanguage.vietnamese;
-      case 'tr': return TranslateLanguage.turkish;
-      case 'it': return TranslateLanguage.italian;
-      case 'nl': return TranslateLanguage.dutch;
-      case 'pl': return TranslateLanguage.polish;
-      case 'sv': return TranslateLanguage.swedish;
-      default: return null;
+      case 'ko':
+        return TranslateLanguage.korean;
+      case 'en':
+        return TranslateLanguage.english;
+      case 'ja':
+        return TranslateLanguage.japanese;
+      case 'zh':
+        return TranslateLanguage.chinese;
+      case 'es':
+        return TranslateLanguage.spanish;
+      case 'fr':
+        return TranslateLanguage.french;
+      case 'de':
+        return TranslateLanguage.german;
+      case 'pt':
+        return TranslateLanguage.portuguese;
+      case 'ru':
+        return TranslateLanguage.russian;
+      case 'ar':
+        return TranslateLanguage.arabic;
+      case 'hi':
+        return TranslateLanguage.hindi;
+      case 'id':
+        return TranslateLanguage.indonesian;
+      case 'th':
+        return TranslateLanguage.thai;
+      case 'vi':
+        return TranslateLanguage.vietnamese;
+      case 'tr':
+        return TranslateLanguage.turkish;
+      case 'it':
+        return TranslateLanguage.italian;
+      case 'nl':
+        return TranslateLanguage.dutch;
+      case 'pl':
+        return TranslateLanguage.polish;
+      case 'sv':
+        return TranslateLanguage.swedish;
+      default:
+        return null;
     }
   }
 
@@ -152,8 +173,12 @@ class _MessageBubbleState extends State<MessageBubble>
     final myLocale = context.read<UserProvider>().locale;
 
     try {
-      final languageIdentifier = LanguageIdentifier(confidenceThreshold: _minConfidence);
-      final result = await languageIdentifier.identifyLanguage(textForDetection);
+      final languageIdentifier = LanguageIdentifier(
+        confidenceThreshold: _minConfidence,
+      );
+      final result = await languageIdentifier.identifyLanguage(
+        textForDetection,
+      );
       languageIdentifier.close();
 
       // 'und' = 감지 불가 (undetermined)
@@ -192,8 +217,12 @@ class _MessageBubbleState extends State<MessageBubble>
     }
 
     try {
-      final languageIdentifier = LanguageIdentifier(confidenceThreshold: _minConfidence);
-      final sourceLangCode = await languageIdentifier.identifyLanguage(textForTranslation);
+      final languageIdentifier = LanguageIdentifier(
+        confidenceThreshold: _minConfidence,
+      );
+      final sourceLangCode = await languageIdentifier.identifyLanguage(
+        textForTranslation,
+      );
       languageIdentifier.close();
 
       final sourceLang = _toTranslateLanguage(sourceLangCode);
@@ -208,7 +237,7 @@ class _MessageBubbleState extends State<MessageBubble>
       );
 
       // 언어 모델 다운로드 확인 및 다운로드
-      final modelManager = OnDeviceTranslatorModelManager();      
+      final modelManager = OnDeviceTranslatorModelManager();
       final String sourceCode = sourceLang.bcpCode;
       final String targetCode = targetLang.bcpCode;
 
@@ -290,21 +319,20 @@ class _MessageBubbleState extends State<MessageBubble>
         break;
       }
       if (idx > start) spans.add(TextSpan(text: text.substring(start, idx)));
-      spans.add(TextSpan(
-        text: text.substring(idx, idx + query.length),
-        style: TextStyle(
-          backgroundColor: colorScheme.primary.withOpacity(0.35),
-          fontWeight: FontWeight.bold,
-          color: colorScheme.onSurface,
+      spans.add(
+        TextSpan(
+          text: text.substring(idx, idx + query.length),
+          style: TextStyle(
+            backgroundColor: colorScheme.primary.withOpacity(0.35),
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
+          ),
         ),
-      ));
+      );
       start = idx + query.length;
     }
     return RichText(
-      text: TextSpan(
-        style: textStyle,
-        children: spans,
-      ),
+      text: TextSpan(style: textStyle, children: spans),
     );
   }
 
@@ -462,10 +490,12 @@ class _MessageBubbleState extends State<MessageBubble>
               const SizedBox(width: 3),
               Text(
                 _translating
-                    ? l.translating        // '번역 중...'
+                    ? l
+                          .translating // '번역 중...'
                     : _translatedText != null
-                        ? l.hideTranslation // '번역 숨기기'
-                        : l.translate,     // '번역'
+                    ? l
+                          .hideTranslation // '번역 숨기기'
+                    : l.translate, // '번역'
                 style: TextStyle(
                   fontSize: 11,
                   color: colorScheme.primary.withOpacity(0.6),
@@ -481,6 +511,7 @@ class _MessageBubbleState extends State<MessageBubble>
   // ── 아바타 ────────────────────────────────────────────────────────────────
   Widget _buildAvatar(String senderName, ColorScheme colorScheme) {
     final photoUrl = widget.data['sender_photo_url'] as String?;
+    final isDeleted = widget.data['sender_is_deleted'] == true;
     final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
 
     return GestureDetector(
@@ -492,6 +523,12 @@ class _MessageBubbleState extends State<MessageBubble>
         onBackgroundImageError: hasPhoto ? (_, __) {} : null,
         child: hasPhoto
             ? null
+            : isDeleted
+            ? Icon(
+                Icons.person_off_outlined,
+                size: 18,
+                color: colorScheme.onSecondaryContainer,
+              )
             : Text(
                 senderName.isNotEmpty ? senderName[0].toUpperCase() : '?',
                 style: TextStyle(
@@ -506,21 +543,23 @@ class _MessageBubbleState extends State<MessageBubble>
 
   // ── 이미지 풀스크린 뷰어 ──────────────────────────────────────────────────
   void _showImageViewer(List<String> urls, int initialIndex) {
-    Navigator.of(context).push(MaterialPageRoute(
-      fullscreenDialog: true,
-      builder: (_) => _ImageViewerScreen(
-        urls: urls,
-        initialIndex: initialIndex,
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) =>
+            _ImageViewerScreen(urls: urls, initialIndex: initialIndex),
       ),
-    ));
+    );
   }
 
   // ── 동영상 플레이어 ────────────────────────────────────────────────────────
   void _showVideoPlayer(String videoUrl) {
-    Navigator.of(context).push(MaterialPageRoute(
-      fullscreenDialog: true,
-      builder: (_) => _VideoPlayerScreen(videoUrl: videoUrl),
-    ));
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _VideoPlayerScreen(videoUrl: videoUrl),
+      ),
+    );
   }
 
   Future<void> _openFileUrl(String url) async {
@@ -532,7 +571,8 @@ class _MessageBubbleState extends State<MessageBubble>
   IconData _fileIcon(String mime) {
     if (mime.contains('pdf')) return Icons.picture_as_pdf;
     if (mime.contains('word') || mime.contains('hwp')) return Icons.description;
-    if (mime.contains('sheet') || mime.contains('excel')) return Icons.table_chart;
+    if (mime.contains('sheet') || mime.contains('excel'))
+      return Icons.table_chart;
     if (mime.contains('presentation') || mime.contains('powerpoint')) {
       return Icons.slideshow;
     }
@@ -736,6 +776,7 @@ class _MessageBubbleState extends State<MessageBubble>
     required String sharedUserId,
     required String sharedUserName,
     required String sharedUserPhotoUrl,
+    required UserDisplayData sharedUser,
     required Widget? replyBox,
     required ColorScheme colorScheme,
   }) {
@@ -778,8 +819,7 @@ class _MessageBubbleState extends State<MessageBubble>
               child: GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 3,
                   crossAxisSpacing: 2,
                   mainAxisSpacing: 2,
@@ -826,16 +866,22 @@ class _MessageBubbleState extends State<MessageBubble>
                             width: 200,
                             height: 150,
                             color: Colors.black54,
-                            child: const Icon(Icons.videocam,
-                                color: Colors.white, size: 40),
+                            child: const Icon(
+                              Icons.videocam,
+                              color: Colors.white,
+                              size: 40,
+                            ),
                           ),
                         )
                       : Container(
                           width: 200,
                           height: 150,
                           color: Colors.black54,
-                          child: const Icon(Icons.videocam,
-                              color: Colors.white, size: 40),
+                          child: const Icon(
+                            Icons.videocam,
+                            color: Colors.white,
+                            size: 40,
+                          ),
                         ),
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -843,8 +889,11 @@ class _MessageBubbleState extends State<MessageBubble>
                       color: Colors.black54,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.play_arrow,
-                        color: Colors.white, size: 32),
+                    child: const Icon(
+                      Icons.play_arrow,
+                      color: Colors.white,
+                      size: 32,
+                    ),
                   ),
                 ],
               ),
@@ -934,7 +983,11 @@ class _MessageBubbleState extends State<MessageBubble>
     }
 
     if (type == 'contact') {
-      final hasPhoto = sharedUserPhotoUrl.isNotEmpty;
+      final resolvedSharedName = sharedUser.displayName(l, fallback: l.unknown);
+      final resolvedSharedPhoto = sharedUser.isDeleted
+          ? ''
+          : sharedUser.photoUrl;
+      final hasPhoto = resolvedSharedPhoto.isNotEmpty;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -944,16 +997,14 @@ class _MessageBubbleState extends State<MessageBubble>
             onTap: sharedUserId.isEmpty
                 ? null
                 : () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => UserProfileDetailScreen(
-                          uid: sharedUserId,
-                          displayName: sharedUserName.isNotEmpty
-                              ? sharedUserName
-                              : l.unknown,
-                          photoUrl: sharedUserPhotoUrl,
-                        ),
+                    MaterialPageRoute(
+                      builder: (_) => UserProfileDetailScreen(
+                        uid: sharedUserId,
+                        displayName: resolvedSharedName,
+                        photoUrl: resolvedSharedPhoto,
                       ),
                     ),
+                  ),
             child: Container(
               constraints: const BoxConstraints(maxWidth: 240),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -967,14 +1018,18 @@ class _MessageBubbleState extends State<MessageBubble>
                   CircleAvatar(
                     radius: 22,
                     backgroundColor: colorScheme.primaryContainer,
-                    backgroundImage:
-                        hasPhoto ? NetworkImage(sharedUserPhotoUrl) : null,
+                    backgroundImage: hasPhoto
+                        ? NetworkImage(resolvedSharedPhoto)
+                        : null,
                     child: hasPhoto
                         ? null
+                        : sharedUser.isDeleted
+                        ? Icon(
+                            Icons.person_off_outlined,
+                            color: colorScheme.onPrimaryContainer,
+                          )
                         : Text(
-                            sharedUserName.isNotEmpty
-                                ? sharedUserName[0].toUpperCase()
-                                : '?',
+                            sharedUser.initial(l, fallback: '?'),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: colorScheme.onPrimaryContainer,
@@ -988,9 +1043,7 @@ class _MessageBubbleState extends State<MessageBubble>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          sharedUserName.isNotEmpty
-                              ? sharedUserName
-                              : l.unknown,
+                          resolvedSharedName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -1042,7 +1095,8 @@ class _MessageBubbleState extends State<MessageBubble>
     }
 
     if (type == 'shared_schedule') {
-      final start = (widget.data['schedule_start_time'] as Timestamp?)?.toDate();
+      final start = (widget.data['schedule_start_time'] as Timestamp?)
+          ?.toDate();
       final end = (widget.data['schedule_end_time'] as Timestamp?)?.toDate();
       final locationName =
           widget.data['schedule_location_name'] as String? ?? '';
@@ -1091,7 +1145,8 @@ class _MessageBubbleState extends State<MessageBubble>
             icon: Icons.note_outlined,
             accentColor: Colors.deepOrange,
             label: label,
-            title: (widget.data['memo_title'] as String? ?? '').trim().isNotEmpty
+            title:
+                (widget.data['memo_title'] as String? ?? '').trim().isNotEmpty
                 ? widget.data['memo_title'] as String? ?? ''
                 : '공유된 메모',
             body: widget.data['memo_content'] as String? ?? '',
@@ -1126,8 +1181,7 @@ class _MessageBubbleState extends State<MessageBubble>
           ),
         ],
         // 번역 버튼 + 결과 (내 메시지 아닐 때 + 텍스트 타입 + 언어 감지 완료 시)
-        if (_showTranslateButton)
-          _buildTranslationSection(text, colorScheme),
+        if (_showTranslateButton) _buildTranslationSection(text, colorScheme),
       ],
     );
   }
@@ -1153,8 +1207,9 @@ class _MessageBubbleState extends State<MessageBubble>
       );
     }
 
-    final imageUrls =
-        List<String>.from(widget.data['image_urls'] as List? ?? []);
+    final imageUrls = List<String>.from(
+      widget.data['image_urls'] as List? ?? [],
+    );
     final videoUrl = widget.data['video_url'] as String? ?? '';
     final thumbnailUrl = widget.data['thumbnail_url'] as String? ?? '';
     final fileUrl = widget.data['file_url'] as String? ?? '';
@@ -1165,6 +1220,17 @@ class _MessageBubbleState extends State<MessageBubble>
     final sharedUserName = widget.data['shared_user_name'] as String? ?? '';
     final sharedUserPhotoUrl =
         widget.data['shared_user_photo_url'] as String? ?? '';
+    final sharedUser =
+        UserDisplay.resolveCached(
+          sharedUserId,
+          fallbackName: sharedUserName,
+          fallbackPhotoUrl: sharedUserPhotoUrl,
+        ) ??
+        UserDisplay.fromStored(
+          uid: sharedUserId,
+          name: sharedUserName,
+          photoUrl: sharedUserPhotoUrl,
+        );
 
     // 답장 데이터
     final replyToText = widget.data['reply_to_text'] as String?;
@@ -1180,7 +1246,7 @@ class _MessageBubbleState extends State<MessageBubble>
     final l = AppLocalizations.of(context);
     final timeStr = createdAt != null
         ? '${createdAt.toDate().hour.toString().padLeft(2, '0')}:'
-            '${createdAt.toDate().minute.toString().padLeft(2, '0')}${isEdited ? ' ${l.messageEdited}' : ''}'
+              '${createdAt.toDate().minute.toString().padLeft(2, '0')}${isEdited ? ' ${l.messageEdited}' : ''}'
         : '';
 
     final topPadding = isContinuous ? 2.0 : 8.0;
@@ -1244,6 +1310,7 @@ class _MessageBubbleState extends State<MessageBubble>
       sharedUserId: sharedUserId,
       sharedUserName: sharedUserName,
       sharedUserPhotoUrl: sharedUserPhotoUrl,
+      sharedUser: sharedUser,
       replyBox: replyBox,
       colorScheme: colorScheme,
     );
@@ -1265,15 +1332,11 @@ class _MessageBubbleState extends State<MessageBubble>
           ? colorScheme.primaryContainer.withOpacity(0.4)
           : Colors.transparent,
       child: Padding(
-        padding: EdgeInsets.only(
-          top: topPadding,
-          bottom: 2,
-          left: 8,
-          right: 8,
-        ),
+        padding: EdgeInsets.only(top: topPadding, bottom: 2, left: 8, right: 8),
         child: Row(
-          mainAxisAlignment:
-              isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          mainAxisAlignment: isMe
+              ? MainAxisAlignment.end
+              : MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             // ── 상대방 메시지 ──────────────────────────────────────────
@@ -1305,15 +1368,13 @@ class _MessageBubbleState extends State<MessageBubble>
                     children: [
                       Container(
                         constraints: BoxConstraints(
-                          maxWidth:
-                              MediaQuery.of(context).size.width * 0.62,
+                          maxWidth: MediaQuery.of(context).size.width * 0.62,
                         ),
                         padding: bubblePadding,
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.only(
-                            topLeft:
-                                Radius.circular(isContinuous ? 16 : 4),
+                            topLeft: Radius.circular(isContinuous ? 16 : 4),
                             topRight: const Radius.circular(16),
                             bottomLeft: const Radius.circular(16),
                             bottomRight: const Radius.circular(16),
@@ -1338,8 +1399,7 @@ class _MessageBubbleState extends State<MessageBubble>
                             timeStr,
                             style: TextStyle(
                               fontSize: 10,
-                              color:
-                                  colorScheme.onSurface.withOpacity(0.4),
+                              color: colorScheme.onSurface.withOpacity(0.4),
                             ),
                           ),
                         ],
@@ -1403,8 +1463,7 @@ class _ImageViewerScreen extends StatefulWidget {
   final List<String> urls;
   final int initialIndex;
 
-  const _ImageViewerScreen(
-      {required this.urls, required this.initialIndex});
+  const _ImageViewerScreen({required this.urls, required this.initialIndex});
 
   @override
   State<_ImageViewerScreen> createState() => _ImageViewerScreenState();
@@ -1437,11 +1496,8 @@ class _ImageViewerScreenState extends State<_ImageViewerScreen> {
             child: Image.network(
               widget.urls[i],
               fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Icon(
-                Icons.broken_image,
-                color: Colors.white,
-                size: 48,
-              ),
+              errorBuilder: (_, __, ___) =>
+                  const Icon(Icons.broken_image, color: Colors.white, size: 48),
             ),
           ),
         ),
@@ -1467,14 +1523,13 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    _controller =
-        VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
-          ..initialize().then((_) {
-            if (mounted) {
-              setState(() => _initialized = true);
-              _controller.play();
-            }
-          });
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() => _initialized = true);
+          _controller.play();
+        }
+      });
   }
 
   @override
@@ -1519,9 +1574,7 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
                 });
               },
               child: Icon(
-                _controller.value.isPlaying
-                    ? Icons.pause
-                    : Icons.play_arrow,
+                _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
                 color: Colors.white,
               ),
             )
@@ -1558,8 +1611,8 @@ class _AudioMessagePlayerState extends State<_AudioMessagePlayer> {
     _player.playerStateStream.listen((state) {
       if (!mounted) return;
       setState(() {
-        _playing = state.playing &&
-            state.processingState != ProcessingState.completed;
+        _playing =
+            state.playing && state.processingState != ProcessingState.completed;
       });
 
       if (state.processingState == ProcessingState.completed) {
@@ -1639,7 +1692,8 @@ class _AudioMessagePlayerState extends State<_AudioMessagePlayer> {
               stream: _player.positionStream,
               builder: (context, snapshot) {
                 final position = snapshot.data ?? Duration.zero;
-                final total = _player.duration ??
+                final total =
+                    _player.duration ??
                     Duration(milliseconds: widget.durationMs);
                 final progress = total.inMilliseconds <= 0
                     ? 0.0

@@ -1,21 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:messenger/l10n/app_localizations.dart';
 import 'package:messenger/screens/user_profile_detail_screen.dart';
+import 'package:messenger/utils/user_display.dart';
 
 class ParticipantListSheet extends StatelessWidget {
   final List<dynamic> participants;
   final AppLocalizations l;
 
-  const ParticipantListSheet({super.key, required this.participants, required this.l});
+  const ParticipantListSheet({
+    super.key,
+    required this.participants,
+    required this.l,
+  });
 
   // 상태 뱃지 생성 로직 (위젯 내부로 캡슐화)
   Widget _buildStatusBadge(String? status, ColorScheme colorScheme) {
     Color color;
     String text;
     switch (status) {
-      case 'accepted': color = Colors.green; text = l.rsvpYes; break;
-      case 'pending': color = Colors.orange; text = l.rsvpMaybe; break;
-      default: color = Colors.grey; text = l.rsvpNo; break;
+      case 'accepted':
+        color = Colors.green;
+        text = l.rsvpYes;
+        break;
+      case 'pending':
+        color = Colors.orange;
+        text = l.rsvpMaybe;
+        break;
+      default:
+        color = Colors.grey;
+        text = l.rsvpNo;
+        break;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -24,7 +38,14 @@ class ParticipantListSheet extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withOpacity(0.5)),
       ),
-      child: Text(text, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 
@@ -34,7 +55,9 @@ class ParticipantListSheet extends StatelessWidget {
 
     return Container(
       // 높이를 화면의 60% 정도로 제한하거나 내용에 맞게 조절
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.7,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -52,14 +75,17 @@ class ParticipantListSheet extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(                
+              Text(
                 "${l.participants} (${participants.length})",
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               IconButton(
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.close),
-              )
+              ),
             ],
           ),
           const Divider(),
@@ -70,36 +96,70 @@ class ParticipantListSheet extends StatelessWidget {
                 final p = participants[index];
                 final photoUrl = p['photo_url'];
                 final version = p['photo_version'] ?? 0;
-
-                return ListTile(
-                  onTap: () {
-                    final String peerUid = p['uid'] ?? '';
-                    final String peerName = p['display_name'] ?? l.unknown;
-                    if (peerUid.isEmpty) return;
-                    
-                    Navigator.pop(context);
-
-                    Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) => UserProfileDetailScreen(
-                            uid: peerUid,
-                            displayName: peerName,
-                            photoUrl: photoUrl,
-                        ),
-                    ));
-                  },
-                
-                  contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                  leading: CircleAvatar(
-                    backgroundColor: colorScheme.primaryContainer,
-                    backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
-                        ? NetworkImage('$photoUrl?v=$version')
-                        : null,
-                    child: (p['photo_url'] == null || p['photo_url'].toString().isEmpty)
-                        ? Text(p['display_name'] != null && p['display_name'].toString().isNotEmpty ? p['display_name'].toString()[0].toUpperCase() : '?', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold ))
-                        : null,
+                final peerUid = p['uid'] as String? ?? '';
+                final fallbackName = p['display_name'] as String? ?? l.unknown;
+                return FutureBuilder<UserDisplayData>(
+                  future: UserDisplay.resolve(
+                    peerUid,
+                    fallbackName: fallbackName,
+                    fallbackPhotoUrl: photoUrl as String?,
                   ),
-                  title: Text(p['display_name'] ?? l.unknown, style: const TextStyle(fontWeight: FontWeight.w500)),
-                  trailing: Icon(Icons.chevron_right, color: colorScheme.outline),
+                  builder: (context, snapshot) {
+                    final user =
+                        snapshot.data ??
+                        UserDisplay.fromStored(
+                          uid: peerUid,
+                          name: fallbackName,
+                          photoUrl: photoUrl as String?,
+                        );
+                    final name = user.displayName(l, fallback: fallbackName);
+                    final resolvedPhoto = user.isDeleted ? '' : user.photoUrl;
+                    final hasPhoto = resolvedPhoto.isNotEmpty;
+
+                    return ListTile(
+                      onTap: () {
+                        if (peerUid.isEmpty) return;
+
+                        Navigator.pop(context);
+
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => UserProfileDetailScreen(
+                              uid: peerUid,
+                              displayName: name,
+                              photoUrl: resolvedPhoto,
+                            ),
+                          ),
+                        );
+                      },
+                      contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                      leading: CircleAvatar(
+                        backgroundColor: colorScheme.primaryContainer,
+                        backgroundImage: hasPhoto
+                            ? NetworkImage('$resolvedPhoto?v=$version')
+                            : null,
+                        child: hasPhoto
+                            ? null
+                            : user.isDeleted
+                            ? const Icon(Icons.person_off_outlined)
+                            : Text(
+                                user.initial(l, fallback: '?'),
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                      title: Text(
+                        name,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                      trailing: Icon(
+                        Icons.chevron_right,
+                        color: colorScheme.outline,
+                      ),
+                    );
+                  },
                 );
               },
             ),

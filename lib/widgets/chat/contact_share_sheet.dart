@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../services/friend_service.dart';
+import '../../utils/user_display.dart';
 
 class ContactShareResult {
   final String uid;
@@ -73,10 +74,7 @@ class _ContactShareSheetState extends State<ContactShareSheet> {
             const SizedBox(height: 16),
             Text(
               l.attachContact,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
             Text(
@@ -108,8 +106,10 @@ class _ContactShareSheetState extends State<ContactShareSheet> {
                 ),
                 filled: true,
                 fillColor: colorScheme.surfaceContainerHighest,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 isDense: true,
               ),
             ),
@@ -153,10 +153,17 @@ class _ContactShareSheetState extends State<ContactShareSheet> {
                     itemBuilder: (context, index) {
                       final friend = friends[index];
                       final uid = friend['uid'] as String? ?? '';
-                      final name =
-                          friend['display_name'] as String? ?? l.unknown;
-                      final photoUrl =
-                          friend['profile_image'] as String? ?? '';
+                      final user = UserDisplay.fromStored(
+                        uid: uid,
+                        name: friend['display_name'] as String? ?? l.unknown,
+                        photoUrl: friend['profile_image'] as String? ?? '',
+                      );
+                      final name = user.displayName(
+                        l,
+                        fallback:
+                            friend['display_name'] as String? ?? l.unknown,
+                      );
+                      final photoUrl = user.photoUrl;
                       final hasPhoto = photoUrl.isNotEmpty;
 
                       return ListTile(
@@ -171,9 +178,7 @@ class _ContactShareSheetState extends State<ContactShareSheet> {
                           child: hasPhoto
                               ? null
                               : Text(
-                                  name.isNotEmpty
-                                      ? name[0].toUpperCase()
-                                      : '?',
+                                  user.initial(l, fallback: '?'),
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: colorScheme.onPrimaryContainer,
@@ -193,12 +198,12 @@ class _ContactShareSheetState extends State<ContactShareSheet> {
                           onPressed: uid.isEmpty
                               ? null
                               : () => Navigator.of(context).pop(
-                                    ContactShareResult(
-                                      uid: uid,
-                                      displayName: name,
-                                      photoUrl: photoUrl,
-                                    ),
+                                  ContactShareResult(
+                                    uid: uid,
+                                    displayName: name,
+                                    photoUrl: photoUrl,
                                   ),
+                                ),
                           child: Text(l.shareMessage),
                         ),
                       );

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/user_cache.dart';
 
 class FriendService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -140,17 +141,31 @@ class FriendService {
         .collection('friends')
         .orderBy('added_at', descending: false)
         .snapshots()
-        .map((snap) {
-      final list = snap.docs.map((doc) {
-        final data = Map<String, dynamic>.from(doc.data());
-        data['uid'] = doc.id;
-        return data;
-      }).toList();
+        .asyncMap((snap) async {
+          final list = snap.docs.map((doc) {
+            final data = Map<String, dynamic>.from(doc.data());
+            data['uid'] = doc.id;
+            return data;
+          }).toList();
 
-      // 스트림에서 실제 개수 확인될 때마다 캐시 동기화
-      _saveFriendCount(list.length);
-      return list;
-    });
+          final uids = list
+              .map((friend) => friend['uid'] as String? ?? '')
+              .where((uid) => uid.isNotEmpty)
+              .toSet();
+          if (uids.isNotEmpty) {
+            await UserCache.prefetch(uids);
+          }
+
+          final visible = list.where((friend) {
+            final uid = friend['uid'] as String? ?? '';
+            final cached = uid.isEmpty ? null : UserCache.getCached(uid);
+            return cached?['is_deleted'] != true;
+          }).toList();
+
+          // 스트림에서 실제 개수 확인될 때마다 캐시 동기화
+          _saveFriendCount(visible.length);
+          return visible;
+        });
   }
 
   // ── 친구 여부 확인 ────────────────────────────────────────────────────────
@@ -265,8 +280,7 @@ class FriendService {
     await batch.commit();
 
     final names = allNames.take(4).join(', ');
-    final suffix =
-        allNames.length > 4 ? ' 외 ${allNames.length - 4}명' : '';
+    final suffix = allNames.length > 4 ? ' 외 ${allNames.length - 4}명' : '';
     await roomRef.collection('messages').add({
       'text': '$names$suffix 님이 채팅방에 입장했습니다.',
       'is_system': true,

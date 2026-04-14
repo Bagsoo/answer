@@ -8,6 +8,8 @@ import '../../providers/group_provider.dart';
 import '../../providers/user_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/chat_service.dart';
+import '../../utils/user_cache.dart';
+import '../../utils/user_display.dart';
 import '../../widgets/chat/chat_room_share_sheet.dart';
 import 'schedule_form_screen.dart';
 import '../../widgets/schedule/participant_list_sheet.dart';
@@ -42,10 +44,10 @@ class ScheduleDetailScreen extends StatelessWidget {
       'uid': myProfile.uid,
       'display_name': myProfile.name ?? 'Anonymous',
       'photo_url': myProfile.photoUrl ?? '',
-      // 'status'는 participants가 '참석자' 전용이므로 생략 가능하지만, 
+      // 'status'는 participants가 '참석자' 전용이므로 생략 가능하지만,
       // 나중에 확장성을 위해 'yes'로 넣어두는 것도 방법입니다.
-      'status': 'yes', 
-    };    
+      'status': 'yes',
+    };
 
     try {
       await FirebaseFirestore.instance.runTransaction((transaction) async {
@@ -67,7 +69,7 @@ class ScheduleDetailScreen extends StatelessWidget {
         // 5. 트랜잭션으로 한꺼번에 업데이트
         transaction.update(_ref, {
           'rsvp.$currentUserId': status, // 전체 상태 관리용 Map
-          'participants': participants,  // 참석자 전용 List
+          'participants': participants, // 참석자 전용 List
         });
       });
     } catch (e) {
@@ -85,8 +87,9 @@ class ScheduleDetailScreen extends StatelessWidget {
         content: Text(l.deleteScheduleConfirm),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(l.cancel)),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l.cancel),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
@@ -103,14 +106,15 @@ class ScheduleDetailScreen extends StatelessWidget {
     await _ref.delete();
     if (context.mounted) {
       context.read<NotificationService>().cancelNotification(
-          NotificationService.notificationId(scheduleId));
+        NotificationService.notificationId(scheduleId),
+      );
     }
 
     if (context.mounted) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.scheduleDeleted)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l.scheduleDeleted)));
     }
   }
 
@@ -162,16 +166,14 @@ class ScheduleDetailScreen extends StatelessWidget {
     );
     await chatService.updateLastReadTime(roomId);
     if (!context.mounted) return;
-    messenger.showSnackBar(
-      const SnackBar(content: Text('채팅방에 일정을 공유했습니다.')),
-    );
+    messenger.showSnackBar(const SnackBar(content: Text('채팅방에 일정을 공유했습니다.')));
   }
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     // 현재 화면에서 사용 중인 GroupProvider를 미리 읽어둡니다.
     final groupProvider = context.read<GroupProvider>();
 
@@ -192,16 +194,18 @@ class ScheduleDetailScreen extends StatelessWidget {
                 final data = snap.data() as Map<String, dynamic>;
                 data['id'] = scheduleId;
 
-                Navigator.of(context).push(MaterialPageRoute(
-                  // .value를 사용하여 기존 GroupProvider 인스턴스를 수정 화면에 전달합니다.
-                  builder: (_) => ChangeNotifierProvider.value(
-                    value: groupProvider,
-                    child: ScheduleFormScreen(
-                      groupId: groupId,
-                      existing: data,
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    // .value를 사용하여 기존 GroupProvider 인스턴스를 수정 화면에 전달합니다.
+                    builder: (_) => ChangeNotifierProvider.value(
+                      value: groupProvider,
+                      child: ScheduleFormScreen(
+                        groupId: groupId,
+                        existing: data,
+                      ),
                     ),
                   ),
-                ));
+                );
               },
             ),
             IconButton(
@@ -233,9 +237,12 @@ class ScheduleDetailScreen extends StatelessWidget {
 
           int yesCount = 0, noCount = 0, maybeCount = 0;
           for (final v in rsvp.values) {
-            if (v == 'yes') yesCount++;
-            else if (v == 'no') noCount++;
-            else if (v == 'maybe') maybeCount++;
+            if (v == 'yes')
+              yesCount++;
+            else if (v == 'no')
+              noCount++;
+            else if (v == 'maybe')
+              maybeCount++;
           }
 
           return SingleChildScrollView(
@@ -243,9 +250,13 @@ class ScheduleDetailScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.bold)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 16),
 
                 if (start != null)
@@ -262,18 +273,25 @@ class ScheduleDetailScreen extends StatelessWidget {
                     label: l.endTime,
                     value: _fmt(end),
                     colorScheme: colorScheme,
-                  ),                  
+                  ),
                 ],
                 const SizedBox(height: 20),
-                _buildParticipantSummary(context, data['participants'] as List<dynamic>? ?? [], l),                
+                _buildParticipantSummary(
+                  context,
+                  data['participants'] as List<dynamic>? ?? [],
+                  l,
+                ),
 
                 if (desc.isNotEmpty) ...[
                   const SizedBox(height: 20),
-                  Text(l.scheduleDescription,
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.onSurface.withOpacity(0.5),
-                          fontWeight: FontWeight.w600)),
+                  Text(
+                    l.scheduleDescription,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.onSurface.withOpacity(0.5),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(height: 6),
                   Text(desc),
                 ],
@@ -282,30 +300,49 @@ class ScheduleDetailScreen extends StatelessWidget {
                 const Divider(),
                 const SizedBox(height: 8),
 
-                Text(l.rsvp,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(
+                  l.rsvp,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 12),
 
                 Row(
                   children: [
-                    _RsvpCount(icon: Icons.check_circle, color: Colors.green,
-                        count: yesCount, label: l.rsvpYes),
+                    _RsvpCount(
+                      icon: Icons.check_circle,
+                      color: Colors.green,
+                      count: yesCount,
+                      label: l.rsvpYes,
+                    ),
                     const SizedBox(width: 12),
-                    _RsvpCount(icon: Icons.help, color: Colors.orange,
-                        count: maybeCount, label: l.rsvpMaybe),
+                    _RsvpCount(
+                      icon: Icons.help,
+                      color: Colors.orange,
+                      count: maybeCount,
+                      label: l.rsvpMaybe,
+                    ),
                     const SizedBox(width: 12),
-                    _RsvpCount(icon: Icons.cancel, color: Colors.red,
-                        count: noCount, label: l.rsvpNo),
+                    _RsvpCount(
+                      icon: Icons.cancel,
+                      color: Colors.red,
+                      count: noCount,
+                      label: l.rsvpNo,
+                    ),
                   ],
                 ),
 
                 const SizedBox(height: 20),
 
-                Text(l.myRsvp,
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.onSurface.withOpacity(0.6))),
+                Text(
+                  l.myRsvp,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -341,20 +378,28 @@ class ScheduleDetailScreen extends StatelessWidget {
                 // ── 장소 정보 및 지도 버튼 추가 ───────────────────
                 if (isPro && locationName.isNotEmpty) ...[
                   const SizedBox(height: 20),
-                  Text(l.location,
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.onSurface.withOpacity(0.5),
-                          fontWeight: FontWeight.w600)),
+                  Text(
+                    l.location,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.onSurface.withOpacity(0.5),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      Icon(Icons.location_on_outlined, 
-                           size: 18, color: colorScheme.primary),
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 18,
+                        color: colorScheme.primary,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text(locationName, 
-                                   style: const TextStyle(fontWeight: FontWeight.w500)),
+                        child: Text(
+                          locationName,
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
                       ),
                     ],
                   ),
@@ -364,7 +409,9 @@ class ScheduleDetailScreen extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: () => _launchMaps(locationName),
                       icon: const Icon(Icons.map_outlined),
-                      label: Text(l.viewOnMap), // l10n에 viewOnMap: "지도 보기" 추가 필요
+                      label: Text(
+                        l.viewOnMap,
+                      ), // l10n에 viewOnMap: "지도 보기" 추가 필요
                       style: OutlinedButton.styleFrom(
                         foregroundColor: colorScheme.primary,
                         side: BorderSide(color: colorScheme.outlineVariant),
@@ -385,24 +432,39 @@ class ScheduleDetailScreen extends StatelessWidget {
   }
 
   // ── 참여자 요약 빌더 ──────────────────────────────────────────────────────
-  Widget _buildParticipantSummary(BuildContext context, List<dynamic> participants, AppLocalizations l) {
-    if (participants == null || participants.isEmpty) return const SizedBox.shrink();
+  Widget _buildParticipantSummary(
+    BuildContext context,
+    List<dynamic> participants,
+    AppLocalizations l,
+  ) {
+    if (participants.isEmpty) return const SizedBox.shrink();
 
     const int maxVisible = 5; // 최대 노출 사진 수
     final int totalCount = participants.length;
     final displayList = participants.take(maxVisible).toList();
     final colorScheme = Theme.of(context).colorScheme;
+    final participantIds = participants
+        .map((p) => p['uid'] as String? ?? '')
+        .where((uid) => uid.isNotEmpty)
+        .toSet();
+    if (participantIds.isNotEmpty) {
+      UserCache.prefetch(participantIds);
+    }
 
     // 겹치는 정도를 조절하는 변수 (Avatar 크기 32 기준)
     const double avatarSize = 32.0;
-    const double overlapOffset = 24.0; 
+    const double overlapOffset = 24.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "${l.participants} ($totalCount)", 
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withOpacity(0.5))
+          "${l.participants} ($totalCount)",
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: colorScheme.onSurface.withOpacity(0.5),
+          ),
         ),
         const SizedBox(height: 10),
         GestureDetector(
@@ -413,7 +475,8 @@ class ScheduleDetailScreen extends StatelessWidget {
               shape: const RoundedRectangleBorder(
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              builder: (_) => ParticipantListSheet(participants: participants, l: l),
+              builder: (_) =>
+                  ParticipantListSheet(participants: participants, l: l),
             );
           },
           child: Row(
@@ -421,30 +484,59 @@ class ScheduleDetailScreen extends StatelessWidget {
               // --- Stack 시작 ---
               SizedBox(
                 // 전체 너비 = (아이콘 개수 * 오프셋) + (마지막 아이콘의 남은 너비)
-                width: (displayList.length * overlapOffset) + (totalCount > maxVisible ? overlapOffset : 8.0),
+                width:
+                    (displayList.length * overlapOffset) +
+                    (totalCount > maxVisible ? overlapOffset : 8.0),
                 height: avatarSize + 4, // 테두리 포함 높이
                 child: Stack(
                   children: [
                     // 역순으로 쌓아야 첫 번째 사람이 맨 위로 올라옵니다 (asMap().entries.toList().reversed)
-                    ...displayList.asMap().entries.toList().reversed.map((entry) {
+                    ...displayList.asMap().entries.toList().reversed.map((
+                      entry,
+                    ) {
                       int idx = entry.key;
                       var p = entry.value;
+                      final uid = p['uid'] as String? ?? '';
+                      final user =
+                          UserDisplay.resolveCached(
+                            uid,
+                            fallbackName: p['display_name'] as String? ?? '',
+                            fallbackPhotoUrl: p['photo_url'] as String?,
+                          ) ??
+                          UserDisplay.fromStored(
+                            uid: uid,
+                            name: p['display_name'] as String? ?? '',
+                            photoUrl: p['photo_url'] as String?,
+                          );
+                      final resolvedPhoto = user.isDeleted ? '' : user.photoUrl;
                       return Positioned(
                         left: idx * overlapOffset,
                         child: Container(
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(color: colorScheme.surface, width: 2), // 겹치는 부분의 흰색 테두리
+                            border: Border.all(
+                              color: colorScheme.surface,
+                              width: 2,
+                            ), // 겹치는 부분의 흰색 테두리
                           ),
                           child: CircleAvatar(
                             radius: avatarSize / 2,
                             backgroundColor: colorScheme.primaryContainer,
-                            backgroundImage: (p['photo_url'] != null && p['photo_url'] != '')
-                                ? NetworkImage('${p['photo_url']}?v=${p['photo_version'] ?? 0}')
+                            backgroundImage: resolvedPhoto.isNotEmpty
+                                ? NetworkImage(
+                                    '$resolvedPhoto?v=${p['photo_version'] ?? 0}',
+                                  )
                                 : null,
-                            child: (p['photo_url'] == null || p['photo_url'].toString().isEmpty)
-                                ? Text(p['display_name'].toString()[0].toUpperCase() ?? '?', 
-                                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))
+                            child: resolvedPhoto.isEmpty
+                                ? user.isDeleted
+                                      ? const Icon(Icons.person_off_outlined)
+                                      : Text(
+                                          user.initial(l, fallback: '?'),
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
                                 : null,
                           ),
                         ),
@@ -457,7 +549,10 @@ class ScheduleDetailScreen extends StatelessWidget {
                         child: Container(
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(color: colorScheme.surface, width: 2),
+                            border: Border.all(
+                              color: colorScheme.surface,
+                              width: 2,
+                            ),
                           ),
                           child: CircleAvatar(
                             radius: avatarSize / 2,
@@ -465,9 +560,9 @@ class ScheduleDetailScreen extends StatelessWidget {
                             child: Text(
                               "+${totalCount - maxVisible}",
                               style: TextStyle(
-                                fontSize: 10, 
+                                fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: colorScheme.onSurfaceVariant
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ),
@@ -478,7 +573,11 @@ class ScheduleDetailScreen extends StatelessWidget {
               ),
               // --- Stack 끝 ---
               const SizedBox(width: 8),
-              Icon(Icons.arrow_forward_ios, size: 14, color: colorScheme.outline),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: colorScheme.outline,
+              ),
             ],
           ),
         ),
@@ -494,8 +593,10 @@ class _InfoRow extends StatelessWidget {
   final ColorScheme colorScheme;
 
   const _InfoRow({
-    required this.icon, required this.label,
-    required this.value, required this.colorScheme,
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.colorScheme,
   });
 
   @override
@@ -504,13 +605,19 @@ class _InfoRow extends StatelessWidget {
       children: [
         Icon(icon, size: 18, color: colorScheme.primary),
         const SizedBox(width: 8),
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
               style: TextStyle(
-                  fontSize: 11,
-                  color: colorScheme.onSurface.withOpacity(0.5))),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
-        ]),
+                fontSize: 11,
+                color: colorScheme.onSurface.withOpacity(0.5),
+              ),
+            ),
+            Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
+          ],
+        ),
       ],
     );
   }
@@ -523,18 +630,24 @@ class _RsvpCount extends StatelessWidget {
   final String label;
 
   const _RsvpCount({
-    required this.icon, required this.color,
-    required this.count, required this.label,
+    required this.icon,
+    required this.color,
+    required this.count,
+    required this.label,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(children: [
-      Icon(icon, color: color, size: 18),
-      const SizedBox(width: 4),
-      Text('$count $label',
-          style: TextStyle(color: color, fontWeight: FontWeight.w600)),
-    ]);
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(width: 4),
+        Text(
+          '$count $label',
+          style: TextStyle(color: color, fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
   }
 }
 
@@ -547,8 +660,12 @@ class _RsvpButton extends StatelessWidget {
   final VoidCallback onTap;
 
   const _RsvpButton({
-    required this.label, required this.icon, required this.activeIcon,
-    required this.color, required this.isActive, required this.onTap,
+    required this.label,
+    required this.icon,
+    required this.activeIcon,
+    required this.color,
+    required this.isActive,
+    required this.onTap,
   });
 
   @override
@@ -562,19 +679,24 @@ class _RsvpButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: isActive ? color.withOpacity(0.15) : Colors.transparent,
             border: Border.all(
-                color: isActive ? color : Colors.grey.withOpacity(0.4)),
+              color: isActive ? color : Colors.grey.withOpacity(0.4),
+            ),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Column(children: [
-            Icon(isActive ? activeIcon : icon, color: color, size: 22),
-            const SizedBox(height: 4),
-            Text(label,
+          child: Column(
+            children: [
+              Icon(isActive ? activeIcon : icon, color: color, size: 22),
+              const SizedBox(height: 4),
+              Text(
+                label,
                 style: TextStyle(
-                    color: color,
-                    fontSize: 12,
-                    fontWeight:
-                        isActive ? FontWeight.bold : FontWeight.normal)),
-          ]),
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

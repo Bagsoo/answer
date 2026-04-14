@@ -1,9 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/group_service.dart';
 import '../providers/user_provider.dart';
 import '../l10n/app_localizations.dart';
+import '../utils/user_display.dart';
 import 'group_detail_screen.dart';
 import 'group_tabs/group_type_category_data.dart';
 import 'user_profile_detail_screen.dart';
@@ -59,31 +59,33 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
       );
       if (!requireApproval && mounted) {
         // 가입 성공 시 그룹 상세로 이동
-        Navigator.of(context).pushReplacement(MaterialPageRoute(
-          builder: (_) => GroupDetailScreen(
-            groupId: groupId,
-            groupName: groupName,
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) =>
+                GroupDetailScreen(groupId: groupId, groupName: groupName),
           ),
-        ));
+        );
       } else {
         Navigator.of(context).pop();
       }
     } else if (result == 'full') {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l.groupFull)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l.groupFull)));
     } else if (result == 'banned') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.bannedFromGroup)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l.bannedFromGroup)));
     } else {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l.joinFailed)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l.joinFailed)));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);    
+    final l = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
 
     final groupId = group['id'] as String? ?? '';
@@ -100,42 +102,73 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
     final plan = group['plan'] as String? ?? 'free';
     final typeLabel = GroupTypeCategoryData.localizeType(type, l);
     final categoryLabel = GroupTypeCategoryData.localizeKey(category, l);
+    final ownerId = group['owner_id'] as String? ?? '';
+    final ownerFallbackName = group['owner_name'] as String? ?? 'Owner';
+    final ownerFallbackPhoto = group['owner_photo_url'] as String? ?? '';
     return Scaffold(
       appBar: AppBar(
         title: Text(name),
         actions: [
-          if (group['owner_id'] != null && group['owner_id'].toString().isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => UserProfileDetailScreen(
-                      uid: group['owner_id'],
-                      displayName: group['owner_name'] ?? 'Owner',
-                      photoUrl: group['owner_photo_url'],
-                    ),
-                  ));
-                },
-                child: Row(
-                  children: [
-                    Text(
-                      group['owner_name'] ?? 'Owner',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                    ),
-                    const SizedBox(width: 8),
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundImage: (group['owner_photo_url'] != null && group['owner_photo_url'].isNotEmpty)
-                          ? NetworkImage(group['owner_photo_url'])
-                          : null,
-                      child: (group['owner_photo_url'] == null || group['owner_photo_url'].isEmpty)
-                          ? const Icon(Icons.person, size: 16)
-                          : null,
-                    ),
-                  ],
-                ),
+          if (ownerId.isNotEmpty)
+            FutureBuilder<UserDisplayData>(
+              future: UserDisplay.resolve(
+                ownerId,
+                fallbackName: ownerFallbackName,
+                fallbackPhotoUrl: ownerFallbackPhoto,
               ),
+              builder: (context, snapshot) {
+                final owner =
+                    snapshot.data ??
+                    UserDisplay.fromStored(
+                      uid: ownerId,
+                      name: ownerFallbackName,
+                      photoUrl: ownerFallbackPhoto,
+                    );
+                final ownerName = owner.displayName(
+                  l,
+                  fallback: ownerFallbackName,
+                );
+                final ownerPhoto = owner.isDeleted ? '' : owner.photoUrl;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 16.0),
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => UserProfileDetailScreen(
+                            uid: ownerId,
+                            displayName: ownerName,
+                            photoUrl: ownerPhoto,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Row(
+                      children: [
+                        Text(
+                          ownerName,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        CircleAvatar(
+                          radius: 14,
+                          backgroundImage: ownerPhoto.isNotEmpty
+                              ? NetworkImage(ownerPhoto)
+                              : null,
+                          child: ownerPhoto.isNotEmpty
+                              ? null
+                              : owner.isDeleted
+                              ? const Icon(Icons.person_off_outlined, size: 16)
+                              : const Icon(Icons.person, size: 16),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
         ],
       ),
@@ -148,8 +181,7 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
             CircleAvatar(
               radius: 56,
               backgroundColor: colorScheme.primaryContainer,
-              backgroundImage:
-                  hasImage ? NetworkImage(profileImageUrl) : null,
+              backgroundImage: hasImage ? NetworkImage(profileImageUrl) : null,
               child: hasImage
                   ? null
                   : Text(
@@ -166,8 +198,7 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
             // ── 그룹명 ──────────────────────────────────────────────────
             Text(
               name,
-              style: const TextStyle(
-                  fontSize: 22, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -177,7 +208,9 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
               Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 3),
+                  horizontal: 10,
+                  vertical: 3,
+                ),
                 decoration: BoxDecoration(
                   color: plan == 'pro'
                       ? Colors.amber.withOpacity(0.15)
@@ -232,18 +265,20 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
               child: Column(
                 children: [
                   _InfoRow(
-                      label: l.type, value: typeLabel, colorScheme: colorScheme),
+                    label: l.type,
+                    value: typeLabel,
+                    colorScheme: colorScheme,
+                  ),
                   const SizedBox(height: 8),
                   _InfoRow(
-                      label: l.category,
-                      value: categoryLabel,
-                      colorScheme: colorScheme),
+                    label: l.category,
+                    value: categoryLabel,
+                    colorScheme: colorScheme,
+                  ),
                   const SizedBox(height: 8),
                   _InfoRow(
                     label: l.joinMethod,
-                    value: requireApproval
-                        ? l.requiresApproval
-                        : l.freeJoin,
+                    value: requireApproval ? l.requiresApproval : l.freeJoin,
                     colorScheme: colorScheme,
                   ),
                 ],
@@ -259,13 +294,17 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
                   spacing: 8,
                   runSpacing: 6,
                   children: tags
-                      .map((tag) => Chip(
-                            label: Text('#$tag',
-                                style: const TextStyle(fontSize: 12)),
-                            padding: EdgeInsets.zero,
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                          ))
+                      .map(
+                        (tag) => Chip(
+                          label: Text(
+                            '#$tag',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          padding: EdgeInsets.zero,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      )
                       .toList(),
                 ),
               ),
@@ -283,11 +322,15 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
-                    : Icon(requireApproval
-                        ? Icons.how_to_reg_outlined
-                        : Icons.group_add_outlined),
+                    : Icon(
+                        requireApproval
+                            ? Icons.how_to_reg_outlined
+                            : Icons.group_add_outlined,
+                      ),
                 label: Text(requireApproval ? l.requestJoin : l.joinNow),
               ),
             ),
@@ -356,8 +399,7 @@ class _InfoRow extends StatelessWidget {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w500),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
           ),
         ),
       ],

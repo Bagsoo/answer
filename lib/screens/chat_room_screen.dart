@@ -19,6 +19,7 @@ import '../services/file_service.dart';
 import '../services/audio_service.dart';
 import '../services/local_preferences_service.dart';
 import '../utils/user_cache.dart';
+import '../utils/user_display.dart';
 import 'chat_room_more/chat_room_participants_screen.dart';
 import 'chat_room_more/chat_room_invite_screen.dart';
 import 'chat_room_more/notices_screen.dart';
@@ -42,8 +43,13 @@ class ChatRoomScreen extends StatefulWidget {
   final String? initialScrollToMessageId;
   final bool isDesktopMode;
   final VoidCallback? onClosePanel;
-  const ChatRoomScreen(
-      {super.key, required this.roomId, this.initialScrollToMessageId, this.isDesktopMode = false, this.onClosePanel});
+  const ChatRoomScreen({
+    super.key,
+    required this.roomId,
+    this.initialScrollToMessageId,
+    this.isDesktopMode = false,
+    this.onClosePanel,
+  });
 
   @override
   State<ChatRoomScreen> createState() => _ChatRoomScreenState();
@@ -99,16 +105,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   // ── 잔상 방지용 현재 표시 중인 roomId ──────────────────────────────────────
   String _displayingRoomId = '';
 
-  String get _currentUserId =>
-      FirebaseAuth.instance.currentUser?.uid ?? '';
+  String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
 
-  String get _myName =>
-      context.read<UserProvider>().name;
+  String get _myName => context.read<UserProvider>().name;
 
-  String get _chatDraftKey => LocalPreferencesService.chatDraftKey(
-        _prefsUserId,
-        widget.roomId,
-      );
+  String get _chatDraftKey =>
+      LocalPreferencesService.chatDraftKey(_prefsUserId, widget.roomId);
 
   // ──────────────────────────────────────────────────────────────────────────
   // Lifecycle
@@ -184,9 +186,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   Future<void> _loadMuteState() async {
-    final muted = await context
-        .read<NotificationService>()
-        .getChatRoomMuted(widget.roomId);
+    final muted = await context.read<NotificationService>().getChatRoomMuted(
+      widget.roomId,
+    );
     if (mounted) setState(() => _isMuted = muted);
   }
 
@@ -194,8 +196,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final draft = await LocalPreferencesService.getString(_chatDraftKey);
     if (!mounted || draft == null || draft.isEmpty) return;
     _msgController.text = draft;
-    _msgController.selection =
-        TextSelection.collapsed(offset: draft.length);
+    _msgController.selection = TextSelection.collapsed(offset: draft.length);
   }
 
   void _persistMessageDraft() {
@@ -210,8 +211,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (_loadingMore || !_hasMore || _lastStreamDoc == null) return;
     setState(() => _loadingMore = true);
     final chatService = context.read<ChatService>();
-    final baseDoc =
-        _olderMessages.isNotEmpty ? _olderMessages.last : _lastStreamDoc!;
+    final baseDoc = _olderMessages.isNotEmpty
+        ? _olderMessages.last
+        : _lastStreamDoc!;
     final newDocs = await chatService.loadMoreMessages(
       widget.roomId,
       baseDoc,
@@ -243,13 +245,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           .doc(widget.roomId)
           .collection('messages')
           .add({
-        'text': data['text'] as String? ?? '',
-        'sender_id': data['sender_id'] as String? ?? _currentUserId,
-        'sender_name': data['sender_name'] as String? ?? _myName,
-        'type': 'text',
-        'is_system': false,
-        'created_at': FieldValue.serverTimestamp(),
-      });
+            'text': data['text'] as String? ?? '',
+            'sender_id': data['sender_id'] as String? ?? _currentUserId,
+            'sender_name': data['sender_name'] as String? ?? _myName,
+            'type': 'text',
+            'is_system': false,
+            'created_at': FieldValue.serverTimestamp(),
+          });
       await doc.reference.update({'sent': true});
     }
     if (snap.docs.isNotEmpty) {
@@ -443,9 +445,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final l = AppLocalizations.of(context);
     final newVal = !_isMuted;
     setState(() => _isMuted = newVal);
-    await context
-        .read<NotificationService>()
-        .setChatRoomMuted(widget.roomId, newVal);
+    await context.read<NotificationService>().setChatRoomMuted(
+      widget.roomId,
+      newVal,
+    );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(newVal ? l.chatMuted : l.chatUnmuted)),
@@ -453,8 +456,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
   }
 
-  Future<void> _pinMessage(
-      Map<String, dynamic> data, String messageId) async {
+  Future<void> _pinMessage(Map<String, dynamic> data, String messageId) async {
     final l = AppLocalizations.of(context);
     final pinData = {
       'text': data['text'] as String? ?? '',
@@ -488,11 +490,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 otherUserUid: _roomMeta!.otherUserUid,
                 otherUserName: _roomMeta!.otherUserName,
                 otherUserPhoto: _roomMeta!.otherUserPhoto,
+                otherUserDeleted: _roomMeta!.otherUserDeleted,
               );
         _noticeBannerDismissed = false;
       });
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l.noticePinned)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l.noticePinned)));
     }
   }
 
@@ -503,7 +507,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     _clearMessageDraft();
     final replyId = _replyToId;
     final replyData = _replyToData;
-    if (mounted) setState(() { _replyToId = null; _replyToData = null; });
+    if (mounted)
+      setState(() {
+        _replyToId = null;
+        _replyToData = null;
+      });
 
     final userProvider = context.read<UserProvider>();
     final chatService = context.read<ChatService>();
@@ -515,8 +523,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       replyToId: replyId,
       replyToText: replyData != null
           ? (replyData['text'] as String? ?? '').length > 80
-              ? '${(replyData['text'] as String).substring(0, 80)}…'
-              : replyData['text'] as String? ?? ''
+                ? '${(replyData['text'] as String).substring(0, 80)}…'
+                : replyData['text'] as String? ?? ''
           : null,
       replyToSender: replyData?['sender_name'] as String?,
     );
@@ -576,8 +584,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (VideoService().isVideoSizeExceeded(file)) {
       if (mounted) {
         final l = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l.videoSizeExceeded)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l.videoSizeExceeded)));
       }
       return;
     }
@@ -589,8 +598,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
     if (result == null) {
       final l = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l.videoProcessingFailed)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l.videoProcessingFailed)));
       return;
     }
 
@@ -640,8 +650,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Future<void> _leaveRoom(AppLocalizations l) async {
     final meta = _roomMeta;
     if (meta?.myRole == 'owner') {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l.ownerCannotLeave)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l.ownerCannotLeave)));
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -651,8 +662,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         content: Text(l.leaveRoomConfirm),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(l.cancel)),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l.cancel),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
@@ -669,8 +681,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final roomRef = FirebaseFirestore.instance
         .collection('chat_rooms')
         .doc(widget.roomId);
-    batch.update(
-        roomRef, {'member_ids': FieldValue.arrayRemove([_currentUserId])});
+    batch.update(roomRef, {
+      'member_ids': FieldValue.arrayRemove([_currentUserId]),
+    });
     batch.delete(roomRef.collection('room_members').doc(_currentUserId));
     batch.set(roomRef.collection('messages').doc(), {
       'is_system': true,
@@ -696,9 +709,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
     final hasOversized = validFiles.length != pickedFiles.length;
     if (hasOversized && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.fileSizeExceeded)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l.fileSizeExceeded)));
     }
     if (validFiles.isEmpty) return;
 
@@ -768,9 +781,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final audioService = AudioService();
     if (audioService.isSizeExceeded(result.file)) {
       final l = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.audioFileSizeExceeded)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l.audioFileSizeExceeded)));
       return;
     }
 
@@ -879,8 +892,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   void _searchNavigate(int delta) {
     if (_searchResults.isEmpty) return;
-    final next =
-        (_searchIndex + delta).clamp(0, _searchResults.length - 1);
+    final next = (_searchIndex + delta).clamp(0, _searchResults.length - 1);
     if (next == _searchIndex) return;
     setState(() => _searchIndex = next);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1009,7 +1021,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       isMe: isMe,
       canHideMessage: canHideMessage,
     );
-    final maxTop = (size.height - estimatedHeight - 12).clamp(12.0, size.height);
+    final maxTop = (size.height - estimatedHeight - 12).clamp(
+      12.0,
+      size.height,
+    );
     final showBelow = rect.center.dy < size.height * 0.58;
     final left = (isMe ? rect.right - menuWidth : rect.left)
         .clamp(12.0, size.width - menuWidth - 12.0)
@@ -1032,9 +1047,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             child: Material(
               color: Colors.transparent,
               child: Container(
-                constraints: BoxConstraints(
-                  maxHeight: size.height * 0.72,
-                ),
+                constraints: BoxConstraints(maxHeight: size.height * 0.72),
                 decoration: BoxDecoration(
                   color: colorScheme.surface,
                   borderRadius: BorderRadius.circular(20),
@@ -1131,7 +1144,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           .orderBy('created_at', descending: true)
           .limit(1)
           .get();
-      if (lastMsgsSnap.docs.isNotEmpty && lastMsgsSnap.docs.first.id == messageId) {
+      if (lastMsgsSnap.docs.isNotEmpty &&
+          lastMsgsSnap.docs.first.id == messageId) {
         await roomRef.update({'last_message': l.messageHidden});
       }
     } catch (e) {
@@ -1178,7 +1192,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           .orderBy('created_at', descending: true)
           .limit(1)
           .get();
-      if (lastMsgsSnap.docs.isNotEmpty && lastMsgsSnap.docs.first.id == messageId) {
+      if (lastMsgsSnap.docs.isNotEmpty &&
+          lastMsgsSnap.docs.first.id == messageId) {
         await roomRef.update({'last_message': l.messageDeleted});
       }
     } catch (e) {
@@ -1198,9 +1213,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           controller: textController,
           maxLines: null,
           autofocus: true,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-          ),
+          decoration: const InputDecoration(border: OutlineInputBorder()),
         ),
         actions: [
           TextButton(
@@ -1231,7 +1244,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           .orderBy('created_at', descending: true)
           .limit(1)
           .get();
-      if (lastMsgsSnap.docs.isNotEmpty && lastMsgsSnap.docs.first.id == messageId) {
+      if (lastMsgsSnap.docs.isNotEmpty &&
+          lastMsgsSnap.docs.first.id == messageId) {
         await roomRef.update({'last_message': newText});
       }
     } catch (e) {
@@ -1304,8 +1318,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final position = RelativeRect.fromRect(
       Rect.fromPoints(
         button.localToGlobal(Offset.zero, ancestor: overlay),
-        button.localToGlobal(button.size.bottomRight(Offset.zero),
-            ancestor: overlay),
+        button.localToGlobal(
+          button.size.bottomRight(Offset.zero),
+          ancestor: overlay,
+        ),
       ),
       Offset.zero & overlay.size,
     );
@@ -1316,52 +1332,68 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       items: [
         PopupMenuItem(
           value: 'participants',
-          child: Row(children: [
-            Icon(Icons.people_outline, color: colorScheme.primary, size: 20),
-            const SizedBox(width: 12),
-            Text(l.participants),
-          ]),
+          child: Row(
+            children: [
+              Icon(Icons.people_outline, color: colorScheme.primary, size: 20),
+              const SizedBox(width: 12),
+              Text(l.participants),
+            ],
+          ),
         ),
         PopupMenuItem(
           value: 'invite',
-          child: Row(children: [
-            Icon(Icons.person_add_outlined,
-                color: colorScheme.primary, size: 20),
-            const SizedBox(width: 12),
-            Text(l.inviteMembers),
-          ]),
+          child: Row(
+            children: [
+              Icon(
+                Icons.person_add_outlined,
+                color: colorScheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Text(l.inviteMembers),
+            ],
+          ),
         ),
         PopupMenuItem(
           value: 'notices',
-          child: Row(children: [
-            Icon(Icons.campaign_outlined,
-                color: colorScheme.primary, size: 20),
-            const SizedBox(width: 12),
-            Text(l.noticeHistory),
-          ]),
+          child: Row(
+            children: [
+              Icon(
+                Icons.campaign_outlined,
+                color: colorScheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Text(l.noticeHistory),
+            ],
+          ),
         ),
         PopupMenuItem(
           value: 'mute',
-          child: Row(children: [
-            Icon(
-              _isMuted
-                  ? Icons.notifications_outlined
-                  : Icons.notifications_off_outlined,
-              color: colorScheme.onSurface.withOpacity(0.7),
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Text(_isMuted ? l.chatUnmuteAction : l.chatMuteAction),
-          ]),
+          child: Row(
+            children: [
+              Icon(
+                _isMuted
+                    ? Icons.notifications_outlined
+                    : Icons.notifications_off_outlined,
+                color: colorScheme.onSurface.withOpacity(0.7),
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Text(_isMuted ? l.chatUnmuteAction : l.chatMuteAction),
+            ],
+          ),
         ),
         const PopupMenuDivider(),
         PopupMenuItem(
           value: 'leave',
-          child: Row(children: [
-            Icon(Icons.exit_to_app, color: colorScheme.error, size: 20),
-            const SizedBox(width: 12),
-            Text(l.leaveRoom, style: TextStyle(color: colorScheme.error)),
-          ]),
+          child: Row(
+            children: [
+              Icon(Icons.exit_to_app, color: colorScheme.error, size: 20),
+              const SizedBox(width: 12),
+              Text(l.leaveRoom, style: TextStyle(color: colorScheme.error)),
+            ],
+          ),
         ),
       ],
     );
@@ -1369,26 +1401,32 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final meta = _roomMeta;
     switch (result) {
       case 'participants':
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => ChatRoomParticipantsScreen(
-            roomId: widget.roomId,
-            roomType: meta?.roomType ?? '',
-            currentUserId: _currentUserId,
-            myRole: meta?.myRole ?? 'member',
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ChatRoomParticipantsScreen(
+              roomId: widget.roomId,
+              roomType: meta?.roomType ?? '',
+              currentUserId: _currentUserId,
+              myRole: meta?.myRole ?? 'member',
+            ),
           ),
-        ));
+        );
       case 'invite':
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => ChatRoomInviteScreen(
-            roomId: widget.roomId,
-            currentUserId: _currentUserId,
-            refGroupId: meta?.refGroupId,
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ChatRoomInviteScreen(
+              roomId: widget.roomId,
+              currentUserId: _currentUserId,
+              refGroupId: meta?.refGroupId,
+            ),
           ),
-        ));
+        );
       case 'notices':
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => NoticesScreen(roomId: widget.roomId),
-        ));
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => NoticesScreen(roomId: widget.roomId),
+          ),
+        );
       case 'mute':
         await _toggleMute();
       case 'leave':
@@ -1401,7 +1439,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   // ──────────────────────────────────────────────────────────────────────────
 
   int _calculateUnread(
-      Timestamp? createdAt, List<QueryDocumentSnapshot> members) {
+    Timestamp? createdAt,
+    List<QueryDocumentSnapshot> members,
+  ) {
     if (createdAt == null) return 0;
     int unread = 0;
     for (final member in members) {
@@ -1413,14 +1453,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     return unread;
   }
 
-  bool _needsDateDivider(
-      List<QueryDocumentSnapshot> messages, int index) {
-    final current = (messages[index].data()
-        as Map<String, dynamic>)['created_at'] as Timestamp?;
+  bool _needsDateDivider(List<QueryDocumentSnapshot> messages, int index) {
+    final current =
+        (messages[index].data() as Map<String, dynamic>)['created_at']
+            as Timestamp?;
     if (current == null) return false;
     if (index == messages.length - 1) return true;
-    final prev = (messages[index + 1].data()
-        as Map<String, dynamic>)['created_at'] as Timestamp?;
+    final prev =
+        (messages[index + 1].data() as Map<String, dynamic>)['created_at']
+            as Timestamp?;
     if (prev == null) return false;
     final curDate = current.toDate();
     final prevDate = prev.toDate();
@@ -1447,11 +1488,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     final meta = _roomMeta;
     final isDm = meta?.roomType == 'direct';
-    final appBarTitle = isDm && (meta?.otherUserName.isNotEmpty ?? false)
-        ? meta!.otherUserName
+    final dmDisplayName = (meta?.otherUserDeleted ?? false)
+        ? l.deletedUser
+        : meta?.otherUserName ?? '';
+    final appBarTitle = isDm && dmDisplayName.isNotEmpty
+        ? dmDisplayName
         : (meta?.roomName ?? '');
     final otherUserPhoto = meta?.otherUserPhoto ?? '';
-    final hasOtherPhoto = otherUserPhoto.isNotEmpty;
+    final hasOtherPhoto =
+        otherUserPhoto.isNotEmpty && !(meta?.otherUserDeleted ?? false);
     final isDesktopPanel = widget.isDesktopMode && widget.onClosePanel != null;
 
     return Scaffold(
@@ -1463,13 +1508,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 padding: const EdgeInsets.all(10),
                 child: GestureDetector(
                   onTap: (meta?.otherUserUid.isNotEmpty ?? false)
-                      ? () => Navigator.of(context).push(MaterialPageRoute(
+                      ? () => Navigator.of(context).push(
+                          MaterialPageRoute(
                             builder: (_) => UserProfileDetailScreen(
                               uid: meta!.otherUserUid,
-                              displayName: meta.otherUserName,
+                              displayName: dmDisplayName,
                               photoUrl: meta.otherUserPhoto,
                             ),
-                          ))
+                          ),
+                        )
                       : null,
                   child: CircleAvatar(
                     radius: 16,
@@ -1480,16 +1527,26 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     onBackgroundImageError: hasOtherPhoto ? (_, __) {} : null,
                     child: hasOtherPhoto
                         ? null
-                        : ((meta?.otherUserName.isNotEmpty ?? false)
-                            ? Text(meta!.otherUserName[0].toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
+                        : (meta?.otherUserDeleted ?? false)
+                        ? Icon(
+                            Icons.person_off_outlined,
+                            size: 16,
+                            color: colorScheme.onTertiaryContainer,
+                          )
+                        : (dmDisplayName.isNotEmpty
+                              ? Text(
+                                  dmDisplayName[0].toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.onTertiaryContainer,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.person,
+                                  size: 16,
                                   color: colorScheme.onTertiaryContainer,
-                                ))
-                            : Icon(Icons.person,
-                                size: 16,
-                                color: colorScheme.onTertiaryContainer)),
+                                )),
                   ),
                 ),
               )
@@ -1501,8 +1558,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 decoration: InputDecoration(
                   hintText: l.searchMessages,
                   hintStyle: TextStyle(
-                      color: colorScheme.onSurface.withOpacity(0.4),
-                      fontSize: 14),
+                    color: colorScheme.onSurface.withOpacity(0.4),
+                    fontSize: 14,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(20),
                     borderSide: BorderSide.none,
@@ -1510,11 +1568,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   filled: true,
                   fillColor: colorScheme.surfaceContainerHighest,
                   contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   isDense: true,
-                  prefixIcon: Icon(Icons.search,
-                      size: 18,
-                      color: colorScheme.onSurface.withOpacity(0.4)),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    size: 18,
+                    color: colorScheme.onSurface.withOpacity(0.4),
+                  ),
                 ),
                 style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
                 onChanged: (val) {
@@ -1538,9 +1600,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     Text(appBarTitle.isNotEmpty ? appBarTitle : 'Chat Room'),
                   if (_isMuted) ...[
                     const SizedBox(width: 6),
-                    Icon(Icons.notifications_off_outlined,
-                        size: 16,
-                        color: colorScheme.onSurface.withOpacity(0.4)),
+                    Icon(
+                      Icons.notifications_off_outlined,
+                      size: 16,
+                      color: colorScheme.onSurface.withOpacity(0.4),
+                    ),
                   ],
                 ],
               ),
@@ -1563,14 +1627,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           _buildNoticeBanner(colorScheme),
           if (_isSearching && _searchLoading)
             LinearProgressIndicator(
-                minHeight: 2,
-                backgroundColor: colorScheme.surface,
-                color: colorScheme.primary),
+              minHeight: 2,
+              backgroundColor: colorScheme.surface,
+              color: colorScheme.primary,
+            ),
           if (_uploadingMedia)
             LinearProgressIndicator(
-                minHeight: 2,
-                backgroundColor: colorScheme.surface,
-                color: colorScheme.primary),
+              minHeight: 2,
+              backgroundColor: colorScheme.surface,
+              color: colorScheme.primary,
+            ),
           Expanded(
             child: Stack(
               clipBehavior: Clip.none,
@@ -1586,8 +1652,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                       onPressed: _jumpToBottom,
                       backgroundColor: colorScheme.surface.withOpacity(0.9),
                       elevation: 2,
-                      child: Icon(Icons.keyboard_arrow_down,
-                          color: colorScheme.primary),
+                      child: Icon(
+                        Icons.keyboard_arrow_down,
+                        color: colorScheme.primary,
+                      ),
                     ),
                   ),
 
@@ -1637,8 +1705,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         ),
         child: Row(
           children: [
-            Icon(Icons.keyboard_arrow_down,
-                color: colorScheme.onInverseSurface, size: 18),
+            Icon(
+              Icons.keyboard_arrow_down,
+              color: colorScheme.onInverseSurface,
+              size: 18,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
@@ -1675,23 +1746,29 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   List<Widget> _buildAppBarActions(
-      AppLocalizations l, ColorScheme colorScheme) {
+    AppLocalizations l,
+    ColorScheme colorScheme,
+  ) {
     if (_isSearching) {
       return [
         if (_searchLoading)
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 12),
             child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2)),
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
           )
         else if (_searchResults.isNotEmpty) ...[
           Center(
-            child: Text('${_searchIndex + 1}/${_searchResults.length}',
-                style: TextStyle(
-                    fontSize: 13,
-                    color: colorScheme.onSurface.withOpacity(0.7))),
+            child: Text(
+              '${_searchIndex + 1}/${_searchResults.length}',
+              style: TextStyle(
+                fontSize: 13,
+                color: colorScheme.onSurface.withOpacity(0.7),
+              ),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.keyboard_arrow_up),
@@ -1707,14 +1784,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Center(
-              child: Text(l.noSearchResults,
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: colorScheme.onSurface.withOpacity(0.4))),
+              child: Text(
+                l.noSearchResults,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colorScheme.onSurface.withOpacity(0.4),
+                ),
+              ),
             ),
           ),
-        IconButton(
-            icon: const Icon(Icons.close), onPressed: _toggleSearch),
+        IconButton(icon: const Icon(Icons.close), onPressed: _toggleSearch),
       ];
     }
     return [
@@ -1735,8 +1814,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       return NoticeBanner(
         text: pinned['text'] as String? ?? '',
         onDismiss: () => setState(() => _noticeBannerDismissed = true),
-        onTap: () => Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => NoticesScreen(roomId: widget.roomId))),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => NoticesScreen(roomId: widget.roomId),
+          ),
+        ),
         colorScheme: colorScheme,
       );
     }
@@ -1752,8 +1834,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               color: colorScheme.primaryContainer,
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.campaign_outlined,
-                size: 18, color: colorScheme.primary),
+            child: Icon(
+              Icons.campaign_outlined,
+              size: 18,
+              color: colorScheme.primary,
+            ),
           ),
         ),
       ),
@@ -1789,7 +1874,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
                 // ── _lastStreamDoc 업데이트 & 새 메시지 배너 감지 ──────────────
                 if (messages.isNotEmpty) {
-                  final isNewMessage = _lastStreamDoc != null &&
+                  final isNewMessage =
+                      _lastStreamDoc != null &&
                       _lastStreamDoc!.id != messages.last.id;
 
                   // _lastStreamDoc 갱신
@@ -1805,10 +1891,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   if (isNewMessage && _showScrollToBottom) {
                     final latestData =
                         messages.first.data() as Map<String, dynamic>;
-                    final isSystem =
-                        latestData['is_system'] as bool? ?? false;
-                    final senderId =
-                        latestData['sender_id'] as String? ?? '';
+                    final isSystem = latestData['is_system'] as bool? ?? false;
+                    final senderId = latestData['sender_id'] as String? ?? '';
 
                     if (!isSystem && senderId != _currentUserId) {
                       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1823,8 +1907,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 final uniqueOlder = _olderMessages
                     .where((d) => !streamIds.contains(d.id))
                     .toList();
-                final allMessages =
-                    [...messages, ...uniqueOlder].where((d) {
+                final allMessages = [...messages, ...uniqueOlder].where((d) {
                   final data = d.data() as Map<String, dynamic>;
                   final senderId = data['sender_id'] as String? ?? '';
                   final isSystem = data['is_system'] as bool? ?? false;
@@ -1832,9 +1915,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 }).toList();
 
                 final senderIds = allMessages
-                    .map((doc) => (doc.data() as Map<String, dynamic>)['sender_id']
-                        as String? ??
-                        '')
+                    .expand((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      return [
+                        data['sender_id'] as String? ?? '',
+                        data['shared_user_id'] as String? ?? '',
+                      ];
+                    })
                     .where((uid) => uid.isNotEmpty)
                     .toSet();
                 if (senderIds.isNotEmpty) {
@@ -1843,9 +1930,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
                 if (allMessages.isEmpty && _uploadingMessages.isEmpty) {
                   return Center(
-                    child: Text(l.noMessages,
-                        style: TextStyle(
-                            color: colorScheme.onSurface.withOpacity(0.4))),
+                    child: Text(
+                      l.noMessages,
+                      style: TextStyle(
+                        color: colorScheme.onSurface.withOpacity(0.4),
+                      ),
+                    ),
                   );
                 }
 
@@ -1855,7 +1945,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   reverse: true,
                   padding: const EdgeInsets.only(top: 8, bottom: 8),
                   cacheExtent: 3000,
-                  itemCount: uploadingList.length +
+                  itemCount:
+                      uploadingList.length +
                       allMessages.length +
                       (_loadingMore ? 1 : 0),
                   itemBuilder: (context, index) {
@@ -1913,11 +2004,28 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final isContinuous = _isContinuous(allMessages, index);
     final senderId = data['sender_id'] as String? ?? '';
     final storedPhoto = data['sender_photo_url'] as String? ?? '';
-    final cachedProfile = senderId.isNotEmpty
-        ? context.read<ChatProvider>().getCachedUserProfile(senderId)
-        : null;
-    final resolvedPhoto =
-        storedPhoto.isNotEmpty ? storedPhoto : cachedProfile?['photo'] as String? ?? '';
+    final senderProfile = UserDisplay.resolveCached(
+      senderId,
+      fallbackName: data['sender_name'] as String? ?? '',
+      fallbackPhotoUrl: storedPhoto,
+    );
+    final resolvedPhoto = senderProfile?.isDeleted == true
+        ? ''
+        : (senderProfile?.photoUrl ?? storedPhoto);
+    final resolvedSenderName =
+        (senderProfile ??
+                UserDisplay.fromStored(
+                  uid: senderId,
+                  name: data['sender_name'] as String? ?? '',
+                  photoUrl: storedPhoto,
+                ))
+            .displayName(l, fallback: data['sender_name'] as String? ?? '');
+    final resolvedData = {
+      ...data,
+      'sender_name': resolvedSenderName,
+      'sender_photo_url': resolvedPhoto,
+      'sender_is_deleted': senderProfile?.isDeleted == true,
+    };
 
     _messageKeys.putIfAbsent(msgId, () => GlobalKey());
 
@@ -1949,7 +2057,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         else if (storedPhoto.isNotEmpty)
           _buildBubble(
             context: context,
-            data: data['is_deleted'] == true ? {...data, 'text': l.messageDeleted, 'type': 'text'} : data,
+            data: data['is_deleted'] == true
+                ? {...resolvedData, 'text': l.messageDeleted, 'type': 'text'}
+                : resolvedData,
             msgId: msgId,
             photoUrl: resolvedPhoto,
             isContinuous: isContinuous,
@@ -1960,7 +2070,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         else
           _buildBubble(
             context: context,
-            data: data['is_deleted'] == true ? {...data, 'text': l.messageDeleted, 'type': 'text'} : data,
+            data: data['is_deleted'] == true
+                ? {...resolvedData, 'text': l.messageDeleted, 'type': 'text'}
+                : resolvedData,
             msgId: msgId,
             photoUrl: resolvedPhoto,
             isContinuous: isContinuous,
@@ -1986,27 +2098,34 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onTap: isDesktopLayout ? () => _showMessageOptions(context, data, msgId) : null,
-      onLongPress:
-          isDesktopLayout ? null : () => _showMessageOptions(context, data, msgId),
+      onTap: isDesktopLayout
+          ? () => _showMessageOptions(context, data, msgId)
+          : null,
+      onLongPress: isDesktopLayout
+          ? null
+          : () => _showMessageOptions(context, data, msgId),
       child: MessageBubble(
         data: {...data, 'sender_photo_url': photoUrl},
         isMe: data['sender_id'] == _currentUserId,
         isContinuous: isContinuous,
-        unreadCount:
-            _calculateUnread(data['created_at'] as Timestamp?, members),
+        unreadCount: _calculateUnread(
+          data['created_at'] as Timestamp?,
+          members,
+        ),
         colorScheme: colorScheme,
         isHighlighted: msgId == _highlightMessageId,
         searchQuery: _isSearching ? _searchQuery : '',
-        onAvatarTap: data['sender_id'] != null &&
-                data['sender_id'] != _currentUserId
-            ? () => Navigator.of(context).push(MaterialPageRoute(
+        onAvatarTap:
+            data['sender_id'] != null && data['sender_id'] != _currentUserId
+            ? () => Navigator.of(context).push(
+                MaterialPageRoute(
                   builder: (_) => UserProfileDetailScreen(
                     uid: data['sender_id'] as String,
                     photoUrl: photoUrl,
                     displayName: data['sender_name'] as String? ?? '',
                   ),
-                ))
+                ),
+              )
             : null,
         onReplyTap: data['reply_to_id'] != null
             ? () => _scrollToMessage(data['reply_to_id'] as String)
@@ -2016,22 +2135,28 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   Widget _buildUploadingBubble(
-      _UploadingMessage msg, ColorScheme colorScheme, AppLocalizations l) {
+    _UploadingMessage msg,
+    ColorScheme colorScheme,
+    AppLocalizations l,
+  ) {
     Widget content;
     if (msg.type == 'image') {
       content = msg.imageFiles.length == 1
           ? ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.file(msg.imageFiles[0],
-                  width: 200, height: 200, fit: BoxFit.cover),
+              child: Image.file(
+                msg.imageFiles[0],
+                width: 200,
+                height: 200,
+                fit: BoxFit.cover,
+              ),
             )
           : SizedBox(
               width: 200,
               child: GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 3,
                   crossAxisSpacing: 2,
                   mainAxisSpacing: 2,
@@ -2049,14 +2174,23 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Image.file(msg.thumbnailFile!,
-                width: 200, height: 150, fit: BoxFit.cover),
+            Image.file(
+              msg.thumbnailFile!,
+              width: 200,
+              height: 150,
+              fit: BoxFit.cover,
+            ),
             Container(
               padding: const EdgeInsets.all(10),
               decoration: const BoxDecoration(
-                  color: Colors.black54, shape: BoxShape.circle),
-              child: const Icon(Icons.play_arrow,
-                  color: Colors.white, size: 32),
+                color: Colors.black54,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.play_arrow,
+                color: Colors.white,
+                size: 32,
+              ),
             ),
           ],
         ),
@@ -2071,8 +2205,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         ),
         child: Row(
           children: [
-            Icon(Icons.insert_drive_file_outlined,
-                color: colorScheme.primary, size: 28),
+            Icon(
+              Icons.insert_drive_file_outlined,
+              color: colorScheme.primary,
+              size: 28,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -2196,10 +2333,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     ),
                     child: Center(
                       child: msg.failed
-                          ? const Icon(Icons.error_outline,
-                              color: Colors.white, size: 32)
+                          ? const Icon(
+                              Icons.error_outline,
+                              color: Colors.white,
+                              size: 32,
+                            )
                           : const CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2),
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
                     ),
                   ),
                 ),
@@ -2223,7 +2365,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 color: colorScheme.surfaceContainerHighest,
                 border: Border(
                   top: BorderSide(
-                      color: colorScheme.onSurface.withOpacity(0.08)),
+                    color: colorScheme.onSurface.withOpacity(0.08),
+                  ),
                   left: BorderSide(color: colorScheme.primary, width: 3),
                 ),
               ),
@@ -2238,9 +2381,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                         Text(
                           _replyToData!['sender_name'] as String? ?? '',
                           style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.primary),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.primary,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -2248,16 +2392,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                              fontSize: 12,
-                              color: colorScheme.onSurface.withOpacity(0.6)),
+                            fontSize: 12,
+                            color: colorScheme.onSurface.withOpacity(0.6),
+                          ),
                         ),
                       ],
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.close,
-                        size: 18,
-                        color: colorScheme.onSurface.withOpacity(0.5)),
+                    icon: Icon(
+                      Icons.close,
+                      size: 18,
+                      color: colorScheme.onSurface.withOpacity(0.5),
+                    ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                     onPressed: () => setState(() {
@@ -2273,8 +2420,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             decoration: BoxDecoration(
               color: colorScheme.surface,
               border: Border(
-                  top: BorderSide(
-                      color: colorScheme.onSurface.withOpacity(0.08))),
+                top: BorderSide(color: colorScheme.onSurface.withOpacity(0.08)),
+              ),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -2283,10 +2430,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   icon: AnimatedRotation(
                     turns: _showAttachPanel ? 0.125 : 0.0,
                     duration: const Duration(milliseconds: 200),
-                    child: Icon(Icons.add,
-                        color: _showAttachPanel
-                            ? colorScheme.primary
-                            : colorScheme.onSurface.withOpacity(0.5)),
+                    child: Icon(
+                      Icons.add,
+                      color: _showAttachPanel
+                          ? colorScheme.primary
+                          : colorScheme.onSurface.withOpacity(0.5),
+                    ),
                   ),
                   padding: const EdgeInsets.all(6),
                   constraints: const BoxConstraints(),
@@ -2301,16 +2450,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                           _sendMessage();
                         }
                       },
-                      const SingleActivator(LogicalKeyboardKey.enter,
-                          shift: true): () {
+                      const SingleActivator(
+                        LogicalKeyboardKey.enter,
+                        shift: true,
+                      ): () {
                         final text = _msgController.text;
                         final selection = _msgController.selection;
                         final newText = text.replaceRange(
-                            selection.start, selection.end, '\n');
+                          selection.start,
+                          selection.end,
+                          '\n',
+                        );
                         _msgController.value = _msgController.value.copyWith(
                           text: newText,
                           selection: TextSelection.collapsed(
-                              offset: selection.start + 1),
+                            offset: selection.start + 1,
+                          ),
                         );
                       },
                     },
@@ -2325,8 +2480,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                       decoration: InputDecoration(
                         hintText: l.typeMessage,
                         hintStyle: TextStyle(
-                            color: colorScheme.onSurface.withOpacity(0.4),
-                            fontSize: 14),
+                          color: colorScheme.onSurface.withOpacity(0.4),
+                          fontSize: 14,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(22),
                           borderSide: BorderSide.none,
@@ -2334,7 +2490,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                         filled: true,
                         fillColor: colorScheme.surfaceContainerHighest,
                         contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 9),
+                          horizontal: 16,
+                          vertical: 9,
+                        ),
                         isDense: true,
                       ),
                       style: const TextStyle(fontSize: 14),
@@ -2346,8 +2504,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 ),
                 const SizedBox(width: 4),
                 IconButton(
-                  icon:
-                      Icon(Icons.send_rounded, color: colorScheme.primary),
+                  icon: Icon(Icons.send_rounded, color: colorScheme.primary),
                   padding: const EdgeInsets.all(6),
                   constraints: const BoxConstraints(),
                   onPressed: _sendMessage,
@@ -2372,83 +2529,90 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Widget _buildAttachPanel(ColorScheme colorScheme, AppLocalizations l) {
     final items = [
       AttachItem(
-          icon: Icons.photo_outlined,
-          label: l.attachPhotos,
-          color: Colors.green,
-          onTap: _sendImages),
+        icon: Icons.photo_outlined,
+        label: l.attachPhotos,
+        color: Colors.green,
+        onTap: _sendImages,
+      ),
       AttachItem(
-          icon: Icons.videocam_outlined,
-          label: l.attachVideos,
-          color: Colors.red,
-          onTap: _sendVideo),
+        icon: Icons.videocam_outlined,
+        label: l.attachVideos,
+        color: Colors.red,
+        onTap: _sendVideo,
+      ),
       AttachItem(
-          icon: Icons.mic_outlined,
-          label: l.attachVoice,
-          color: Colors.orange,
-          onTap: _sendVoiceMessage),
+        icon: Icons.mic_outlined,
+        label: l.attachVoice,
+        color: Colors.orange,
+        onTap: _sendVoiceMessage,
+      ),
       AttachItem(
-          icon: Icons.call_outlined,
-          label: l.attachCall,
-          color: Colors.blue,
-          onTap: () {}),
+        icon: Icons.call_outlined,
+        label: l.attachCall,
+        color: Colors.blue,
+        onTap: () {},
+      ),
       AttachItem(
-          icon: Icons.videocam,
-          label: l.attachVideoCall,
-          color: Colors.purple,
-          onTap: () {}),
+        icon: Icons.videocam,
+        label: l.attachVideoCall,
+        color: Colors.purple,
+        onTap: () {},
+      ),
       AttachItem(
-          icon: Icons.auto_awesome_outlined,
-          label: l.attachAiMinutes,
-          color: Colors.teal,
-          onTap: () {}),
+        icon: Icons.auto_awesome_outlined,
+        label: l.attachAiMinutes,
+        color: Colors.teal,
+        onTap: () {},
+      ),
       AttachItem(
-          icon: Icons.share_location_outlined,
-          label: l.attachLocation,
-          color: Colors.cyan,
-          onTap: () async {
-            setState(() => _showAttachPanel = false);
-            final result = await showModalBottomSheet<LocationShareResult>(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              shape: const RoundedRectangleBorder(
-                borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              builder: (_) => LocationShareSheet(),
-            );
-            if (result != null && mounted) {
-              await _sendLocationMessage(result, l);
-            }
-          }),
+        icon: Icons.share_location_outlined,
+        label: l.attachLocation,
+        color: Colors.cyan,
+        onTap: () async {
+          setState(() => _showAttachPanel = false);
+          final result = await showModalBottomSheet<LocationShareResult>(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder: (_) => LocationShareSheet(),
+          );
+          if (result != null && mounted) {
+            await _sendLocationMessage(result, l);
+          }
+        },
+      ),
       AttachItem(
-          icon: Icons.insert_drive_file_outlined,
-          label: l.attachFile,
-          color: Colors.brown,
-          onTap: _sendFiles),
+        icon: Icons.insert_drive_file_outlined,
+        label: l.attachFile,
+        color: Colors.brown,
+        onTap: _sendFiles,
+      ),
       AttachItem(
-          icon: Icons.contacts_outlined,
-          label: l.attachContact,
-          color: Colors.indigo,
-          onTap: () async {
-            setState(() => _showAttachPanel = false);
-            final result = await showModalBottomSheet<ContactShareResult>(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              shape: const RoundedRectangleBorder(
-                borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              builder: (_) => ContactShareSheet(
-                shareButtonColor: Colors.white,
-                shareButtonForegroundColor: Colors.black,
-              ),
-            );
-            if (result != null && mounted) {
-              await _sendContactMessage(result);
-            }
-          }),
+        icon: Icons.contacts_outlined,
+        label: l.attachContact,
+        color: Colors.indigo,
+        onTap: () async {
+          setState(() => _showAttachPanel = false);
+          final result = await showModalBottomSheet<ContactShareResult>(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder: (_) => ContactShareSheet(
+              shareButtonColor: Colors.white,
+              shareButtonForegroundColor: Colors.black,
+            ),
+          );
+          if (result != null && mounted) {
+            await _sendContactMessage(result);
+          }
+        },
+      ),
       AttachItem(
         icon: Icons.schedule_send_outlined,
         label: l.attachSchedule,
@@ -2464,9 +2628,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         color: Colors.deepPurple,
         onTap: () {
           setState(() => _showAttachPanel = false);
-          Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => CreatePollScreen(roomId: widget.roomId),
-          ));
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => CreatePollScreen(roomId: widget.roomId),
+            ),
+          );
         },
       ),
     ];
@@ -2485,8 +2651,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           mainAxisSpacing: 16,
           crossAxisSpacing: 8,
           children: items
-              .map((item) =>
-                  AttachButton(item: item, colorScheme: colorScheme))
+              .map((item) => AttachButton(item: item, colorScheme: colorScheme))
               .toList(),
         ),
       ),
@@ -2494,27 +2659,29 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   Future<void> _sendLocationMessage(
-      LocationShareResult result, AppLocalizations l) async {
+    LocationShareResult result,
+    AppLocalizations l,
+  ) async {
     await FirebaseFirestore.instance
         .collection('chat_rooms')
         .doc(widget.roomId)
         .collection('messages')
         .add({
-      'type': 'location',
-      'location_lat': result.lat,
-      'location_lng': result.lng,
-      'location_type': result.type,
-      'sender_id': _currentUserId,
-      'sender_name': _myName,
-      'created_at': FieldValue.serverTimestamp(),
-    });
+          'type': 'location',
+          'location_lat': result.lat,
+          'location_lng': result.lng,
+          'location_type': result.type,
+          'sender_id': _currentUserId,
+          'sender_name': _myName,
+          'created_at': FieldValue.serverTimestamp(),
+        });
     await FirebaseFirestore.instance
         .collection('chat_rooms')
         .doc(widget.roomId)
         .update({
-      'last_message': result.type,
-      'last_time': FieldValue.serverTimestamp(),
-    });
+          'last_message': result.type,
+          'last_time': FieldValue.serverTimestamp(),
+        });
   }
 
   Future<void> _sendContactMessage(ContactShareResult result) async {

@@ -2,9 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../l10n/app_localizations.dart';
 import '../../providers/user_provider.dart';
 import '../../services/poll_service.dart';
+import '../../utils/user_cache.dart';
+import '../../utils/user_display.dart';
 
 class PollBubble extends StatelessWidget {
   final String roomId;
@@ -42,17 +45,33 @@ class PollBubble extends StatelessWidget {
         final isClosed = poll['is_closed'] as bool? ?? false;
         final scheduleSaved = poll['schedule_saved'] as bool? ?? false;
         final createdBy = poll['created_by'] as String? ?? '';
-        final options =
-            List<Map<String, dynamic>>.from(poll['options'] as List? ?? []);
+        final options = List<Map<String, dynamic>>.from(
+          poll['options'] as List? ?? [],
+        );
 
         final isDatePoll = type == 'date';
         final isCreator = createdBy == _myUid;
+        final voterIds = options
+            .expand(
+              (opt) => List<Map<String, dynamic>>.from(
+                (opt['voters'] as List? ?? []).map(
+                  (v) => Map<String, dynamic>.from(v as Map),
+                ),
+              ),
+            )
+            .map((voter) => voter['uid'] as String? ?? '')
+            .where((uid) => uid.isNotEmpty)
+            .toSet();
+        if (voterIds.isNotEmpty) {
+          UserCache.prefetch(voterIds);
+        }
 
         // 내가 투표한 옵션 ID 목록 (anonymous_voter_ids로 중복 체크 — 익명/실명 모두)
         final myVotes = <String>{};
         for (final opt in options) {
-          final anonVoters =
-              List<String>.from(opt['anonymous_voter_ids'] as List? ?? []);
+          final anonVoters = List<String>.from(
+            opt['anonymous_voter_ids'] as List? ?? [],
+          );
           if (anonVoters.contains(_myUid)) myVotes.add(opt['id'] as String);
         }
         final hasVoted = myVotes.isNotEmpty;
@@ -61,8 +80,9 @@ class PollBubble extends StatelessWidget {
         final allVoters = <String>{};
         int totalVoteCount = 0;
         for (final opt in options) {
-          final anonVoters =
-              List<String>.from(opt['anonymous_voter_ids'] as List? ?? []);
+          final anonVoters = List<String>.from(
+            opt['anonymous_voter_ids'] as List? ?? [],
+          );
           allVoters.addAll(anonVoters);
           totalVoteCount += opt['vote_count'] as int? ?? 0;
         }
@@ -95,59 +115,67 @@ class PollBubble extends StatelessWidget {
                       ? colorScheme.onSurface.withOpacity(0.05)
                       : colorScheme.primaryContainer.withOpacity(0.4),
                   borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16)),
+                    top: Radius.circular(16),
+                  ),
                 ),
-                child: Row(children: [
-                  Icon(
-                    isDatePoll
-                        ? Icons.calendar_today_outlined
-                        : Icons.poll_outlined,
-                    size: 16,
-                    color: isClosed
-                        ? colorScheme.onSurface.withOpacity(0.4)
-                        : colorScheme.primary,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: isClosed
-                            ? colorScheme.onSurface.withOpacity(0.5)
-                            : colorScheme.onSurface,
-                      ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isDatePoll
+                          ? Icons.calendar_today_outlined
+                          : Icons.poll_outlined,
+                      size: 16,
+                      color: isClosed
+                          ? colorScheme.onSurface.withOpacity(0.4)
+                          : colorScheme.primary,
                     ),
-                  ),
-                  if (isClosed)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: colorScheme.onSurface.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
+                    const SizedBox(width: 6),
+                    Expanded(
                       child: Text(
-                        l.pollClosed,
+                        title,
                         style: TextStyle(
-                          fontSize: 10,
-                          color: colorScheme.onSurface.withOpacity(0.5),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: isClosed
+                              ? colorScheme.onSurface.withOpacity(0.5)
+                              : colorScheme.onSurface,
                         ),
                       ),
                     ),
-                ]),
+                    if (isClosed)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.onSurface.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          l.pollClosed,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: colorScheme.onSurface.withOpacity(0.5),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
 
               // ── 뱃지 (익명/복수선택) ────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
-                child: Wrap(spacing: 6, children: [
-                  if (isAnonymous)
-                    _Badge(label: l.pollAnonymous, colorScheme: colorScheme),
-                  if (isMultiple)
-                    _Badge(label: l.pollMultiple, colorScheme: colorScheme),
-                ]),
+                child: Wrap(
+                  spacing: 6,
+                  children: [
+                    if (isAnonymous)
+                      _Badge(label: l.pollAnonymous, colorScheme: colorScheme),
+                    if (isMultiple)
+                      _Badge(label: l.pollMultiple, colorScheme: colorScheme),
+                  ],
+                ),
               ),
 
               // ── 선택지 ───────────────────────────────────────────────────
@@ -160,13 +188,16 @@ class PollBubble extends StatelessWidget {
                     final count = opt['vote_count'] as int? ?? 0;
                     // 실명 투표자 목록 [{uid, name, photo_url}]
                     final voters = List<Map<String, dynamic>>.from(
-                      (opt['voters'] as List? ?? [])
-                          .map((v) => Map<String, dynamic>.from(v as Map)),
+                      (opt['voters'] as List? ?? []).map(
+                        (v) => Map<String, dynamic>.from(v as Map),
+                      ),
                     );
                     final isSelected = myVotes.contains(id);
 
                     // 비율 계산
-                    final total = isAnonymous ? totalVoteCount : allVoters.length;
+                    final total = isAnonymous
+                        ? totalVoteCount
+                        : allVoters.length;
                     final pct = total == 0 ? 0.0 : count / total;
 
                     // 최다 득표 여부 (종료 시 강조)
@@ -179,8 +210,7 @@ class PollBubble extends StatelessWidget {
                       onTap: isClosed
                           ? null
                           : () {
-                              final myName =
-                                  context.read<UserProvider>().name;
+                              final myName = context.read<UserProvider>().name;
                               service.vote(
                                 roomId: roomId,
                                 pollId: pollId,
@@ -194,93 +224,102 @@ class PollBubble extends StatelessWidget {
                             },
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 8),
-                        child: Stack(children: [
-                          // 바 배경
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: LinearProgressIndicator(
-                              value: (hasVoted || isClosed) ? pct : 0,
-                              minHeight: 40,
-                              backgroundColor:
-                                  colorScheme.onSurface.withOpacity(0.06),
-                              valueColor: AlwaysStoppedAnimation(
-                                isWinner
-                                    ? colorScheme.primary.withOpacity(0.25)
-                                    : isSelected
-                                        ? colorScheme.primary.withOpacity(0.15)
-                                        : colorScheme.onSurface
-                                            .withOpacity(0.08),
+                        child: Stack(
+                          children: [
+                            // 바 배경
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: LinearProgressIndicator(
+                                value: (hasVoted || isClosed) ? pct : 0,
+                                minHeight: 40,
+                                backgroundColor: colorScheme.onSurface
+                                    .withOpacity(0.06),
+                                valueColor: AlwaysStoppedAnimation(
+                                  isWinner
+                                      ? colorScheme.primary.withOpacity(0.25)
+                                      : isSelected
+                                      ? colorScheme.primary.withOpacity(0.15)
+                                      : colorScheme.onSurface.withOpacity(0.08),
+                                ),
                               ),
                             ),
-                          ),
-                          // 텍스트 + 득표 수
-                          Positioned.fill(
-                            child: Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              child: Row(children: [
-                                // 선택 체크
-                                if (isSelected)
-                                  Icon(Icons.check_circle,
-                                      size: 16,
-                                      color: colorScheme.primary),
-                                if (!isSelected)
-                                  Icon(Icons.circle_outlined,
-                                      size: 16,
-                                      color: colorScheme.onSurface
-                                          .withOpacity(0.3)),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    isDatePoll
-                                        ? _formatDateOption(text)
-                                        : text,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: isWinner || isSelected
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                      color: isWinner
-                                          ? colorScheme.primary
-                                          : colorScheme.onSurface,
-                                    ),
-                                  ),
+                            // 텍스트 + 득표 수
+                            Positioned.fill(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
                                 ),
-                                if (hasVoted || isClosed) ...[
-                                  Text(
-                                    '$count${l.pollTotalVotes}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: isWinner
-                                          ? colorScheme.primary
-                                          : colorScheme.onSurface
-                                              .withOpacity(0.5),
-                                      fontWeight: isWinner
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
+                                child: Row(
+                                  children: [
+                                    // 선택 체크
+                                    if (isSelected)
+                                      Icon(
+                                        Icons.check_circle,
+                                        size: 16,
+                                        color: colorScheme.primary,
+                                      ),
+                                    if (!isSelected)
+                                      Icon(
+                                        Icons.circle_outlined,
+                                        size: 16,
+                                        color: colorScheme.onSurface
+                                            .withOpacity(0.3),
+                                      ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        isDatePoll
+                                            ? _formatDateOption(text)
+                                            : text,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: isWinner || isSelected
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                          color: isWinner
+                                              ? colorScheme.primary
+                                              : colorScheme.onSurface,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${(pct * 100).round()}%',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: colorScheme.onSurface
-                                          .withOpacity(0.4),
-                                    ),
-                                  ),
-                                ],
-                                // 실명 투표 시 투표자 아바타
-                                if (!isAnonymous &&
-                                    (hasVoted || isClosed) &&
-                                    voters.isNotEmpty)
-                                  _VoterAvatars(
-                                      voters: voters,
-                                      colorScheme: colorScheme),
-                              ]),
+                                    if (hasVoted || isClosed) ...[
+                                      Text(
+                                        '$count${l.pollTotalVotes}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isWinner
+                                              ? colorScheme.primary
+                                              : colorScheme.onSurface
+                                                    .withOpacity(0.5),
+                                          fontWeight: isWinner
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${(pct * 100).round()}%',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: colorScheme.onSurface
+                                              .withOpacity(0.4),
+                                        ),
+                                      ),
+                                    ],
+                                    // 실명 투표 시 투표자 아바타
+                                    if (!isAnonymous &&
+                                        (hasVoted || isClosed) &&
+                                        voters.isNotEmpty)
+                                      _VoterAvatars(
+                                        voters: voters,
+                                        colorScheme: colorScheme,
+                                      ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
-                        ]),
+                          ],
+                        ),
                       ),
                     );
                   }).toList(),
@@ -290,60 +329,77 @@ class PollBubble extends StatelessWidget {
               // ── 하단 정보 + 액션 ─────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
-                child: Row(children: [
-                  Text(
-                    '총 $totalDisplay${l.pollTotalVotes}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: colorScheme.onSurface.withOpacity(0.4),
-                    ),
-                  ),
-                  const Spacer(),
-
-                  // 날짜투표 + 종료 + 그룹 있음 → 일정 저장 버튼
-                  if (isDatePoll &&
-                      isClosed &&
-                      !scheduleSaved &&
-                      refGroupId != null &&
-                      isCreator)
-                    TextButton.icon(
-                      onPressed: () =>
-                          _saveSchedule(context, poll, options, l),
-                      icon: const Icon(Icons.event_available, size: 14),
-                      label: Text(l.pollScheduleSave,
-                          style: const TextStyle(fontSize: 12)),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                child: Row(
+                  children: [
+                    Text(
+                      '총 $totalDisplay${l.pollTotalVotes}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: colorScheme.onSurface.withOpacity(0.4),
                       ),
                     ),
+                    const Spacer(),
 
-                  // 일정 저장 완료
-                  if (scheduleSaved)
-                    Row(children: [
-                      Icon(Icons.check_circle,
-                          size: 14, color: colorScheme.primary),
-                      const SizedBox(width: 4),
-                      Text(
-                        l.pollScheduleSaved,
-                        style: TextStyle(
-                            fontSize: 11, color: colorScheme.primary),
+                    // 날짜투표 + 종료 + 그룹 있음 → 일정 저장 버튼
+                    if (isDatePoll &&
+                        isClosed &&
+                        !scheduleSaved &&
+                        refGroupId != null &&
+                        isCreator)
+                      TextButton.icon(
+                        onPressed: () =>
+                            _saveSchedule(context, poll, options, l),
+                        icon: const Icon(Icons.event_available, size: 14),
+                        label: Text(
+                          l.pollScheduleSave,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                        ),
                       ),
-                    ]),
 
-                  // 투표 종료 버튼 (생성자만, 아직 안 닫힘)
-                  if (!isClosed && isCreator)
-                    TextButton(
-                      onPressed: () => _confirmClose(context, l),
-                      style: TextButton.styleFrom(
-                        foregroundColor: colorScheme.error,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                    // 일정 저장 완료
+                    if (scheduleSaved)
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            size: 14,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            l.pollScheduleSaved,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ],
                       ),
-                      child: Text(l.pollClose,
-                          style: const TextStyle(fontSize: 12)),
-                    ),
-                ]),
+
+                    // 투표 종료 버튼 (생성자만, 아직 안 닫힘)
+                    if (!isClosed && isCreator)
+                      TextButton(
+                        onPressed: () => _confirmClose(context, l),
+                        style: TextButton.styleFrom(
+                          foregroundColor: colorScheme.error,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                        ),
+                        child: Text(
+                          l.pollClose,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -361,8 +417,9 @@ class PollBubble extends StatelessWidget {
         content: Text(l.pollCloseConfirm),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(l.cancel)),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l.cancel),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
@@ -392,8 +449,9 @@ class PollBubble extends StatelessWidget {
         content: Text(l.pollScheduleSaveConfirm),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(l.cancel)),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l.cancel),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(l.pollScheduleSave),
@@ -412,8 +470,7 @@ class PollBubble extends StatelessWidget {
     );
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(ok ? l.pollScheduleSaved : '저장에 실패했습니다.')),
+        SnackBar(content: Text(ok ? l.pollScheduleSaved : '저장에 실패했습니다.')),
       );
     }
   }
@@ -437,17 +494,16 @@ class _Badge extends StatelessWidget {
   const _Badge({required this.label, required this.colorScheme});
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-        decoration: BoxDecoration(
-          color: colorScheme.secondaryContainer,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-              fontSize: 10, color: colorScheme.onSecondaryContainer),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    decoration: BoxDecoration(
+      color: colorScheme.secondaryContainer,
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(fontSize: 10, color: colorScheme.onSecondaryContainer),
+    ),
+  );
 }
 
 // ── 실명 투표자 아바타 ─────────────────────────────────────────────────────────
@@ -462,9 +518,7 @@ class _VoterAvatars extends StatelessWidget {
     final extra = voters.length - show.length; // 3명 초과 시 +N 표시
 
     return GestureDetector(
-      onTap: voters.isNotEmpty
-          ? () => _showVoterList(context)
-          : null,
+      onTap: voters.isNotEmpty ? () => _showVoterList(context) : null,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -475,13 +529,13 @@ class _VoterAvatars extends StatelessWidget {
               children: [
                 ...show.asMap().entries.map((e) {
                   final voter = e.value;
-                  final name = voter['name'] as String? ?? '?';
-                  final photoUrl = voter['photo_url'] as String?;
+                  final uid = voter['uid'] as String? ?? '';
                   return Positioned(
                     left: e.key * 12.0,
                     child: _VoterAvatar(
-                      name: name,
-                      photoUrl: photoUrl,
+                      uid: uid,
+                      fallbackName: voter['name'] as String? ?? '?',
+                      fallbackPhotoUrl: voter['photo_url'] as String?,
                       colorScheme: colorScheme,
                     ),
                   );
@@ -492,8 +546,7 @@ class _VoterAvatars extends StatelessWidget {
                     left: show.length * 12.0,
                     child: CircleAvatar(
                       radius: 9,
-                      backgroundColor:
-                          colorScheme.onSurface.withOpacity(0.25),
+                      backgroundColor: colorScheme.onSurface.withOpacity(0.25),
                       child: Text(
                         '+$extra',
                         style: TextStyle(
@@ -514,6 +567,7 @@ class _VoterAvatars extends StatelessWidget {
 
   // 투표자 전체 목록 바텀시트
   void _showVoterList(BuildContext context) {
+    final l = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SafeArea(
@@ -521,23 +575,38 @@ class _VoterAvatars extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 12),
-            Text('투표자 목록',
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(
+              l.participants,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
             const SizedBox(height: 8),
             const Divider(height: 1),
             ...voters.map((voter) {
-              final name = voter['name'] as String? ?? '?';
-              final photoUrl = voter['photo_url'] as String?;
               return ListTile(
                 leading: _VoterAvatar(
-                  name: name,
-                  photoUrl: photoUrl,
+                  uid: voter['uid'] as String? ?? '',
+                  fallbackName: voter['name'] as String? ?? '?',
+                  fallbackPhotoUrl: voter['photo_url'] as String?,
                   colorScheme: colorScheme,
                   radius: 18,
                   fontSize: 13,
                 ),
-                title: Text(name),
+                title: Text(
+                  (UserDisplay.resolveCached(
+                            voter['uid'] as String? ?? '',
+                            fallbackName: voter['name'] as String? ?? '?',
+                            fallbackPhotoUrl: voter['photo_url'] as String?,
+                          ) ??
+                          UserDisplay.fromStored(
+                            uid: voter['uid'] as String? ?? '',
+                            name: voter['name'] as String? ?? '?',
+                            photoUrl: voter['photo_url'] as String?,
+                          ))
+                      .displayName(
+                        l,
+                        fallback: voter['name'] as String? ?? '?',
+                      ),
+                ),
               );
             }),
             const SizedBox(height: 8),
@@ -550,15 +619,17 @@ class _VoterAvatars extends StatelessWidget {
 
 // 개별 아바타 (photo_url 있으면 사진, 없으면 이름 첫 글자)
 class _VoterAvatar extends StatelessWidget {
-  final String name;
-  final String? photoUrl;
+  final String uid;
+  final String fallbackName;
+  final String? fallbackPhotoUrl;
   final ColorScheme colorScheme;
   final double radius;
   final double fontSize;
 
   const _VoterAvatar({
-    required this.name,
-    required this.photoUrl,
+    required this.uid,
+    required this.fallbackName,
+    required this.fallbackPhotoUrl,
     required this.colorScheme,
     this.radius = 9,
     this.fontSize = 8,
@@ -566,24 +637,44 @@ class _VoterAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (photoUrl != null && photoUrl!.isNotEmpty) {
+    final l = AppLocalizations.of(context);
+    final user =
+        UserDisplay.resolveCached(
+          uid,
+          fallbackName: fallbackName,
+          fallbackPhotoUrl: fallbackPhotoUrl,
+        ) ??
+        UserDisplay.fromStored(
+          uid: uid,
+          name: fallbackName,
+          photoUrl: fallbackPhotoUrl,
+        );
+    final photoUrl = user.isDeleted ? '' : user.photoUrl;
+
+    if (photoUrl.isNotEmpty) {
       return CircleAvatar(
         radius: radius,
-        backgroundImage: NetworkImage(photoUrl!),
+        backgroundImage: NetworkImage(photoUrl),
         onBackgroundImageError: (_, __) {},
       );
     }
     return CircleAvatar(
       radius: radius,
       backgroundColor: colorScheme.primary.withOpacity(0.75),
-      child: Text(
-        name.isNotEmpty ? name[0].toUpperCase() : '?',
-        style: TextStyle(
-          fontSize: fontSize,
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      child: user.isDeleted
+          ? Icon(
+              Icons.person_off_outlined,
+              size: fontSize + 6,
+              color: Colors.white,
+            )
+          : Text(
+              user.initial(l, fallback: '?'),
+              style: TextStyle(
+                fontSize: fontSize,
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
     );
   }
 }

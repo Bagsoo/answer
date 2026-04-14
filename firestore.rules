@@ -6,6 +6,11 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return isLoggedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
     function isOwner(uid) {
       return request.auth.uid == uid;
     }
@@ -17,80 +22,112 @@ service cloud.firestore {
       return isGroup && member != null && (member.role == 'owner' || member.permissions.can_create_sub_chat == true);
     }
 
+    // ── 관리자 ──────────────────────────────────────────────────────────────
+    match /admins/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+
     // ── 유저 ────────────────────────────────────────────────────────────────
     match /users/{uid} {
       allow read: if isLoggedIn();
       allow write: if isOwner(uid);
 
       match /friends/{friendUid} {
-        allow read, write: if isOwner(uid);
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if isOwner(uid);
       }
       match /blocked/{blockedUid} {
-        allow read, write: if isOwner(uid);
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if isOwner(uid);
       }
 
       match /fcm_tokens/{tokenId} {
-        allow read, write: if isOwner(uid);
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if isOwner(uid);
       }
       match /group_notification_settings/{groupId} {
-        allow read, write: if isOwner(uid);
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if isOwner(uid);
       }
       match /joined_groups/{groupId} {
-        allow read, write: if isOwner(uid);
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if isOwner(uid);
       }
       match /memos/{memoId} {
-        allow read, write: if isOwner(uid);
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if isOwner(uid);
       }
     }
 
     // ── 채팅방 ──────────────────────────────────────────────────────────────
     match /chat_rooms/{roomId} {
-      allow read: if isLoggedIn() && (
+      allow read: if isAdmin() || (isLoggedIn() && (
         request.auth.uid in resource.data.member_ids || 
         (
           resource.data.ref_group_id != null && 
           exists(/databases/$(database)/documents/groups/$(resource.data.ref_group_id)/members/$(request.auth.uid))
         )
-      );
+      ));
       allow create: if isLoggedIn();
-      allow update: if isLoggedIn() &&
-        request.auth.uid in resource.data.member_ids;
+      allow update: if isAdmin() || (
+        isLoggedIn() &&
+        request.auth.uid in resource.data.member_ids
+      );
 
       match /messages/{messageId} {
-        allow read, create, delete: if isLoggedIn() &&
+        allow read: if isAdmin() || (
+          isLoggedIn() &&
+          request.auth.uid in
+            get(/databases/$(database)/documents/chat_rooms/$(roomId))
+              .data.member_ids
+        );
+        allow create, delete: if isLoggedIn() &&
           request.auth.uid in
             get(/databases/$(database)/documents/chat_rooms/$(roomId))
               .data.member_ids;
               
-        allow update: if isLoggedIn() &&
+        allow update: if isAdmin() || (
+          isLoggedIn() &&
           request.auth.uid in get(/databases/$(database)/documents/chat_rooms/$(roomId)).data.member_ids &&
           (
             (request.auth.uid == resource.data.sender_id && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'is_deleted', 'deleted_at', 'edited', 'updated_at'])) ||
             (request.resource.data.diff(resource.data).affectedKeys().hasAny(['is_hidden', 'hidden_by', 'hidden_at', 'is_system']) && canHideChatMessage(roomId))
-          );
+          )
+        );
       }
       match /room_members/{memberId} {
-        allow read: if isLoggedIn() &&
+        allow read: if isAdmin() || (
+          isLoggedIn() &&
           request.auth.uid in
             get(/databases/$(database)/documents/chat_rooms/$(roomId))
-              .data.member_ids;
+              .data.member_ids
+        );
         allow write: if isLoggedIn() &&
           request.auth.uid in
             getAfter(/databases/$(database)/documents/chat_rooms/$(roomId))
               .data.member_ids;
       }
       match /notices/{noticeId} {
-        allow read: if isLoggedIn() &&
+        allow read: if isAdmin() || (
+          isLoggedIn() &&
           request.auth.uid in
             get(/databases/$(database)/documents/chat_rooms/$(roomId))
-              .data.member_ids;
+              .data.member_ids
+        );
         allow write: if isLoggedIn() &&
           request.auth.uid in
             get(/databases/$(database)/documents/chat_rooms/$(roomId))
               .data.member_ids;
       }
       match /scheduled_messages/{msgId} {
-        allow read, write: if isLoggedIn() &&
+        allow read: if isAdmin() || (
+          isLoggedIn() &&
+          request.auth.uid in
+            get(/databases/$(database)/documents/chat_rooms/$(roomId))
+              .data.member_ids
+        );
+        allow write: if isLoggedIn() &&
           request.auth.uid in
             get(/databases/$(database)/documents/chat_rooms/$(roomId))
               .data.member_ids;
@@ -101,15 +138,16 @@ service cloud.firestore {
     match /groups/{groupId} {
       allow read: if isLoggedIn();
       allow create: if isLoggedIn();
-      allow update: if isLoggedIn() &&
-        exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+      allow update: if isAdmin() || (isLoggedIn() &&
+        exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)));
 
       match /members/{memberId} {
         allow read: if isLoggedIn();
-        allow write: if isLoggedIn();
+        allow write: if isLoggedIn() || isAdmin();
       }
       match /join_requests/{requestId} {
-        allow read, write: if isLoggedIn();
+        allow read: if isLoggedIn();
+        allow write: if isLoggedIn() || isAdmin();
       }
       match /schedules/{scheduleId} {
         allow read: if isLoggedIn();
