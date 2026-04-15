@@ -783,6 +783,7 @@ Future<void> _pickGroupLocation(
               latitude: gp.locationLat!,
               longitude: gp.locationLng!,
               name: gp.locationName,
+              address: '',
             )
           : null,
     ),

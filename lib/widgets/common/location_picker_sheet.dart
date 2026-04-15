@@ -12,11 +12,13 @@ class LocationResult {
   final double latitude;
   final double longitude;
   final String name;
+  final String address;
 
   const LocationResult({
     required this.latitude,
     required this.longitude,
     required this.name,
+    required this.address,
   });
 }
 
@@ -135,19 +137,20 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
         {
           'place_id': placeId,
           'key': widget.googleApiKey,
-          'fields': 'geometry,name',
+          'fields': 'geometry,name,formatted_address',
           'language': widget.languageCode,
         },
       );
       final response = await http.get(uri);
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final loc = data['result']?['geometry']?['location']
-          as Map<String, dynamic>?;
+      final result = data['result'] as Map<String, dynamic>?;
+      final loc = result?['geometry']?['location'] as Map<String, dynamic>?;
       if (loc == null) return null;
       return LocationResult(
         latitude: (loc['lat'] as num).toDouble(),
         longitude: (loc['lng'] as num).toDouble(),
         name: name,
+        address: result?['formatted_address'] as String? ?? '',
       );
     } catch (e) {
       return null;
@@ -202,9 +205,9 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       );
       if (!mounted) return;
 
-      final locationName =
+      final address =
           await _reverseGeocode(position.latitude, position.longitude);
-      await _saveRecentSearch(locationName);
+      await _saveRecentSearch(address);
 
       if (mounted) {
         Navigator.pop(
@@ -212,7 +215,8 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
           LocationResult(
             latitude: position.latitude,
             longitude: position.longitude,
-            name: locationName,
+            name: address,
+            address: address,
           ),
         );
       }

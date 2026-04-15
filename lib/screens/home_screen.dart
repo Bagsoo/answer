@@ -19,6 +19,7 @@ import 'group_detail_screen.dart';
 import 'app_settings_screen.dart';
 import 'friends_screen.dart';
 import 'memo_screen.dart';
+import 'my_schedules_screen.dart';
 import 'profile_screen.dart';
 import 'incoming_share_screen.dart';
 import '../widgets/memo/memo_detail_sheet.dart';
@@ -46,6 +47,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic>? _editingMemoData;
   String? _activeGroupId;
   String? _activeGroupName;
+  String? _activeScheduleId;
+  Map<String, dynamic>? _activeScheduleData;
   final Map<String, Map<String, dynamic>> _desktopVisitedGroups = {};
 
   @override
@@ -143,6 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
       FriendsScreen(),
       const ChatListScreen(),
       const MemoScreen(),
+      const MySchedulesScreen(),
       GroupListScreen(),
     ];
 
@@ -189,7 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const VerticalDivider(width: 1, thickness: 1),
 
-            // ── 오른쪽 채팅 영역 ──────────────────────────────────────────
+            // ── 오른쪽 컨텐츠 영역 ──────────────────────────────────────────
             Expanded(
               child: _currentIndex == 1
                   ? _buildDesktopChatArea(
@@ -197,6 +201,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   : _currentIndex == 2
                       ? _buildDesktopMemoArea(context, l)
                   : _currentIndex == 3
+                      ? _buildDesktopScheduleArea(context, l)
+                  : _currentIndex == 4
                       ? _buildDesktopGroupArea(context, l)
                   : _buildDesktopOtherTab(context, l),
             ),
@@ -245,6 +251,8 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         );
       case 3:
+        return const MySchedulesScreen(isDesktopMode: true);
+      case 4:
         return GroupListScreen(
           isDesktopMode: true,
           selectedGroupId: _activeGroupId,
@@ -264,6 +272,13 @@ class _HomeScreenState extends State<HomeScreen> {
       default:
         return const SizedBox();
     }
+  }
+
+  Widget _buildDesktopScheduleArea(BuildContext context, AppLocalizations l) {
+    // 스케줄은 현재 MySchedulesScreen 하나로 통합되어 있으므로 사이드바와 메인 영역을 어떻게 나눌지 고민 필요
+    // 일단 메인 영역에도 동일하게 보여주거나, 메인에 더 큰 달력을 보여줄 수 있음.
+    // 여기서는 메인 영역에 상세 내용을 보여주는 쪽으로 확장 가능.
+    return const MySchedulesScreen(isDesktopMode: true);
   }
 
   Widget _buildDesktopChatArea(
@@ -534,6 +549,10 @@ class _HomeScreenState extends State<HomeScreen> {
           label: l.navMemo,
         ),
         BottomNavigationBarItem(
+          icon: const Icon(Icons.calendar_month_outlined),
+          label: l.navSchedule,
+        ),
+        BottomNavigationBarItem(
           icon: const Icon(Icons.groups),
           label: l.navGroups,
         ),
@@ -545,6 +564,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (index == 0) return l.navFriends;
     if (index == 1) return l.navChats;
     if (index == 2) return l.navMemo;
+    if (index == 3) return l.navSchedule;
     return l.navGroups;
   }
 }
