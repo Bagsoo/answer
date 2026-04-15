@@ -29,6 +29,7 @@ class ScheduleFormScreen extends StatefulWidget {
 class _ScheduleFormScreenState extends State<ScheduleFormScreen> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
+  final _costController = TextEditingController();
   final _locationNameController = TextEditingController();
 
   DateTime _startTime = DateTime.now().add(const Duration(hours: 1));
@@ -47,6 +48,7 @@ class _ScheduleFormScreenState extends State<ScheduleFormScreen> {
       final e = widget.existing!;
       _titleController.text = e['title'] as String? ?? '';
       _descController.text = e['description'] as String? ?? '';
+      _costController.text = e['cost'] as String? ?? '';
       _startTime = (e['start_time'] as Timestamp?)?.toDate() ?? _startTime;
       _endTime = (e['end_time'] as Timestamp?)?.toDate() ?? _endTime;
 
@@ -62,6 +64,7 @@ class _ScheduleFormScreenState extends State<ScheduleFormScreen> {
   void dispose() {
     _titleController.dispose();
     _descController.dispose();
+    _costController.dispose();
     _locationNameController.dispose();
     super.dispose();
   }
@@ -192,6 +195,7 @@ class _ScheduleFormScreenState extends State<ScheduleFormScreen> {
       final data = {
         'title': title,
         'description': _descController.text.trim(),
+        'cost': _costController.text.trim(),
         'start_time': Timestamp.fromDate(_startTime),
         'end_time': Timestamp.fromDate(_endTime),
         'location': finalLocation,
@@ -321,6 +325,17 @@ class _ScheduleFormScreenState extends State<ScheduleFormScreen> {
                 prefixIcon: const Icon(Icons.notes),
               ),
               maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+
+            // 비용
+            TextField(
+              controller: _costController,
+              decoration: InputDecoration(
+                labelText: l.scheduleCost,
+                hintText: l.scheduleCostHint,
+                prefixIcon: const Icon(Icons.wallet_outlined),
+              ),
             ),
             const SizedBox(height: 24),
 

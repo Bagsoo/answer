@@ -477,6 +477,53 @@ class ChatService {
     await batch.commit();
   }
 
+  Future<void> sendSettlementMessage(
+    String roomId, {
+    required String groupId,
+    required String groupName,
+    required String settlementId,
+    required String title,
+    required String totalCost,
+    required String bankInfo,
+    required String creatorUid,
+    required List<dynamic> participants,
+  }) async {
+    final unreadUpdate = await _buildUnreadUpdate(roomId);
+    final batch = _db.batch();
+
+    final msgRef = _db
+        .collection('chat_rooms')
+        .doc(roomId)
+        .collection('messages')
+        .doc();
+
+    batch.set(msgRef, {
+      'sender_id': currentUserId,
+      'sender_name': FirebaseAuth.instance.currentUser?.displayName ?? '',
+      'sender_photo_url': FirebaseAuth.instance.currentUser?.photoURL ?? '',
+      'text': '',
+      'type': 'settlement',
+      'group_id': groupId,
+      'group_name': groupName,
+      'settlement_id': settlementId,
+      'settlement_title': title,
+      'settlement_total_cost': totalCost,
+      'settlement_bank_info': bankInfo,
+      'settlement_creator_uid': creatorUid,
+      'settlement_participants': participants,
+      'is_system': false,
+      'created_at': FieldValue.serverTimestamp(),
+    });
+
+    batch.update(_db.collection('chat_rooms').doc(roomId), {
+      'last_message': '💸 $title',
+      'last_time': FieldValue.serverTimestamp(),
+      ...unreadUpdate,
+    });
+
+    await batch.commit();
+  }
+
   Future<void> sendSharedMemoMessage(
     String roomId, {
     required String title,

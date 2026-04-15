@@ -192,6 +192,42 @@ class AppLocalizations {
   String get proPlanDesc => _s.proPlanDesc;
   String get viewOnMap => _s.viewOnMap;
 
+  // ── 일정 비용 및 정산 ──────────────────────────────────────────────────────
+  String get scheduleCost => _s.scheduleCost;
+  String get scheduleCostHint => _s.scheduleCostHint;
+  String get createSettlement => _s.createSettlement;
+  String get settlementTitle => _s.settlementTitle;
+  String get settlementTotalCost => _s.settlementTotalCost;
+  String get settlementTotalCostHint => _s.settlementTotalCostHint;
+  String get settlementBankInfo => _s.settlementBankInfo;
+  String get settlementBankInfoHint => _s.settlementBankInfoHint;
+  String get settlementSplitEqual => _s.settlementSplitEqual;
+  String get settlementSplitManual => _s.settlementSplitManual;
+  String get settlementSplitMode => _s.settlementSplitMode;
+  String get settlementMembers => _s.settlementMembers;
+  String get settlementAmountPerPerson => _s.settlementAmountPerPerson;
+  String get settlementAmountHint => _s.settlementAmountHint;
+  String get settlementCreated => _s.settlementCreated;
+  String get settlementCreateFailed => _s.settlementCreateFailed;
+  String get settlementStatus => _s.settlementStatus;
+  String get settlementPending => _s.settlementPending;
+  String get settlementSent => _s.settlementSent;
+  String get settlementConfirmed => _s.settlementConfirmed;
+  String get settlementMarkSent => _s.settlementMarkSent;
+  String get settlementMarkConfirmed => _s.settlementMarkConfirmed;
+  String get settlementCopyAccount => _s.settlementCopyAccount;
+  String get settlementAccountCopied => _s.settlementAccountCopied;
+  String get settlementDetail => _s.settlementDetail;
+  String get settlementMyAmount => _s.settlementMyAmount;
+  String get settlementShareToChat => _s.settlementShareToChat;
+  String get settlementTotalCostRequired => _s.settlementTotalCostRequired;
+  String get settlementEnterAllAmounts => _s.settlementEnterAllAmounts;
+  String get settlementCompleted => _s.settlementCompleted;
+  String get settlementSharedToChat => _s.settlementSharedToChat;
+  String get settlementNotFound => _s.settlementNotFound;
+  String settlementTotalCostValue(String cost) => _s.settlementTotalCostValue(cost);
+  String settlementAmountValue(String amount) => _s.settlementAmountValue(amount);
+
   String get uploadFailed => _s.uploadFailed;
   String get uploadingMessage => _s.uploadingMessage;
   String get originalMessage => _s.originalMessage;
@@ -838,6 +874,41 @@ abstract class _AppStrings {
   String get scheduleDetail;
   String get scheduleTitle;
   String get scheduleDescription;
+  // ── 일정 비용 및 정산 ──
+  String get scheduleCost;
+  String get scheduleCostHint;
+  String get createSettlement;
+  String get settlementTitle;
+  String get settlementTotalCost;
+  String get settlementTotalCostHint;
+  String get settlementBankInfo;
+  String get settlementBankInfoHint;
+  String get settlementSplitEqual;
+  String get settlementSplitManual;
+  String get settlementSplitMode;
+  String get settlementMembers;
+  String get settlementAmountPerPerson;
+  String get settlementAmountHint;
+  String get settlementCreated;
+  String get settlementCreateFailed;
+  String get settlementStatus;
+  String get settlementPending;
+  String get settlementSent;
+  String get settlementConfirmed;
+  String get settlementMarkSent;
+  String get settlementMarkConfirmed;
+  String get settlementCopyAccount;
+  String get settlementAccountCopied;
+  String get settlementDetail;
+  String get settlementMyAmount;
+  String get settlementShareToChat;
+  String get settlementTotalCostRequired;
+  String get settlementEnterAllAmounts;
+  String get settlementCompleted;
+  String get settlementSharedToChat;
+  String get settlementNotFound;
+  String settlementTotalCostValue(String cost);
+  String settlementAmountValue(String amount);
   String get startTime;
   String get endTime;
   String get noSchedules;
@@ -1579,6 +1650,42 @@ class _EnStrings extends _AppStrings {
   @override String get proPlanDesc => 'Pro plan description';  
   @override String get viewOnMap => 'View on map';
 
+  // ── schedule cost & settlement ──
+  @override String get scheduleCost => 'Cost';
+  @override String get scheduleCostHint => 'e.g. 30,000 KRW, ~\$10';
+  @override String get createSettlement => 'Create Settlement';
+  @override String get settlementTitle => 'Settlement Title';
+  @override String get settlementTotalCost => 'Total Cost';
+  @override String get settlementTotalCostHint => 'Enter total amount (numbers only)';
+  @override String get settlementBankInfo => 'Bank / Transfer Info';
+  @override String get settlementBankInfoHint => 'e.g. Chase Bank 1234567890 John';
+  @override String get settlementSplitEqual => 'Split Equally (1/N)';
+  @override String get settlementSplitManual => 'Enter Manually';
+  @override String get settlementSplitMode => 'Split Method';
+  @override String get settlementMembers => 'Participants';
+  @override String get settlementAmountPerPerson => 'Per person';
+  @override String get settlementAmountHint => 'Amount...';
+  @override String get settlementCreated => 'Settlement created!';
+  @override String get settlementCreateFailed => 'Failed to create settlement.';
+  @override String get settlementStatus => 'Settlement Status';
+  @override String get settlementPending => 'Pending';
+  @override String get settlementSent => 'Sent';
+  @override String get settlementConfirmed => 'Confirmed';
+  @override String get settlementMarkSent => 'Sent ✓';
+  @override String get settlementMarkConfirmed => 'Confirm Receipt';
+  @override String get settlementCopyAccount => 'Copy Account';
+  @override String get settlementAccountCopied => 'Account info copied!';
+  @override String get settlementDetail => 'Settlement Detail';
+  @override String get settlementMyAmount => 'My share';
+  @override String get settlementShareToChat => 'Share to Chat';
+  @override String get settlementTotalCostRequired => 'Please enter the total cost.';
+  @override String get settlementEnterAllAmounts => 'Please fill in all amounts.';
+  @override String get settlementCompleted => '✅ Settlement Completed';
+  @override String get settlementSharedToChat => 'Settlement shared to chat.';
+  @override String get settlementNotFound => 'Settlement not found.';
+  @override String settlementTotalCostValue(String cost) => 'Total $cost won';
+  @override String settlementAmountValue(String amount) => '$amount won';
+
   // ── 번역 ──
   @override String get translate => 'Translate';
   @override String get translating => 'Translating...';
@@ -2250,6 +2357,42 @@ class _KoStrings extends _AppStrings {
   @override String get plusPlanDesc => 'Plus 플랜 혜택';
   @override String get proPlanDesc => 'Pro 플랜 혜택';  
   @override String get viewOnMap => '지도 보기';
+
+  // ── 일정 비용 및 정산 ──
+  @override String get scheduleCost => '비용';
+  @override String get scheduleCostHint => '예: 3만원, 인당 5천원';
+  @override String get createSettlement => '정산하기';
+  @override String get settlementTitle => '정산 제목';
+  @override String get settlementTotalCost => '총 비용';
+  @override String get settlementTotalCostHint => '총 금액 입력 (숫자만)';
+  @override String get settlementBankInfo => '계좌 / 송금 정보';
+  @override String get settlementBankInfoHint => '예: 카카오뱅크 1234-56-7890 홍길동';
+  @override String get settlementSplitEqual => '균등 분배 (1/N)';
+  @override String get settlementSplitManual => '직접 입력';
+  @override String get settlementSplitMode => '분배 방식';
+  @override String get settlementMembers => '참여자';
+  @override String get settlementAmountPerPerson => '1인당';
+  @override String get settlementAmountHint => '금액...';
+  @override String get settlementCreated => '정산이 생성되었습니다!';
+  @override String get settlementCreateFailed => '정산 생성에 실패했습니다.';
+  @override String get settlementStatus => '정산 현황';
+  @override String get settlementPending => '대기 중';
+  @override String get settlementSent => '보냄';
+  @override String get settlementConfirmed => '확인 완료';
+  @override String get settlementMarkSent => '보냈어요 ✓';
+  @override String get settlementMarkConfirmed => '입금 확인';
+  @override String get settlementCopyAccount => '계좌 복사';
+  @override String get settlementAccountCopied => '계좌 정보가 복사되었습니다!';
+  @override String get settlementDetail => '정산 상세';
+  @override String get settlementMyAmount => '내 몫';
+  @override String get settlementShareToChat => '채팅방에 공유';
+  @override String get settlementTotalCostRequired => '총 비용을 입력해주세요.';
+  @override String get settlementEnterAllAmounts => '모든 참여자의 금액을 입력해주세요.';
+  @override String get settlementCompleted => '✅ 정산 완료';
+  @override String get settlementSharedToChat => '채팅방에 정산을 공유했습니다.';
+  @override String get settlementNotFound => '정산을 찾을 수 없습니다.';
+  @override String settlementTotalCostValue(String cost) => '총 $cost원';
+  @override String settlementAmountValue(String amount) => '$amount원';
 
   // ── 데스크톱 모드 ──
   @override String get selectFriendHint => '친구를 선택하세요';
@@ -2924,6 +3067,42 @@ class _JaStrings extends _AppStrings {
   @override String get plusPlanDesc => '成長中のコミュニティに';
   @override String get proPlanDesc => '大規模グループ向け';  
   @override String get viewOnMap => '地図で確認';
+
+  // ── 費用・精算 ──
+  @override String get scheduleCost => '費用';
+  @override String get scheduleCostHint => '例: 3,000円、一人1,000円程度';
+  @override String get createSettlement => '精算する';
+  @override String get settlementTitle => '精算タイトル';
+  @override String get settlementTotalCost => '合計金額';
+  @override String get settlementTotalCostHint => '合計金額を入力（数字のみ）';
+  @override String get settlementBankInfo => '口座 / 送金情報';
+  @override String get settlementBankInfoHint => '例: ゆうちょ 1234-56 山田';
+  @override String get settlementSplitEqual => '均等割り (1/N)';
+  @override String get settlementSplitManual => '手動入力';
+  @override String get settlementSplitMode => '分配方法';
+  @override String get settlementMembers => '参加者';
+  @override String get settlementAmountPerPerson => '1人あたり';
+  @override String get settlementAmountHint => '金額...';
+  @override String get settlementCreated => '精算が作成されました！';
+  @override String get settlementCreateFailed => '精算の作成に失敗しました。';
+  @override String get settlementStatus => '精算状況';
+  @override String get settlementPending => '未払い';
+  @override String get settlementSent => '送金済み';
+  @override String get settlementConfirmed => '確認済み';
+  @override String get settlementMarkSent => '送りました ✓';
+  @override String get settlementMarkConfirmed => '入金確認';
+  @override String get settlementCopyAccount => '口座コピー';
+  @override String get settlementAccountCopied => '口座情報をコピーしました！';
+  @override String get settlementDetail => '精算詳細';
+  @override String get settlementMyAmount => '自分の分';
+  @override String get settlementShareToChat => 'チャットに共有';
+  @override String get settlementTotalCostRequired => '合計金額を入力してください。';
+  @override String get settlementEnterAllAmounts => '全参加者の金額を入力してください。';
+  @override String get settlementCompleted => '✅ 精算完了';
+  @override String get settlementSharedToChat => 'チャットに精算を共有しました。';
+  @override String get settlementNotFound => '精算が見つかりません。';
+  @override String settlementTotalCostValue(String cost) => '合計 $cost円';
+  @override String settlementAmountValue(String amount) => '$amount円';
 
   // ── 번역 ──
   @override String get translate => '翻訳';

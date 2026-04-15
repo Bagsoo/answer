@@ -5,7 +5,8 @@ import '../../l10n/app_localizations.dart';
 import '../../services/chat_service.dart';
 
 class ChatRoomShareSheet extends StatelessWidget {
-  const ChatRoomShareSheet({super.key});
+  final String? groupId;
+  const ChatRoomShareSheet({super.key, this.groupId});
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +44,7 @@ class ChatRoomShareSheet extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '채팅방을 선택하세요',
+              groupId != null ? '이 그룹의 채팅방에 공유' : '채팅방을 선택하세요',
               style: TextStyle(
                 fontSize: 13,
                 color: colorScheme.onSurface.withOpacity(0.6),
@@ -52,7 +53,7 @@ class ChatRoomShareSheet extends StatelessWidget {
             const SizedBox(height: 12),
             Expanded(
               child: StreamBuilder<List<Map<String, dynamic>>>(
-                stream: context.read<ChatService>().getChatRooms(),
+                stream: context.read<ChatService>().getChatRooms(refGroupId: groupId),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting &&
                       !snapshot.hasData) {

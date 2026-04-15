@@ -17,6 +17,7 @@ import '../post/block_viewer.dart';
 import '../../providers/user_provider.dart';
 import '../../screens/user_profile_detail_screen.dart';
 import 'location_message_bubble.dart';
+import 'settlement_bubble.dart';
 
 class MessageBubble extends StatefulWidget {
   final Map<String, dynamic> data;
@@ -1154,6 +1155,22 @@ class _MessageBubbleState extends State<MessageBubble>
             onTap: () {
               _showSharedMemoPreview();
             },
+          ),
+        ],
+      );
+    }
+
+    // ── 정산 ──────────────────────────────────────────────────────────────────
+    if (type == 'settlement') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (replyBox != null) replyBox,
+          SettlementBubble(
+            data: widget.data,
+            colorScheme: colorScheme,
+            isMe: widget.isMe,
           ),
         ],
       );

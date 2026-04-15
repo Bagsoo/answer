@@ -28,6 +28,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── 관리자용 컬렉션 그룹 접근 ───────────────────────────────────────────
+    match /{path=**}/messages/{messageId} {
+      allow read: if isAdmin();
+    }
+
     // ── 유저 ────────────────────────────────────────────────────────────────
     match /users/{uid} {
       allow read: if isLoggedIn();
@@ -182,6 +187,24 @@ service cloud.firestore {
             get(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data.permissions.can_edit_group_info == true
           );
       }
+      match /settlements/{settlementId} {
+        allow read: if isLoggedIn() &&
+          exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+        allow write: if isLoggedIn() &&
+          exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+      }
+    }
+
+    // ── 신고 및 결제 ───────────────────────────────────────────────────────
+    match /reports/{reportId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+      allow create: if isLoggedIn();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAdmin() || (isLoggedIn() && request.auth.uid == resource.data.payer_uid);
+      allow write: if isAdmin();
     }
   }
 }

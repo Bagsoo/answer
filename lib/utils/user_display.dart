@@ -27,6 +27,12 @@ class UserDisplayData {
     if (resolved.isEmpty) return fallback;
     return resolved.characters.first.toUpperCase();
   }
+
+  String nameOrInitial(AppLocalizations l, {String fallback = '?'}) {
+    if (isDeleted) return l.deletedUser;
+    if (name.isNotEmpty) return name;
+    return initial(l, fallback: fallback);
+  }
 }
 
 class UserDisplay {

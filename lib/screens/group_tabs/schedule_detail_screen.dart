@@ -13,6 +13,8 @@ import '../../utils/user_display.dart';
 import '../../widgets/chat/chat_room_share_sheet.dart';
 import 'schedule_form_screen.dart';
 import '../../widgets/schedule/participant_list_sheet.dart';
+import 'settlement_form_screen.dart';
+import 'settlement_detail_screen.dart';
 
 class ScheduleDetailScreen extends StatelessWidget {
   final String groupId;
@@ -228,6 +230,7 @@ class ScheduleDetailScreen extends StatelessWidget {
           final data = snap.data!.data() as Map<String, dynamic>;
           final title = data['title'] as String? ?? '';
           final desc = data['description'] as String? ?? '';
+          final cost = data['cost'] as String? ?? '';
           final locationName = data['location']?['name'] as String? ?? '';
           final start = (data['start_time'] as Timestamp?)?.toDate();
           final end = (data['end_time'] as Timestamp?)?.toDate();
@@ -272,6 +275,15 @@ class ScheduleDetailScreen extends StatelessWidget {
                     icon: Icons.stop_circle_outlined,
                     label: l.endTime,
                     value: _fmt(end),
+                    colorScheme: colorScheme,
+                  ),
+                ],
+                if (cost.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _InfoRow(
+                    icon: Icons.wallet_outlined,
+                    label: l.scheduleCost,
+                    value: cost,
                     colorScheme: colorScheme,
                   ),
                 ],
@@ -373,6 +385,91 @@ class ScheduleDetailScreen extends StatelessWidget {
                       onTap: () => _setRsvp(context, 'no'),
                     ),
                   ],
+                ),
+
+                // ── 정산하기 버튼 ─────────────────────────────────
+                const SizedBox(height: 20),
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('groups')
+                      .doc(groupId)
+                      .collection('settlements')
+                      .where('schedule_id', isEqualTo: scheduleId)
+                      .limit(1)
+                      .snapshots(),
+                  builder: (context, settlementSnap) {
+                    final exists = settlementSnap.hasData &&
+                        settlementSnap.data!.docs.isNotEmpty;
+                    final settlementIdFromSnap =
+                        exists ? settlementSnap.data!.docs.first.id : null;
+
+                    return SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          if (exists && settlementIdFromSnap != null) {
+                            // 이미 정산이 있으면 상세 화면으로 이동
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => SettlementDetailScreen(
+                                  groupId: groupId,
+                                  settlementId: settlementIdFromSnap,
+                                  groupName: groupProvider.name,
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          // 정산이 없으면 생성 화면으로 이동
+                          final participants =
+                              data['participants'] as List<dynamic>? ?? [];
+                          final rsvpYesUids =
+                              (data['rsvp'] as Map<String, dynamic>? ?? {})
+                                  .entries
+                                  .where((e) => e.value == 'yes')
+                                  .map((e) => e.key)
+                                  .toSet();
+                          final defaultMembers = participants
+                              .where((p) =>
+                                  rsvpYesUids.contains(p['uid']))
+                              .map((p) =>
+                                  Map<String, dynamic>.from(p as Map))
+                              .toList();
+
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => SettlementFormScreen(
+                                groupId: groupId,
+                                groupName: groupProvider.name,
+                                scheduleId: scheduleId,
+                                scheduleTitle: title,
+                                defaultMembers: defaultMembers,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: Icon(exists
+                            ? Icons.description_outlined
+                            : Icons.payments_outlined),
+                        label: Text(exists
+                            ? l.settlementDetail
+                            : l.createSettlement),
+                        style: FilledButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          backgroundColor: exists
+                              ? colorScheme.secondary
+                              : colorScheme.primary,
+                          foregroundColor: exists
+                              ? colorScheme.onSecondary
+                              : colorScheme.onPrimary,
+                        ),
+                      ),
+                    );
+                  },
                 ),
 
                 // ── 장소 정보 및 지도 버튼 추가 ───────────────────
