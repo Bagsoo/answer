@@ -73,6 +73,32 @@ class ScheduleDetailScreen extends StatelessWidget {
           'rsvp.$currentUserId': status, // 전체 상태 관리용 Map
           'participants': participants, // 참석자 전용 List
         });
+
+        // 6. 개인 일정(personal_schedules) DB에 동기화
+        final personalRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUserId)
+            .collection('personal_schedules')
+            .doc(scheduleId);
+
+        if (status == 'yes') {
+          transaction.set(personalRef, {
+            'title': data['title'] ?? '',
+            'description': data['description'] ?? '',
+            'cost': data['cost'] ?? '',
+            'start_time': data['start_time'],
+            'end_time': data['end_time'],
+            'location': data['location'],
+            'type': 'group',
+            'group_id': groupId,
+            'group_name': context.read<GroupProvider>().name,
+            'created_by': data['created_by'],
+            'created_at': data['created_at'],
+            'updated_at': FieldValue.serverTimestamp(),
+          });
+        } else {
+          transaction.delete(personalRef);
+        }
       });
     } catch (e) {
       debugPrint('RSVP 업데이트 실패: $e');

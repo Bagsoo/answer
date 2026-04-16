@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/group_provider.dart';
@@ -37,17 +38,40 @@ class _SchedulesTabState extends State<SchedulesTab> {
   String get currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   Stream<List<Map<String, dynamic>>> _schedulesStream(String groupId) {
-    return FirebaseFirestore.instance
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return Stream.value([]);
+
+    // 해당 그룹의 일정 + 사용자가 RSVP='yes'한 모든 일정 결합
+    final groupSchedules = FirebaseFirestore.instance
         .collection('groups')
         .doc(groupId)
         .collection('schedules')
-        .orderBy('start_time', descending: false)
-        .snapshots()
-        .map((snap) => snap.docs.map((doc) {
-              final data = doc.data();
-              data['id'] = doc.id;
-              return data;
-            }).toList());
+        .snapshots();
+
+    final rsvpSchedules = FirebaseFirestore.instance
+        .collectionGroup('schedules')
+        .where('rsvp.$uid', isEqualTo: 'yes')
+        .snapshots();
+
+    return Rx.combineLatest2(
+      groupSchedules,
+      rsvpSchedules,
+      (QuerySnapshot groupSnap, QuerySnapshot rsvpSnap) {
+        final Map<String, Map<String, dynamic>> all = {};
+
+        for (var doc in groupSnap.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          data['id'] = doc.id;
+          all[doc.id] = data;
+        }
+        for (var doc in rsvpSnap.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          data['id'] = doc.id;
+          all[doc.id] = data; // 중복 시 덮어씀 (문제 없음)
+        }
+        return all.values.toList()..sort((a, b) => (a['start_time'] as Timestamp).compareTo(b['start_time'] as Timestamp));
+      },
+    );
   }
 
   List<Map<String, dynamic>> _eventsForDay(

@@ -16,37 +16,18 @@ class MyScheduleService {
 
   String get currentUserId => _auth.currentUser?.uid ?? '';
 
-  // ── 통합 스케줄 스트림 (Cache + Group + Personal) ───────────────────────
   Stream<List<Schedule>> getMySchedules() {
-    final personalStream = _db
+    return _db
         .collection('users')
         .doc(currentUserId)
         .collection('personal_schedules')
         .snapshots()
-        .map((snap) => snap.docs.map((doc) => Schedule.fromFirestore(doc)).toList());
-
-    final groupScheduleStream = _db
-        .collectionGroup('schedules')
-        .where('rsvp.$currentUserId', isEqualTo: 'yes')
-        .snapshots()
-        .asyncMap((snap) async {
-          final groupNames = await _getGroupNames();
-          return snap.docs.map((doc) {
-            final groupId = doc.reference.parent.parent?.id;
-            return Schedule.fromFirestore(doc, groupName: groupNames[groupId]);
-          }).toList();
+        .map((snap) {
+          final schedules = snap.docs.map((doc) => Schedule.fromFirestore(doc)).toList();
+          schedules.sort((a, b) => a.startTime.compareTo(b.startTime));
+          _cacheSchedules(schedules);
+          return schedules;
         });
-
-    return Rx.combineLatest2<List<Schedule>, List<Schedule>, List<Schedule>>(
-      personalStream,
-      groupScheduleStream,
-      (personal, groups) {
-        final combined = [...personal, ...groups];
-        combined.sort((a, b) => a.startTime.compareTo(b.startTime));
-        _cacheSchedules(combined);
-        return combined;
-      },
-    ).startWith([]); // Simplified to emit empty list first
   }
 
   // ── 캐시 처리 ──────────────────────────────────────────────────────────

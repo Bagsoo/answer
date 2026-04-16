@@ -28,9 +28,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // ── 관리자용 컬렉션 그룹 접근 ───────────────────────────────────────────
-    match /{path=**}/messages/{messageId} {
-      allow read: if isAdmin();
+    // ── 컬렉션 그룹 ──────────────────────────────────────────────────────────
+    match /{path=**}/schedules/{scheduleId} {
+      allow read: if isLoggedIn() &&
+        (resource.data.rsvp != null && 
+         resource.data.rsvp[request.auth.uid] == 'yes');
     }
 
     // ── 유저 ────────────────────────────────────────────────────────────────
@@ -62,6 +64,9 @@ service cloud.firestore {
       match /memos/{memoId} {
         allow read: if isOwner(uid) || isAdmin();
         allow write: if isOwner(uid);
+      }
+      match /personal_schedules/{scheduleId} {
+        allow read, write: if isOwner(uid);
       }
     }
 

@@ -23,10 +23,15 @@ class _MySchedulesScreenState extends State<MySchedulesScreen> {
   double? _calendarHeight;
   static const double _calendarMinHeight = 80;
 
+  late Stream<List<Schedule>> _schedulesStream;
+
   @override
   void initState() {
     super.initState();
     _selectedDay = _focusedDay;
+
+    // Stream 초기화
+    _schedulesStream = context.read<MyScheduleService>().getMySchedules();
 
     // 기기 변경 등을 고려하여 다가오는 개인 일정 알림 동기화
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -48,7 +53,7 @@ class _MySchedulesScreenState extends State<MySchedulesScreen> {
     final service = context.watch<MyScheduleService>();
 
     return StreamBuilder<List<Schedule>>(
-      stream: service.getMySchedules(),
+      stream: _schedulesStream,
       builder: (context, snap) {
         final all = snap.data ?? [];
         final selectedEvents = _selectedDay != null
@@ -57,7 +62,7 @@ class _MySchedulesScreenState extends State<MySchedulesScreen> {
 
         Map<DateTime, List<Schedule>> eventMap = {};
         for (final s in all) {
-          final key = DateTime(s.startTime.year, s.startTime.month, s.startTime.day);
+          final key = DateTime.utc(s.startTime.year, s.startTime.month, s.startTime.day);
           eventMap.putIfAbsent(key, () => []).add(s);
         }
 
@@ -117,7 +122,7 @@ class _MySchedulesScreenState extends State<MySchedulesScreen> {
                                 lastDay: DateTime.utc(2030, 12, 31),
                                 focusedDay: _focusedDay,
                                 selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                                eventLoader: (day) => eventMap[DateTime(day.year, day.month, day.day)] ?? [],
+                                eventLoader: (day) => eventMap[DateTime.utc(day.year, day.month, day.day)] ?? [],
                                 onDaySelected: (selected, focused) {
                                   setState(() {
                                     _selectedDay = selected;
@@ -138,7 +143,7 @@ class _MySchedulesScreenState extends State<MySchedulesScreen> {
                                     color: colorScheme.tertiary,
                                     shape: BoxShape.circle,
                                   ),
-                                  markersMaxCount: 3,
+                                  markersMaxCount: 1,
                                   cellMargin: const EdgeInsets.all(2),
                                 ),
                                 headerStyle: const HeaderStyle(

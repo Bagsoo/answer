@@ -33,7 +33,10 @@ class Schedule {
 
   factory Schedule.fromFirestore(DocumentSnapshot doc, {String? groupName}) {
     final data = doc.data() as Map<String, dynamic>;
-    final isPersonal = doc.reference.path.contains('personal_schedules');
+    final typeStr = data['type'] as String?;
+    final isPersonal = typeStr != null 
+        ? typeStr == 'personal'
+        : doc.reference.path.contains('personal_schedules');
     
     return Schedule(
       id: doc.id,
@@ -44,8 +47,8 @@ class Schedule {
       endTime: (data['end_time'] as Timestamp).toDate(),
       location: data['location'] != null ? Map<String, dynamic>.from(data['location']) : null,
       type: isPersonal ? ScheduleType.personal : ScheduleType.group,
-      groupId: !isPersonal ? doc.reference.parent.parent?.id : null,
-      groupName: groupName,
+      groupId: data['group_id'] ?? (!isPersonal ? doc.reference.parent.parent?.id : null),
+      groupName: data['group_name'] ?? groupName,
       createdBy: data['created_by'] ?? '',
       createdAt: (data['created_at'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
