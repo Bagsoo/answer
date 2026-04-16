@@ -5,6 +5,7 @@ import '../services/my_schedule_service.dart';
 import '../models/schedule.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/schedule/participant_list_sheet.dart';
+import '../providers/group_provider.dart';
 import 'group_tabs/schedule_detail_screen.dart';
 import 'personal_schedule_form_screen.dart';
 
@@ -240,10 +241,13 @@ class _ScheduleListView extends StatelessWidget {
             } else {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => ScheduleDetailScreen(
-                    groupId: s.groupId ?? '',
-                    scheduleId: s.id,
-                    canEdit: false, // Group schedules from here are view-only usually, or depends on rsvp
+                  builder: (_) => ChangeNotifierProvider(
+                    create: (_) => GroupProvider(s.groupId ?? ''),
+                    child: ScheduleDetailScreen(
+                      groupId: s.groupId ?? '',
+                      scheduleId: s.id,
+                      canEdit: false, // Group schedules from here are view-only usually, or depends on rsvp
+                    ),
                   ),
                 ),
               );

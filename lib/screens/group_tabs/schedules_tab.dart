@@ -38,40 +38,28 @@ class _SchedulesTabState extends State<SchedulesTab> {
   String get currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   Stream<List<Map<String, dynamic>>> _schedulesStream(String groupId) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return Stream.value([]);
+    if (groupId.isEmpty) return Stream.value([]);
 
-    // 해당 그룹의 일정 + 사용자가 RSVP='yes'한 모든 일정 결합
-    final groupSchedules = FirebaseFirestore.instance
+    return FirebaseFirestore.instance
         .collection('groups')
         .doc(groupId)
         .collection('schedules')
-        .snapshots();
-
-    final rsvpSchedules = FirebaseFirestore.instance
-        .collectionGroup('schedules')
-        .where('rsvp.$uid', isEqualTo: 'yes')
-        .snapshots();
-
-    return Rx.combineLatest2(
-      groupSchedules,
-      rsvpSchedules,
-      (QuerySnapshot groupSnap, QuerySnapshot rsvpSnap) {
-        final Map<String, Map<String, dynamic>> all = {};
-
-        for (var doc in groupSnap.docs) {
-          final data = doc.data() as Map<String, dynamic>;
-          data['id'] = doc.id;
-          all[doc.id] = data;
-        }
-        for (var doc in rsvpSnap.docs) {
-          final data = doc.data() as Map<String, dynamic>;
-          data['id'] = doc.id;
-          all[doc.id] = data; // 중복 시 덮어씀 (문제 없음)
-        }
-        return all.values.toList()..sort((a, b) => (a['start_time'] as Timestamp).compareTo(b['start_time'] as Timestamp));
-      },
-    );
+        .snapshots()
+        .map((snap) {
+          final all = <Map<String, dynamic>>[];
+          for (var doc in snap.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            data['id'] = doc.id;
+            all.add(data);
+          }
+          all.sort((a, b) {
+            final t1 = a['start_time'] as Timestamp?;
+            final t2 = b['start_time'] as Timestamp?;
+            if (t1 == null || t2 == null) return 0;
+            return t1.compareTo(t2);
+          });
+          return all;
+        });
   }
 
   List<Map<String, dynamic>> _eventsForDay(
