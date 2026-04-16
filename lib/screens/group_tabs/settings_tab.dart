@@ -407,7 +407,7 @@ class _SettingsTabState extends State<SettingsTab> {
           if (isOwner || canEdit)
             ListTile(
               leading:
-                  Icon(Icons.article_outlined, color: colorScheme.primary),
+                  Icon(Icons.workspace_premium, color: colorScheme.primary),
               title: Text(l.manageGroupPlan),
               trailing: Icon(Icons.chevron_right,
                   color: colorScheme.onSurface.withOpacity(0.4)),
