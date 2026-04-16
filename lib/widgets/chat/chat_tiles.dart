@@ -25,6 +25,48 @@ String _localizedLastMessage(BuildContext context, String lastMessage) {
   }
 }
 
+class ParticipantCountBadge extends StatelessWidget {
+  final int count;
+  final ColorScheme colorScheme;
+
+  const ParticipantCountBadge({
+    super.key,
+    required this.count,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (count <= 0) return const SizedBox.shrink();
+    final cs = colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.people_outline,
+              size: 12, color: cs.onSurface.withOpacity(0.55)),
+          const SizedBox(width: 4),
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface.withOpacity(0.65),
+              height: 1.0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── 1:1 DM 타일 ───────────────────────────────────────────────────────────────
 class DmTile extends StatefulWidget {
   final Map<String, dynamic> room;
@@ -115,11 +157,21 @@ class _DmTileState extends State<DmTile> {
                     : Icon(Icons.person, color: cs.onTertiaryContainer, size: 22))
                 : Icon(Icons.person, color: cs.onTertiaryContainer, size: 22),
       ),
-      title: Text(
-        _loaded ? displayName : '...',
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-            fontWeight: unreadCnt > 0 ? FontWeight.bold : FontWeight.normal),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              _loaded ? displayName : '...',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontWeight: unreadCnt > 0 ? FontWeight.bold : FontWeight.normal),
+            ),
+          ),
+          if ((widget.room['muted_uids'] as List<dynamic>? ?? []).contains(widget.myUid)) ...[
+            const SizedBox(width: 4),
+            Icon(Icons.notifications_off, size: 14, color: cs.onSurface.withOpacity(0.4)),
+          ],
+        ],
       ),
       subtitle: Text(
         lastMessage,
@@ -286,6 +338,9 @@ class ChatTile extends StatelessWidget {
     final memberIds = List<String>.from(room['member_ids'] as List? ?? []);
     final groupProfileImage = room['group_profile_image'] as String? ?? '';
     final hasGroupProfileImage = groupProfileImage.isNotEmpty;
+    final isMuted =
+        (room['muted_uids'] as List<dynamic>? ?? []).contains(myUid);
+    final memberCount = (room['member_count'] as int?) ?? memberIds.length;
 
     Widget avatar;
     if (type == 'group_direct' || type == 'group_sub') {
@@ -331,10 +386,14 @@ class ChatTile extends StatelessWidget {
                     fontWeight:
                         unreadCnt > 0 ? FontWeight.bold : FontWeight.normal)),
           ),
-          if (type == 'group_direct' || type == 'group_sub') ...[
+          if (type != 'direct') ...[
             const SizedBox(width: 4),
-            Icon(Icons.people,
-                size: 12, color: colorScheme.onSurface.withOpacity(0.35)),
+            ParticipantCountBadge(count: memberCount, colorScheme: colorScheme),
+          ],
+          if (isMuted) ...[
+            const SizedBox(width: 4),
+            Icon(Icons.notifications_off,
+                size: 14, color: colorScheme.onSurface.withOpacity(0.4)),
           ],
         ],
       ),

@@ -188,6 +188,8 @@ class _ChatsTabState extends State<ChatsTab> {
                               data['group_profile_image'] as String? ?? '';
                           final memberIds =
                               List<String>.from(data['member_ids'] as List? ?? []);
+                          final memberCount =
+                              (data['member_count'] as int?) ?? memberIds.length;
 
                           Widget avatar;
                           if (isGroupAll) {
@@ -219,11 +221,37 @@ class _ChatsTabState extends State<ChatsTab> {
                             selected: widget.isDesktopMode && widget.selectedRoomId == roomId,
                             selectedTileColor: colorScheme.primaryContainer.withOpacity(0.5),
                             leading: avatar,
-                            title: Text(name,
-                                style: TextStyle(
-                                    fontWeight: isGroupAll
-                                        ? FontWeight.bold
-                                        : FontWeight.normal)),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    name,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontWeight: isGroupAll
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                                if (type != 'direct') ...[
+                                  const SizedBox(width: 6),
+                                  ParticipantCountBadge(
+                                    count: memberCount,
+                                    colorScheme: colorScheme,
+                                  ),
+                                ],
+                                if ((data['muted_uids'] as List<dynamic>? ?? [])
+                                    .contains(currentUserId)) ...[
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.notifications_off,
+                                    size: 14,
+                                    color: colorScheme.onSurface.withOpacity(0.4),
+                                  ),
+                                ],
+                              ],
+                            ),
                             subtitle: Text(
                               data['last_message'] as String? ??
                                   'No messages yet...',

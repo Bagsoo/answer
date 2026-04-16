@@ -432,7 +432,26 @@ class NotificationService {
         .doc(uid);
     batch.update(memberRef, {'notification_muted': muted});
 
-    if (myTokens.isNotEmpty) {
+    final roomRef = _db.collection('chat_rooms').doc(roomId);
+    if (muted) {
+      final updates = <String, dynamic>{
+        'muted_uids': FieldValue.arrayUnion([uid]),
+      };
+      if (myTokens.isNotEmpty) {
+        updates['active_fcm_tokens'] = FieldValue.arrayRemove(myTokens);
+      }
+      batch.update(roomRef, updates);
+    } else {
+      final updates = <String, dynamic>{
+        'muted_uids': FieldValue.arrayRemove([uid]),
+      };
+      if (myTokens.isNotEmpty) {
+        updates['active_fcm_tokens'] = FieldValue.arrayUnion(myTokens);
+      }
+      batch.update(roomRef, updates);
+    }
+    
+    if (false) {
       final roomRef = _db.collection('chat_rooms').doc(roomId);
       if (muted) {
         // 뮤트: 내 토큰을 active_fcm_tokens에서 제거
