@@ -1,14 +1,283 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:linkify/linkify.dart';
+import 'chat_asset_service.dart';
+
+class _ChatAssetDraft {
+  final String docId;
+  final String type;
+  final Map<String, dynamic> data;
+
+  const _ChatAssetDraft({
+    required this.docId,
+    required this.type,
+    required this.data,
+  });
+}
 
 class ChatService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final ChatAssetService _chatAssetService = ChatAssetService();
+  static const LinkifyOptions _linkifyOptions = LinkifyOptions(
+    looseUrl: true,
+    defaultToHttps: true,
+    humanize: false,
+  );
 
   // 현재 보고 있는 채팅방 ID
   String? currentRoomId;
   
   String get currentUserId => _auth.currentUser?.uid ?? '';
+
+  DocumentReference<Map<String, dynamic>> _roomRef(String roomId) =>
+      _db.collection('chat_rooms').doc(roomId);
+
+  CollectionReference<Map<String, dynamic>> _messageCollection(String roomId) =>
+      _roomRef(roomId).collection('messages');
+
+  CollectionReference<Map<String, dynamic>> _assetCollection(String roomId) =>
+      _roomRef(roomId).collection('message_assets');
+
+  List<String> _extractUrls(String text) {
+    final elements = linkify(text, options: _linkifyOptions);
+    final urls = <String>[];
+
+    for (final element in elements) {
+      if (element is! UrlElement) continue;
+      final normalized = _normalizeUrl(element.url);
+      if (normalized == null || urls.contains(normalized)) continue;
+      urls.add(normalized);
+    }
+
+    return urls;
+  }
+
+  String? _normalizeUrl(String rawUrl) {
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) return null;
+
+    final direct = Uri.tryParse(trimmed);
+    if (direct != null && direct.hasScheme) return direct.toString();
+
+    return Uri.tryParse('https://$trimmed')?.toString();
+  }
+
+  List<_ChatAssetDraft> _buildAssetDrafts(
+    String messageId,
+    Map<String, dynamic> messageData,
+  ) {
+    final createdAt = messageData['created_at'] ?? FieldValue.serverTimestamp();
+    final type = messageData['type'] as String? ?? 'text';
+
+    switch (type) {
+      case 'image':
+        final imageUrls = List<String>.from(
+          messageData['image_urls'] as List? ?? [],
+        ).where((url) => url.trim().isNotEmpty).toList(growable: false);
+        if (imageUrls.isEmpty) return const [];
+        return [
+          _ChatAssetDraft(
+            docId: messageId,
+            type: 'image',
+            data: {
+              'message_id': messageId,
+              'type': 'image',
+              'bucket': 'media',
+              'is_starred': false,
+              'created_at': createdAt,
+              'primary_url': imageUrls.first,
+              'thumb_url': imageUrls.first,
+            },
+          ),
+        ];
+      case 'video':
+        final videoUrl = (messageData['video_url'] as String? ?? '').trim();
+        if (videoUrl.isEmpty) return const [];
+        return [
+          _ChatAssetDraft(
+            docId: messageId,
+            type: 'video',
+            data: {
+              'message_id': messageId,
+              'type': 'video',
+              'bucket': 'media',
+              'is_starred': false,
+              'created_at': createdAt,
+              'primary_url': videoUrl,
+              'thumb_url': (messageData['thumbnail_url'] as String? ?? '').trim(),
+            },
+          ),
+        ];
+      case 'file':
+        final fileUrl = (messageData['file_url'] as String? ?? '').trim();
+        if (fileUrl.isEmpty) return const [];
+        return [
+          _ChatAssetDraft(
+            docId: messageId,
+            type: 'file',
+            data: {
+              'message_id': messageId,
+              'type': 'file',
+              'bucket': 'file',
+              'is_starred': false,
+              'created_at': createdAt,
+              'primary_url': fileUrl,
+              'file_name': (messageData['file_name'] as String? ?? '').trim(),
+            },
+          ),
+        ];
+      case 'audio':
+        final audioUrl = (messageData['audio_url'] as String? ?? '').trim();
+        if (audioUrl.isEmpty) return const [];
+        return [
+          _ChatAssetDraft(
+            docId: messageId,
+            type: 'audio',
+            data: {
+              'message_id': messageId,
+              'type': 'audio',
+              'bucket': 'file',
+              'is_starred': false,
+              'created_at': createdAt,
+              'primary_url': audioUrl,
+              'file_name': (messageData['file_name'] as String? ?? '').trim(),
+            },
+          ),
+        ];
+      case 'poll':
+        final pollId = (messageData['poll_id'] as String? ?? '').trim();
+        if (pollId.isEmpty) return const [];
+        return [
+          _ChatAssetDraft(
+            docId: messageId,
+            type: 'poll',
+            data: {
+              'message_id': messageId,
+              'type': 'poll',
+              'bucket': 'poll',
+              'is_starred': false,
+              'created_at': createdAt,
+              'poll_id': pollId,
+            },
+          ),
+        ];
+      case 'text':
+        final urls = _extractUrls(messageData['text'] as String? ?? '');
+        return [
+          for (var index = 0; index < urls.length; index++)
+            _ChatAssetDraft(
+              docId: '${messageId}_link_$index',
+              type: 'link',
+              data: {
+                'message_id': messageId,
+                'type': 'link',
+                'bucket': 'link',
+                'is_starred': false,
+                'created_at': createdAt,
+                'link_url': urls[index],
+              },
+            ),
+        ];
+      default:
+        return const [];
+    }
+  }
+
+  Map<String, int> _countAssetDrafts(Iterable<_ChatAssetDraft> drafts) {
+    final counts = <String, int>{};
+    for (final draft in drafts) {
+      counts[draft.type] = (counts[draft.type] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  Map<String, int> _countAssetDocs(
+    Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    final counts = <String, int>{};
+    for (final doc in docs) {
+      final type = (doc.data()['type'] as String? ?? '').trim();
+      if (type.isEmpty) continue;
+      counts[type] = (counts[type] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  Map<String, int> _diffAssetCounts(
+    Map<String, int> current,
+    Map<String, int> next,
+  ) {
+    final keys = {...current.keys, ...next.keys};
+    final diff = <String, int>{};
+    for (final key in keys) {
+      final delta = (next[key] ?? 0) - (current[key] ?? 0);
+      if (delta != 0) diff[key] = delta;
+    }
+    return diff;
+  }
+
+  void _writeAssetDrafts(
+    WriteBatch batch,
+    String roomId,
+    Iterable<_ChatAssetDraft> drafts,
+  ) {
+    for (final draft in drafts) {
+      batch.set(_assetCollection(roomId).doc(draft.docId), draft.data);
+    }
+  }
+
+  void _applyAssetCountDelta(
+    WriteBatch batch,
+    String roomId,
+    Map<String, int> deltas,
+  ) {
+    if (deltas.isEmpty) return;
+
+    final updates = <String, dynamic>{};
+    deltas.forEach((type, count) {
+      updates['asset_counts.$type'] = FieldValue.increment(count);
+    });
+    batch.update(_roomRef(roomId), updates);
+  }
+
+  Future<QuerySnapshot<Map<String, dynamic>>> _loadMessageAssets(
+    String roomId,
+    String messageId,
+  ) {
+    return _assetCollection(roomId).where('message_id', isEqualTo: messageId).get();
+  }
+
+  Future<bool> _isLatestMessage(String roomId, String messageId) async {
+    final lastSnap = await _messageCollection(roomId)
+        .orderBy('created_at', descending: true)
+        .limit(1)
+        .get();
+    return lastSnap.docs.isNotEmpty && lastSnap.docs.first.id == messageId;
+  }
+
+  Future<void> _commitMessage(
+    String roomId, {
+    required DocumentReference<Map<String, dynamic>> msgRef,
+    required Map<String, dynamic> msgData,
+    required String lastMessage,
+  }) async {
+    final unreadUpdate = await _buildUnreadUpdate(roomId);
+    final drafts = _buildAssetDrafts(msgRef.id, msgData);
+    final batch = _db.batch();
+
+    batch.set(msgRef, msgData);
+    _writeAssetDrafts(batch, roomId, drafts);
+    _applyAssetCountDelta(batch, roomId, _countAssetDrafts(drafts));
+    batch.update(_roomRef(roomId), {
+      'last_message': lastMessage,
+      'last_time': FieldValue.serverTimestamp(),
+      ...unreadUpdate,
+    });
+
+    await batch.commit();
+    _chatAssetService.invalidateRoom(roomId);
+  }
 
   // ── 채팅방 목록 ────────────────────────────────────────────────────────────
   Stream<List<Map<String, dynamic>>> getChatRooms({
@@ -134,14 +403,7 @@ class ChatService {
     String? replyToSender,
     String? pollId,
   }) async {
-    final unreadUpdate = await _buildUnreadUpdate(roomId);
-    final batch = _db.batch();
-
-    final msgRef = _db
-        .collection('chat_rooms')
-        .doc(roomId)
-        .collection('messages')
-        .doc();
+    final msgRef = _messageCollection(roomId).doc();
 
     final msgData = <String, dynamic>{
       'sender_id': currentUserId,
@@ -161,14 +423,12 @@ class ChatService {
       msgData['poll_id'] = pollId;
     }
 
-    batch.set(msgRef, msgData);
-    batch.update(_db.collection('chat_rooms').doc(roomId), {
-      'last_message': text,
-      'last_time': FieldValue.serverTimestamp(),
-      ...unreadUpdate,
-    });
-
-    await batch.commit();
+    await _commitMessage(
+      roomId,
+      msgRef: msgRef,
+      msgData: msgData,
+      lastMessage: text,
+    );
   }
 
   // ── 이미지 메시지 전송 ─────────────────────────────────────────────────────
@@ -179,16 +439,8 @@ class ChatService {
     required String senderName,
     String? senderPhotoUrl,
   }) async {
-    final unreadUpdate = await _buildUnreadUpdate(roomId);
-    final batch = _db.batch();
-
-    final msgRef = _db
-        .collection('chat_rooms')
-        .doc(roomId)
-        .collection('messages')
-        .doc(messageId);
-
-    batch.set(msgRef, {
+    final msgRef = _messageCollection(roomId).doc(messageId);
+    final msgData = <String, dynamic>{
       'sender_id': currentUserId,
       'sender_name': senderName,
       'sender_photo_url': senderPhotoUrl ?? '',
@@ -197,19 +449,18 @@ class ChatService {
       'image_urls': imageUrls,
       'is_system': false,
       'created_at': FieldValue.serverTimestamp(),
-    });
+    };
 
     final lastMsg = imageUrls.length > 1
         ? '📷 사진 ${imageUrls.length}장'
         : '📷 사진';
 
-    batch.update(_db.collection('chat_rooms').doc(roomId), {
-      'last_message': lastMsg,
-      'last_time': FieldValue.serverTimestamp(),
-      ...unreadUpdate,
-    });
-
-    await batch.commit();
+    await _commitMessage(
+      roomId,
+      msgRef: msgRef,
+      msgData: msgData,
+      lastMessage: lastMsg,
+    );
   }
 
   // ── 동영상 메시지 전송 ─────────────────────────────────────────────────────
@@ -221,16 +472,8 @@ class ChatService {
     required String senderName,
     String? senderPhotoUrl,
   }) async {
-    final unreadUpdate = await _buildUnreadUpdate(roomId);
-    final batch = _db.batch();
-
-    final msgRef = _db
-        .collection('chat_rooms')
-        .doc(roomId)
-        .collection('messages')
-        .doc(messageId);
-
-    batch.set(msgRef, {
+    final msgRef = _messageCollection(roomId).doc(messageId);
+    final msgData = <String, dynamic>{
       'sender_id': currentUserId,
       'sender_name': senderName,
       'sender_photo_url': senderPhotoUrl ?? '',
@@ -240,15 +483,14 @@ class ChatService {
       'thumbnail_url': thumbnailUrl,
       'is_system': false,
       'created_at': FieldValue.serverTimestamp(),
-    });
+    };
 
-    batch.update(_db.collection('chat_rooms').doc(roomId), {
-      'last_message': '🎥 동영상',
-      'last_time': FieldValue.serverTimestamp(),
-      ...unreadUpdate,
-    });
-
-    await batch.commit();
+    await _commitMessage(
+      roomId,
+      msgRef: msgRef,
+      msgData: msgData,
+      lastMessage: '🎥 동영상',
+    );
   }
 
   // ── 파일 메시지 전송 ───────────────────────────────────────────────────────
@@ -262,16 +504,8 @@ class ChatService {
     required String senderName,
     String? senderPhotoUrl,
   }) async {
-    final unreadUpdate = await _buildUnreadUpdate(roomId);
-    final batch = _db.batch();
-
-    final msgRef = _db
-        .collection('chat_rooms')
-        .doc(roomId)
-        .collection('messages')
-        .doc(messageId);
-
-    batch.set(msgRef, {
+    final msgRef = _messageCollection(roomId).doc(messageId);
+    final msgData = <String, dynamic>{
       'sender_id': currentUserId,
       'sender_name': senderName,
       'sender_photo_url': senderPhotoUrl ?? '',
@@ -283,15 +517,14 @@ class ChatService {
       'mime_type': mimeType,
       'is_system': false,
       'created_at': FieldValue.serverTimestamp(),
-    });
+    };
 
-    batch.update(_db.collection('chat_rooms').doc(roomId), {
-      'last_message': 'file',
-      'last_time': FieldValue.serverTimestamp(),
-      ...unreadUpdate,
-    });
-
-    await batch.commit();
+    await _commitMessage(
+      roomId,
+      msgRef: msgRef,
+      msgData: msgData,
+      lastMessage: 'file',
+    );
   }
 
   // ── 연락처(프로필 카드) 메시지 전송 ───────────────────────────────────────
@@ -345,16 +578,8 @@ class ChatService {
     required String senderName,
     String? senderPhotoUrl,
   }) async {
-    final unreadUpdate = await _buildUnreadUpdate(roomId);
-    final batch = _db.batch();
-
-    final msgRef = _db
-        .collection('chat_rooms')
-        .doc(roomId)
-        .collection('messages')
-        .doc(messageId);
-
-    batch.set(msgRef, {
+    final msgRef = _messageCollection(roomId).doc(messageId);
+    final msgData = <String, dynamic>{
       'sender_id': currentUserId,
       'sender_name': senderName,
       'sender_photo_url': senderPhotoUrl ?? '',
@@ -366,15 +591,14 @@ class ChatService {
       'mime_type': mimeType,
       'is_system': false,
       'created_at': FieldValue.serverTimestamp(),
-    });
+    };
 
-    batch.update(_db.collection('chat_rooms').doc(roomId), {
-      'last_message': 'audio',
-      'last_time': FieldValue.serverTimestamp(),
-      ...unreadUpdate,
-    });
-
-    await batch.commit();
+    await _commitMessage(
+      roomId,
+      msgRef: msgRef,
+      msgData: msgData,
+      lastMessage: 'audio',
+    );
   }
 
   Future<void> sendSharedPostMessage(
@@ -603,5 +827,112 @@ class ChatService {
     });
 
     await batch.commit();
+  }
+
+  Future<void> hideMessage(
+    String roomId,
+    String messageId, {
+    required String hiddenBy,
+    required String replacementLastMessage,
+  }) async {
+    final existingAssets = await _loadMessageAssets(roomId, messageId);
+    final batch = _db.batch();
+
+    batch.update(_messageCollection(roomId).doc(messageId), {
+      'is_system': true,
+      'is_hidden': true,
+      'hidden_by': hiddenBy,
+      'hidden_at': FieldValue.serverTimestamp(),
+    });
+
+    for (final assetDoc in existingAssets.docs) {
+      batch.delete(assetDoc.reference);
+    }
+    _applyAssetCountDelta(
+      batch,
+      roomId,
+      _countAssetDocs(existingAssets.docs).map(
+        (type, count) => MapEntry(type, -count),
+      ),
+    );
+
+    if (await _isLatestMessage(roomId, messageId)) {
+      batch.update(_roomRef(roomId), {'last_message': replacementLastMessage});
+    }
+
+    await batch.commit();
+    _chatAssetService.invalidateRoom(roomId);
+  }
+
+  Future<void> softDeleteMessage(
+    String roomId,
+    String messageId, {
+    required String replacementLastMessage,
+  }) async {
+    final existingAssets = await _loadMessageAssets(roomId, messageId);
+    final batch = _db.batch();
+
+    batch.update(_messageCollection(roomId).doc(messageId), {
+      'is_deleted': true,
+      'deleted_at': FieldValue.serverTimestamp(),
+    });
+
+    for (final assetDoc in existingAssets.docs) {
+      batch.delete(assetDoc.reference);
+    }
+    _applyAssetCountDelta(
+      batch,
+      roomId,
+      _countAssetDocs(existingAssets.docs).map(
+        (type, count) => MapEntry(type, -count),
+      ),
+    );
+
+    if (await _isLatestMessage(roomId, messageId)) {
+      batch.update(_roomRef(roomId), {'last_message': replacementLastMessage});
+    }
+
+    await batch.commit();
+    _chatAssetService.invalidateRoom(roomId);
+  }
+
+  Future<void> editTextMessage(
+    String roomId,
+    String messageId, {
+    required String newText,
+  }) async {
+    final messageSnap = await _messageCollection(roomId).doc(messageId).get();
+    final messageData = messageSnap.data();
+    if (messageData == null) return;
+
+    final existingAssets = await _loadMessageAssets(roomId, messageId);
+    final nextDrafts = _buildAssetDrafts(
+      messageId,
+      {...messageData, 'text': newText},
+    );
+    final countDelta = _diffAssetCounts(
+      _countAssetDocs(existingAssets.docs),
+      _countAssetDrafts(nextDrafts),
+    );
+
+    final batch = _db.batch();
+    batch.update(_messageCollection(roomId).doc(messageId), {
+      'text': newText,
+      'edited': true,
+      'updated_at': FieldValue.serverTimestamp(),
+    });
+
+    for (final assetDoc in existingAssets.docs) {
+      batch.delete(assetDoc.reference);
+    }
+    _writeAssetDrafts(batch, roomId, nextDrafts);
+    _applyAssetCountDelta(batch, roomId, countDelta);
+
+    if (await _isLatestMessage(roomId, messageId)) {
+      batch.update(_roomRef(roomId), {'last_message': newText});
+    }
+
+    await batch.commit();
+    _chatAssetService.invalidateRoom(roomId);
   }
 }

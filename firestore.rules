@@ -130,6 +130,25 @@ service cloud.firestore {
             get(/databases/$(database)/documents/chat_rooms/$(roomId))
               .data.member_ids;
       }
+      match /message_assets/{assetId} {
+        allow read: if isAdmin() || (
+          isLoggedIn() &&
+          request.auth.uid in
+            get(/databases/$(database)/documents/chat_rooms/$(roomId))
+              .data.member_ids
+        );
+        allow create, delete: if isLoggedIn() &&
+          request.auth.uid in
+            get(/databases/$(database)/documents/chat_rooms/$(roomId))
+              .data.member_ids;
+        allow update: if isAdmin() || (
+          isLoggedIn() &&
+          request.auth.uid in
+            get(/databases/$(database)/documents/chat_rooms/$(roomId))
+              .data.member_ids &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['is_starred'])
+        );
+      }
       match /scheduled_messages/{msgId} {
         allow read: if isAdmin() || (
           isLoggedIn() &&

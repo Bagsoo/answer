@@ -25,6 +25,7 @@ import 'chat_room_more/chat_room_invite_screen.dart';
 import 'chat_room_more/notices_screen.dart';
 import 'chat_room_more/create_poll_screen.dart';
 import 'chat_room_more/poll_bubble.dart';
+import 'chat_room_more/chat_room_shared_assets_screen.dart';
 import 'chat_room_more/location_share_sheet.dart';
 import '../widgets/chat/contact_share_sheet.dart';
 import 'user_profile_detail_screen.dart';
@@ -1130,24 +1131,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (confirmed != true) return;
 
     try {
-      final db = FirebaseFirestore.instance;
-      final roomRef = db.collection('chat_rooms').doc(widget.roomId);
-      await roomRef.collection('messages').doc(messageId).update({
-        'is_system': true,
-        'is_hidden': true,
-        'hidden_by': _currentUserId,
-        'hidden_at': FieldValue.serverTimestamp(),
-      });
-
-      final lastMsgsSnap = await roomRef
-          .collection('messages')
-          .orderBy('created_at', descending: true)
-          .limit(1)
-          .get();
-      if (lastMsgsSnap.docs.isNotEmpty &&
-          lastMsgsSnap.docs.first.id == messageId) {
-        await roomRef.update({'last_message': l.messageHidden});
-      }
+      await context.read<ChatService>().hideMessage(
+        widget.roomId,
+        messageId,
+        hiddenBy: _currentUserId,
+        replacementLastMessage: l.messageHidden,
+      );
     } catch (e) {
       debugPrint('Failed to hide message: $e');
     }
@@ -1180,22 +1169,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (confirmed != true) return;
 
     try {
-      final db = FirebaseFirestore.instance;
-      final roomRef = db.collection('chat_rooms').doc(widget.roomId);
-      await roomRef.collection('messages').doc(messageId).update({
-        'is_deleted': true,
-        'deleted_at': FieldValue.serverTimestamp(),
-      });
-
-      final lastMsgsSnap = await roomRef
-          .collection('messages')
-          .orderBy('created_at', descending: true)
-          .limit(1)
-          .get();
-      if (lastMsgsSnap.docs.isNotEmpty &&
-          lastMsgsSnap.docs.first.id == messageId) {
-        await roomRef.update({'last_message': l.messageDeleted});
-      }
+      await context.read<ChatService>().softDeleteMessage(
+        widget.roomId,
+        messageId,
+        replacementLastMessage: l.messageDeleted,
+      );
     } catch (e) {
       debugPrint('Failed to delete message: $e');
     }
@@ -1231,23 +1209,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (newText == null || newText.isEmpty || newText == oldText) return;
 
     try {
-      final db = FirebaseFirestore.instance;
-      final roomRef = db.collection('chat_rooms').doc(widget.roomId);
-      await roomRef.collection('messages').doc(messageId).update({
-        'text': newText,
-        'edited': true,
-        'updated_at': FieldValue.serverTimestamp(),
-      });
-
-      final lastMsgsSnap = await roomRef
-          .collection('messages')
-          .orderBy('created_at', descending: true)
-          .limit(1)
-          .get();
-      if (lastMsgsSnap.docs.isNotEmpty &&
-          lastMsgsSnap.docs.first.id == messageId) {
-        await roomRef.update({'last_message': newText});
-      }
+      await context.read<ChatService>().editTextMessage(
+        widget.roomId,
+        messageId,
+        newText: newText,
+      );
     } catch (e) {
       debugPrint('Failed to edit message: $e');
     }
@@ -1369,6 +1335,20 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           ),
         ),
         PopupMenuItem(
+          value: 'shared_assets',
+          child: Row(
+            children: [
+              Icon(
+                Icons.collections_bookmark_outlined,
+                color: colorScheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Text(l.sharedVault),
+            ],
+          ),
+        ),
+        PopupMenuItem(
           value: 'mute',
           child: Row(
             children: [
@@ -1411,6 +1391,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ),
           ),
         );
+        return;
       case 'invite':
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -1421,16 +1402,36 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ),
           ),
         );
+        return;
       case 'notices':
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => NoticesScreen(roomId: widget.roomId),
           ),
         );
+        return;
+      case 'shared_assets':
+        final selectedMessageId = await Navigator.of(context).push<String>(
+          MaterialPageRoute(
+            builder: (_) => ChatRoomSharedAssetsScreen(
+              roomId: widget.roomId,
+              refGroupId: meta?.refGroupId,
+            ),
+          ),
+        );
+        if (!mounted) return;
+        if (selectedMessageId != null && selectedMessageId.isNotEmpty) {
+          _scrollToMessage(selectedMessageId);
+        }
+        return;
       case 'mute':
         await _toggleMute();
+        return;
       case 'leave':
         _leaveRoom(l);
+        return;
+      case null:
+        return;
     }
   }
 
