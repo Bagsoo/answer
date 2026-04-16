@@ -151,7 +151,7 @@ class _SettingsTabState extends State<SettingsTab> {
           )
         else
           ListTile(
-            leading: Icon(Icons.info_outline, color: colorScheme.primary),
+            leading: Icon(Icons.group, color: colorScheme.primary),
             title: Text(l.groupName),
             subtitle: Text(currentName),
             trailing: canEdit
@@ -186,7 +186,7 @@ class _SettingsTabState extends State<SettingsTab> {
         ),
         // ── 유형 & 카테고리 ──────────────────────────────────────────────────
         ListTile(
-          leading: Icon(Icons.info_outline, color: colorScheme.primary), // 아이콘을 통합된 느낌으로 변경
+          leading: Icon(Icons.category, color: colorScheme.primary), // 아이콘을 통합된 느낌으로 변경
           title: Text(l.groupType), // '그룹 정보' 혹은 '유형 및 카테고리'
           subtitle: Text(
             '${_typeLabel(currentType, l)}  •  ${currentCategory.isEmpty ? '-' : GroupTypeCategoryData.localizeKey(currentCategory, l)}',
