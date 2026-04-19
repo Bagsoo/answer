@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/rendering.dart';
 import '../l10n/app_localizations.dart';
 import '../services/memo_service.dart';
 import '../widgets/memo/memo_form_sheet.dart';
@@ -29,6 +30,8 @@ class MemoScreen extends StatefulWidget {
 }
 
 class _MemoScreenState extends State<MemoScreen> {
+  final ScrollController _scrollController = ScrollController();
+  bool _fabVisible = true;
   static const _cacheKey = 'memo_list_cache';
 
   SharedPreferences? _prefs;
@@ -39,10 +42,26 @@ class _MemoScreenState extends State<MemoScreen> {
   void initState() {
     super.initState();
     _loadCache();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    final isScrollingDown = _scrollController.position.userScrollDirection
+        == ScrollDirection.reverse;
+    final isScrollingUp = _scrollController.position.userScrollDirection
+        == ScrollDirection.forward;
+
+    if (isScrollingDown && _fabVisible) {
+      setState(() => _fabVisible = false);
+    } else if (isScrollingUp && !_fabVisible) {
+      setState(() => _fabVisible = true);
+    }
   }
 
   @override
-  void dispose() {    
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -245,6 +264,7 @@ class _MemoScreenState extends State<MemoScreen> {
           }
 
           return ListView(
+            controller: _scrollController,
             padding: const EdgeInsets.only(bottom: 80),
             children: [
               if (directItems.isNotEmpty)
@@ -277,15 +297,24 @@ class _MemoScreenState extends State<MemoScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          if (widget.isDesktopMode && widget.onCreateRequested != null) {
-            widget.onCreateRequested!();
-          } else {
-            _showNewMemoSheet(context, service);
-          }
-        },
-        child: const Icon(Icons.edit_outlined),
+      floatingActionButton: AnimatedSlide(
+        offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        child: AnimatedOpacity(
+          opacity: _fabVisible ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 300),
+          child: FloatingActionButton(
+            onPressed: () {
+              if (widget.isDesktopMode && widget.onCreateRequested != null) {
+                widget.onCreateRequested!();
+              } else {
+                _showNewMemoSheet(context, service);
+              }
+            },
+            child: const Icon(Icons.edit_outlined),
+          ),
+        ),
       ),
     );
   }

@@ -13,6 +13,7 @@ import '../widgets/chat/chat_tiles.dart';
 import '../widgets/chat/chats_section.dart';
 import 'chat_room_screen.dart';
 import '../utils/ad_interleaver.dart';
+import 'package:flutter/rendering.dart';
 
 class ChatListScreen extends StatefulWidget {
   final void Function(String roomId)? onRoomSelected;
@@ -24,7 +25,8 @@ class ChatListScreen extends StatefulWidget {
 }
 
 class _ChatListScreenState extends State<ChatListScreen> {  
-
+  final ScrollController _scrollController = ScrollController();
+  bool _fabVisible = true;
   String get _myUid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
@@ -36,10 +38,27 @@ class _ChatListScreenState extends State<ChatListScreen> {
         context.read<ChatProvider>().attachGlobalRoomsStreamWhenReady();
       }
     });
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    print('스크롤 감지: ${_scrollController.position.userScrollDirection}');
+    final isScrollingDown = _scrollController.position.userScrollDirection
+        == ScrollDirection.reverse;
+    final isScrollingUp = _scrollController.position.userScrollDirection
+        == ScrollDirection.forward;
+
+    if (isScrollingDown && _fabVisible) {
+      setState(() => _fabVisible = false);
+    } else if (isScrollingUp && !_fabVisible) {
+      setState(() => _fabVisible = true);
+    }
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -155,9 +174,18 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showNewChatSheet(context),
-        child: const Icon(Icons.edit_outlined),
+      floatingActionButton: AnimatedSlide(
+        offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        child: AnimatedOpacity(
+          opacity: _fabVisible ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 250),
+          child: FloatingActionButton(
+            onPressed: () => _showNewChatSheet(context),
+            child: const Icon(Icons.add),
+          ),
+        ),
       ),
       body: Builder(
         builder: (context) {
@@ -262,6 +290,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 ];
 
           return ListView(
+            controller: _scrollController,
             children: [
               ...privateSection,
               ...interleaveAds(groupWidgets, keyPrefix: 'group_ad'),

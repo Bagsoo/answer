@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/rendering.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/user_provider.dart';
 import '../services/group_service.dart';
@@ -36,6 +37,8 @@ class GroupListScreen extends StatefulWidget {
 
 class _GroupListScreenState extends State<GroupListScreen>
     with SingleTickerProviderStateMixin {
+  final ScrollController _myGroupsScrollController = ScrollController();
+  bool _fabVisible = true;
   static const _keyJoinedGroups = 'joined_groups_cache';
 
   late TabController _tabController;
@@ -80,6 +83,20 @@ class _GroupListScreenState extends State<GroupListScreen>
         _saveGroupsCache(mapped);
       }
     });
+    _myGroupsScrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    final isScrollingDown = _myGroupsScrollController.position.userScrollDirection
+        == ScrollDirection.reverse;
+    final isScrollingUp = _myGroupsScrollController.position.userScrollDirection
+        == ScrollDirection.forward;
+
+    if (isScrollingDown && _fabVisible) {
+      setState(() => _fabVisible = false);
+    } else if (isScrollingUp && !_fabVisible) {
+      setState(() => _fabVisible = true);
+    }
   }
 
   Future<void> _loadCachedGroups() async {
@@ -138,6 +155,8 @@ class _GroupListScreenState extends State<GroupListScreen>
 
   @override
   void dispose() {
+    _myGroupsScrollController.removeListener(_onScroll);
+    _myGroupsScrollController.dispose();
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -228,11 +247,20 @@ class _GroupListScreenState extends State<GroupListScreen>
     final userProvider = context.watch<UserProvider>();
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
+      floatingActionButton: AnimatedSlide(
+        offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        child: AnimatedOpacity(
+          opacity: _fabVisible ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 300),
+          child: FloatingActionButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
+            ),
+            child: const Icon(Icons.add),
+          ),
         ),
-        child: const Icon(Icons.add),
       ),
       body: Column(
         children: [
@@ -306,6 +334,7 @@ class _GroupListScreenState extends State<GroupListScreen>
     }).toList();
 
     return ListView(
+      controller: _myGroupsScrollController,
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: interleaveAds(groupWidgets, keyPrefix: 'my_group_ad'),
     );

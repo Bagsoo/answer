@@ -9,9 +9,10 @@ import '../l10n/app_localizations.dart';
 import '../screens/chat_room_screen.dart';
 import '../widgets/friends/friend_tile.dart';
 import '../widgets/friends/add_friend_dialog.dart';
+import 'package:flutter/rendering.dart';
 
-class FriendsScreen extends StatefulWidget {
-  final String filterQuery;
+class FriendsScreen extends StatefulWidget {  
+  final String filterQuery;  
   const FriendsScreen({super.key, this.filterQuery = ''});
 
   @override
@@ -19,7 +20,8 @@ class FriendsScreen extends StatefulWidget {
 }
 
 class _FriendsScreenState extends State<FriendsScreen> {  
-
+  final ScrollController _scrollController = ScrollController();
+  bool _fabVisible = true;
   List<Map<String, dynamic>> _friends = [];
   Set<String> _blockedUids = {};
   bool _loading = true;
@@ -109,6 +111,20 @@ class _FriendsScreenState extends State<FriendsScreen> {
     } else {
       scheduleBind();
     }
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    final isScrollingDown = _scrollController.position.userScrollDirection 
+        == ScrollDirection.reverse;
+    final isScrollingUp = _scrollController.position.userScrollDirection 
+        == ScrollDirection.forward;
+    
+    if (isScrollingDown && _fabVisible) {
+      setState(() => _fabVisible = false);
+    } else if (isScrollingUp && !_fabVisible) {
+      setState(() => _fabVisible = true);
+    }
   }
 
   Future<void> _loadCachedCount() async {
@@ -120,6 +136,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _friendsBindTimer?.cancel();
     _blockedPollTimer?.cancel();
     _friendsSub?.cancel();
@@ -263,9 +281,18 @@ class _FriendsScreenState extends State<FriendsScreen> {
           }).toList();
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddFriendDialog,
-        child: const Icon(Icons.person_add_outlined),
+      floatingActionButton: AnimatedSlide(
+        offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        child: AnimatedOpacity(
+          opacity: _fabVisible ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 250),
+          child: FloatingActionButton(
+            onPressed: _showAddFriendDialog,
+            child: const Icon(Icons.person_add_outlined),
+          ),
+        ),
       ),
       body: Column(
         children: [
@@ -298,6 +325,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                         ),
                       )
                     : ListView.separated(
+                        controller: _scrollController,
                         padding: const EdgeInsets.only(bottom: 80),
                         itemCount: filtered.length,
                         itemBuilder: (context, index) =>
