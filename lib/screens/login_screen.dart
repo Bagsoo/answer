@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import '../services/auth_service.dart';
@@ -14,6 +15,9 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  static const bool _allowPhoneFirstLogin = true;
+
+  final TextEditingController _desktopPhoneController = TextEditingController();
   final TextEditingController _otpController = TextEditingController();
   bool _codeSent = false;
   bool _isLoading = false;
@@ -22,6 +26,13 @@ class _LoginScreenState extends State<LoginScreen> {
   // intl_phone_field에서 조합된 완전한 번호 (+821012345678 형태)
   String _completePhoneNumber = '';
   bool _phoneValid = false;
+  String? _desktopCountryIso;
+
+  static const Map<String, String> _countryDialCodes = {
+    'KR': '82',
+    'US': '1',
+    'JP': '81',
+  };
 
   static const _locales = [
     {'code': 'ko', 'label': '한국어'},
@@ -40,8 +51,101 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _desktopPhoneController.dispose();
     _otpController.dispose();
     super.dispose();
+  }
+
+  bool get _isWindowsNative =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+
+  void _applyDesktopPhoneState() {
+    final countryIso = _desktopCountryIso ?? 'KR';
+    final dialCode = _countryDialCodes[countryIso] ?? '82';
+    final digitsOnly =
+        _desktopPhoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    _completePhoneNumber =
+        digitsOnly.isEmpty ? '' : '+$dialCode$digitsOnly';
+    _phoneValid = digitsOnly.length >= 6;
+  }
+
+  Widget _buildPhoneInput(AppLocalizations l, String currentLocale) {
+    if (!_isWindowsNative) {
+      return IntlPhoneField(
+        initialCountryCode: _initialCountryCode(currentLocale),
+        decoration: InputDecoration(
+          labelText: l.loginPhoneLabel,
+          border: const OutlineInputBorder(),
+        ),
+        onChanged: (phone) {
+          // Extract digits only
+          final digits = phone.number.replaceAll(RegExp(r'[^0-9]'), '');
+          // E.164: remove leading zero if present (e.g., 010 -> 10)
+          final nationalNumber = digits.startsWith('0')
+              ? digits.substring(1)
+              : digits;
+
+          _completePhoneNumber = '${phone.countryCode}$nationalNumber';
+          _phoneValid = true;
+        },
+        onCountryChanged: (country) {
+          _completePhoneNumber = '';
+          _phoneValid = false;
+        },
+        invalidNumberMessage: l.loginPhoneError,
+      );
+    }
+
+    _desktopCountryIso ??= _initialCountryCode(currentLocale);
+    final currentIso = _desktopCountryIso!;
+    final dialCode = _countryDialCodes[currentIso] ?? '82';
+
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: Theme.of(context).colorScheme.outline),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: currentIso,
+              items: _countryDialCodes.entries.map((entry) {
+                return DropdownMenuItem<String>(
+                  value: entry.key,
+                  child: Text('${entry.key}  +${entry.value}'),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _desktopCountryIso = value;
+                  _applyDesktopPhoneState();
+                });
+              },
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: TextField(
+            controller: _desktopPhoneController,
+            keyboardType: TextInputType.phone,
+            onChanged: (_) {
+              setState(() => _applyDesktopPhoneState());
+            },
+            decoration: InputDecoration(
+              labelText: l.loginPhoneLabel,
+              hintText: '01012345678',
+              prefixText: '+$dialCode ',
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   void _sendSms() async {
@@ -76,13 +180,13 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = '';
     });
 
-    final success = await context
+    final error = await context
         .read<AuthService>()
         .verifyOTP(_otpController.text.trim());
 
-    if (!success && mounted) {
+    if (error != null && mounted) {
       setState(() {
-        _errorMessage = l.loginInvalidOtp;
+        _errorMessage = error;
         _isLoading = false;
       });
     }
@@ -113,6 +217,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final l = AppLocalizations.of(context);
     final localeProvider = context.watch<LocaleProvider>();
     final currentLocale = localeProvider.locale.languageCode;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       body: SafeArea(
@@ -212,39 +317,48 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // ── 전화번호 입력 / OTP 입력 ─────────────────────────────
               if (!_codeSent) ...[
-                // intl_phone_field — 국가코드 셀렉터 + 번호 입력
-                IntlPhoneField(
-                  initialCountryCode:
-                      _initialCountryCode(currentLocale),
-                  decoration: InputDecoration(
-                    labelText: l.loginPhoneLabel,
-                    border: const OutlineInputBorder(),
+                if (_allowPhoneFirstLogin) ...[
+                  _buildPhoneInput(l, currentLocale),
+                  if (_isWindowsNative)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Windows 앱에서는 Firebase 전화번호 SMS 인증이 지원되지 않습니다. '
+                        '모바일 앱 또는 웹(Chrome)에서 진행해 주세요.',
+                        style: TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: (_isLoading || _isWindowsNative) ? null : _sendSms,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2))
+                        : Text(l.loginSendSms),
                   ),
-                  onChanged: (phone) {
-                    _completePhoneNumber = phone.completeNumber;
-                    _phoneValid = true;
-                  },
-                  onCountryChanged: (country) {
-                    // 국가 변경 시 번호 초기화
-                    _completePhoneNumber = '';
-                    _phoneValid = false;
-                  },
-                  invalidNumberMessage: l.loginPhoneError,
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _sendSms,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                ] else ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '전화번호는 로그인 후 [설정 > 계정 연결 관리]에서 연결할 수 있습니다.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2))
-                      : Text(l.loginSendSms),
-                ),
+                ],
               ] else ...[
                 TextField(
                   controller: _otpController,
@@ -276,6 +390,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     _errorMessage = '';
                     _completePhoneNumber = '';
                     _phoneValid = false;
+                    _desktopPhoneController.clear();
                   }),
                   child: Text(l.loginBack),
                 ),
@@ -292,7 +407,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
 
               // ── 약관 동의 안내 문구 ──────────────────────────────────────
-              const SizedBox(height: 24),
+              const SizedBox(height: 40),
+              Text(
+                l.loginPcInfo,
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 13,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
               Text(
                 l.loginAgreeToTerms,
                 textAlign: TextAlign.center,

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -22,6 +23,13 @@ class IncomingShareService extends ChangeNotifier {
     if (_initialized) return;
     _initialized = true;
 
+    // Windows/데스크톱에서는 아예 채널을 건드리지 않음
+    final isMobile = defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS;
+    if (!isMobile) {
+      debugPrint('IncomingShareService: Skipping channel init on Windows.');
+      return;
+    }
+
     try {
       final raw = await _channel.invokeMethod<dynamic>('getInitialSharedPayload');
       if (raw is Map) {
@@ -29,7 +37,9 @@ class IncomingShareService extends ChangeNotifier {
             IncomingSharePayload.fromMap(Map<dynamic, dynamic>.from(raw));
         notifyListeners();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('IncomingShareService init error: $e');
+    }
 
     _subscription = _events.receiveBroadcastStream().listen((event) {
       if (event is! Map) return;
@@ -42,6 +52,9 @@ class IncomingShareService extends ChangeNotifier {
   Future<void> clearPendingShare() async {
     _pendingShare = null;
     notifyListeners();
+    final isMobile = !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
+    if (!isMobile) return;
+
     try {
       await _channel.invokeMethod<void>('clearSharedPayload');
     } catch (_) {}

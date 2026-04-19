@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+// import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'utils/ads_helper.dart';
+
 import 'services/chat_service.dart';
 import 'services/auth_service.dart';
 import 'services/group_service.dart';
@@ -18,71 +24,96 @@ import 'services/my_schedule_service.dart';
 import 'providers/locale_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/user_provider.dart';
+import 'providers/chat_provider.dart';
 import 'l10n/app_localizations.dart';
 import 'theme/app_theme.dart';
 import 'screens/auth_wrapper.dart';
 import 'firebase_options.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'providers/chat_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-  // ── Firebase 먼저 초기화 (다른 서비스가 Firebase에 의존하므로 반드시 먼저) ──
-  if (Firebase.apps.isEmpty) {
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)
-        .catchError((e) {
-      debugPrint('Firebase init error: $e');
-    });
-  } else {
-    Firebase.app();
+  
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint('.env load error: $e');
   }
 
-  // ── Firestore 오프라인 캐시 설정 ────────────────────────────────────────────
-  // - 오프라인에서도 마지막 캐시 데이터 표시
-  // - 네트워크 재연결 시 자동 동기화
-  // - 쿼리 결과가 캐시에서 먼저 오고 Firebase에서 최신화 (읽기 비용 절감)
-  FirebaseFirestore.instance.settings = const Settings(
-    persistenceEnabled: true,
-    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-  );
+  // Firebase 초기화 가능 플랫폼 (Android, iOS, Windows, Web)
+  final isFirebaseSupported = !kIsWeb 
+      ? (defaultTargetPlatform == TargetPlatform.android || 
+         defaultTargetPlatform == TargetPlatform.iOS || 
+         defaultTargetPlatform == TargetPlatform.windows)
+      : true;
 
-  // ── Firebase 완료 후 나머지 병렬 초기화 ────────────────────────────────────
-  // dotenv는 await, NotificationService는 네트워크 의존이므로 fire-and-forget
-  await dotenv.load(fileName: '.env');
-  NotificationService().init(); // await 없이 — 네트워크 없어도 앱 시작 블로킹 안 함
-  MobileAds.instance.initialize();
+  if (isFirebaseSupported) {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)
+          .catchError((e) => debugPrint('Firebase init error: $e'));
+    }
+
+    // Windows 등 데스크톱에서 Firestore 디스크 persistence(LevelDB)가
+    // 네이티브 크래시를 유발하는 사례가 있어(FlutterFire #12987, #13145),
+    // 모바일에서만 디스크 persistence를 켠다.
+    final useDiskPersistence = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
+    final isWindows =
+        !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+    if (isWindows) {
+      // 메모리 캐시 무제한이 일부 Windows 빌드에서 불안정해질 수 있어 상한을 둔다.
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: false,
+        cacheSizeBytes: 40 * 1024 * 1024,
+      );
+    } else {
+      FirebaseFirestore.instance.settings = Settings(
+        persistenceEnabled: useDiskPersistence,
+        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+      );
+    }
+
+    // 모바일 전용 서비스
+    final isMobile = defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS;
+    if (isMobile) {
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      NotificationService().init();
+      // MobileAds.instance.initialize();
+      await initializeAds();
+    }
+  }
   
   final prefs = await SharedPreferences.getInstance();
+  debugPrint('prefs initialized');
 
   runApp(
     MultiProvider(
       providers: [
         Provider<SharedPreferences>.value(value: prefs),
-        ChangeNotifierProvider<AuthService>(create: (_) => AuthService()),
-        // LocaleProvider, ThemeProvider는 생성자에서 SharedPreferences 즉시 로드
-        ChangeNotifierProvider<LocaleProvider>(create: (_) => LocaleProvider()),
-        ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider<UserProvider>(create: (_) => UserProvider()),
-        ChangeNotifierProvider<ChatProvider>(create: (_) => ChatProvider()..initialize()),
-        Provider<ChatService>(create: (_) => ChatService()),
-        Provider<GroupService>(create: (_) => GroupService()),
-        Provider<FriendService>(create: (_) => FriendService()),
-        Provider<BlockService>(create: (_) => BlockService()),
-        Provider<MemoService>(create: (_) => MemoService()),
-        Provider<NotificationService>(create: (_) => NotificationService()),
-        Provider<PollService>(create: (_) => PollService()),
-        Provider<ReportService>(create: (_) => ReportService()),
-        Provider<MyScheduleService>(create: (_) => MyScheduleService()),
+        ChangeNotifierProvider<AuthService>(create: (_) { debugPrint('Init AuthService'); return AuthService(); }),
+        ChangeNotifierProvider<LocaleProvider>(create: (_) { debugPrint('Init LocaleProvider'); return LocaleProvider(); }),
+        ChangeNotifierProvider<ThemeProvider>(create: (_) { debugPrint('Init ThemeProvider'); return ThemeProvider(); }),
+        ChangeNotifierProvider<UserProvider>(create: (_) { debugPrint('Init UserProvider'); return UserProvider(); }),
+        ChangeNotifierProvider<ChatProvider>(create: (_) { debugPrint('Init ChatProvider'); return ChatProvider()..initialize(); }),
+        Provider<ChatService>(create: (_) { debugPrint('Init ChatService'); return ChatService(); }),
+        Provider<GroupService>(create: (_) { debugPrint('Init GroupService'); return GroupService(); }),
+        Provider<FriendService>(create: (_) { debugPrint('Init FriendService'); return FriendService(); }),
+        Provider<BlockService>(create: (_) { debugPrint('Init BlockService'); return BlockService(); }),
+        Provider<MemoService>(create: (_) { debugPrint('Init MemoService'); return MemoService(); }),
+        Provider<NotificationService>(create: (_) { debugPrint('Init NotificationService'); return NotificationService(); }),
+        Provider<PollService>(create: (_) { debugPrint('Init PollService'); return PollService(); }),
+        Provider<ReportService>(create: (_) { debugPrint('Init ReportService'); return ReportService(); }),
+        Provider<MyScheduleService>(create: (_) { debugPrint('Init MyScheduleService'); return MyScheduleService(); }),
         ChangeNotifierProvider<IncomingShareService>(
-          create: (_) => IncomingShareService()..initialize(),
+          create: (_) { debugPrint('Init IncomingShareService'); return IncomingShareService()..initialize(); },
         ),
       ],
-      child: const MessengerApp(),
+      child: Builder(
+        builder: (context) {
+          debugPrint('Providers loaded, building MessengerApp');
+          return const MessengerApp();
+        }
+      ),
     ),
   );
 }

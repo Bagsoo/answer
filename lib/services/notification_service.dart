@@ -30,7 +30,8 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
-  final FirebaseMessaging _fcm = FirebaseMessaging.instance;
+  FirebaseMessaging? _fcmInstance;
+  FirebaseMessaging get _fcm => _fcmInstance ??= FirebaseMessaging.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   String? _lastHandledTarget;
   bool _pluginInitialized = false;
@@ -63,6 +64,13 @@ class NotificationService {
 
     await _ensureLocalNotificationsInitialized();
 
+    // Windows/데스크톱에서는 FCM 네이티브 기능을 지원하지 않으므로 여기서 종료
+    final isMobile = !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
+    if (!isMobile) {
+      debugPrint('NotificationService: FCM is only supported on Mobile. Skipping FCM init.');
+      return;
+    }
+
     final settings2 = await _fcm.requestPermission(
       alert: true,
       badge: true,
@@ -85,6 +93,9 @@ class NotificationService {
 
   // ── FCM 토큰 저장 ───────────────────────────────────────────────────────────
   Future<void> _saveFcmToken() async {
+    final isMobile = !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
+    if (!isMobile) return;
+
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
     final token = await _fcm.getToken();

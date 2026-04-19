@@ -75,7 +75,7 @@ class UserProvider extends ChangeNotifier {
       _locationLat  = prefs.getDouble(_keyLocationLat);
       _locationLng  = prefs.getDouble(_keyLocationLng);
       _interests    = prefs.getStringList(_keyInterests) ?? [];
-      _loaded = true;
+      // _loaded = true;
       notifyListeners();
     }
 
@@ -274,13 +274,28 @@ class UserProvider extends ChangeNotifier {
 
   // ── 계정 삭제 ────────────────────────────────────────────────────────────
   Future<void> deleteAccount() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid;
     if (uid == null) return;
+    final providerIds = user!.providerData.map((p) => p.providerId).toSet();
     await _db.collection('users').doc(uid).set({
       'account_status': 'deleted',
       'deleted_at': FieldValue.serverTimestamp(),
       'deleted_by': uid,
       'search_hidden': true,
+      'linked_google': false,
+      'linked_apple': false,
+      'linked_phone': false,
+      'retention_snapshot': {
+        'name': _name,
+        'phone_number': _phoneNumber,
+        'profile_image': _photoUrl ?? '',
+        'locale': _locale,
+        'timezone': _timezone,
+        'linked_google': providerIds.contains('google.com'),
+        'linked_apple': providerIds.contains('apple.com'),
+        'linked_phone': providerIds.contains('phone'),
+      },
     }, SetOptions(merge: true));
     await FirebaseAuth.instance.signOut();
     await clear();

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/friend_service.dart';
@@ -30,26 +31,86 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   StreamSubscription? _friendsSub;
   StreamSubscription? _blockedSub;
+  Timer? _friendsBindTimer;
+  Timer? _blockedPollTimer;
+
+  Future<void> _pollBlockedUidsWindows(BlockService blockService) async {
+    if (!mounted) return;
+    try {
+      final uids = await blockService.fetchBlockedUidSetOnce();
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _blockedUids = uids);
+      });
+    } catch (e) {
+      debugPrint('FriendsScreen blocked poll error: $e');
+    }
+  }
+
+  void _bindFirestoreStreams() {
+    if (!mounted) return;
+    final win = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+
+    void bindFriends() {
+      if (!mounted || _friendsSub != null) return;
+      _friendsSub = context.read<FriendService>().getFriends().listen((list) {
+        if (!mounted) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          setState(() {
+            _friends = list;
+            _loading = false;
+            _cachedFriendCount = list.length; // 실제 값으로 동기화
+          });
+        });
+      });
+    }
+
+    if (win) {
+      final blockService = context.read<BlockService>();
+      // Windows: users/.../blocked 에 snapshots()를 걸면 바로 네이티브가 끊기는
+      // 증상이 있어 get() 폴링으로만 갱신한다.
+      _blockedPollTimer?.cancel();
+      Future<void>.delayed(const Duration(milliseconds: 400), () {
+        _pollBlockedUidsWindows(blockService);
+      });
+      _blockedPollTimer = Timer.periodic(
+        const Duration(seconds: 15),
+        (_) => _pollBlockedUidsWindows(blockService),
+      );
+
+      _friendsBindTimer?.cancel();
+      _friendsBindTimer = Timer(const Duration(milliseconds: 900), bindFriends);
+    } else {
+      _blockedSub =
+          context.read<BlockService>().getBlockedUidSet().listen((uids) {
+        if (!mounted) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _blockedUids = uids);
+        });
+      });
+      bindFriends();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _loadCachedCount();
 
-    _blockedSub =
-        context.read<BlockService>().getBlockedUidSet().listen((uids) {
-      if (mounted) setState(() => _blockedUids = uids);
-    });
+    void scheduleBind() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _bindFirestoreStreams();
+      });
+    }
 
-    _friendsSub = context.read<FriendService>().getFriends().listen((list) {
-      if (mounted) {
-        setState(() {
-          _friends = list;
-          _loading = false;
-          _cachedFriendCount = list.length; // 실제 값으로 동기화
-        });
-      }
-    });
+    // Windows: ChatProvider 등 다른 초기화가 끝난 뒤에 Firestore 구독을 붙인다.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+      Future<void>.delayed(const Duration(milliseconds: 1600), scheduleBind);
+    } else {
+      scheduleBind();
+    }
   }
 
   Future<void> _loadCachedCount() async {
@@ -61,6 +122,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   @override
   void dispose() {
+    _friendsBindTimer?.cancel();
+    _blockedPollTimer?.cancel();
     _friendsSub?.cancel();
     _blockedSub?.cancel();
     _filterController.dispose();
@@ -117,6 +180,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
     await context.read<FriendService>().removeFriend(targetUid);
 
     if (mounted) {
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+        setState(() => _blockedUids = {..._blockedUids, targetUid});
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l.blockUserDone)),
       );

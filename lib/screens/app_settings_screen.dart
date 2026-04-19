@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../services/notification_service.dart';
 import '../services/block_service.dart';
 import '../l10n/app_localizations.dart';
+import 'account_link_management_screen.dart';
 import 'profile_screen.dart';
 
 class AppSettingsScreen extends StatefulWidget {
@@ -197,16 +198,25 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
         'deleted_at': FieldValue.serverTimestamp(),
         'deleted_by': uid,
         'search_hidden': true,
+        'linked_google': false,
+        'linked_apple': false,
+        'linked_phone': false,
         'retention_snapshot': {
           'name': userData['name'] as String? ?? '',
           'phone_number': userData['phone_number'] as String? ?? '',
           'profile_image': userData['profile_image'] as String? ?? '',
           'locale': userData['locale'] as String? ?? 'ko',
           'timezone': userData['timezone'] as String? ?? 'Asia/Seoul',
-          'providers':
-              List<String>.from(userData['providers'] as List? ?? const []),
+          'linked_google': userData['linked_google'] as bool? ?? false,
+          'linked_apple': userData['linked_apple'] as bool? ?? false,
+          'linked_phone': userData['linked_phone'] as bool? ?? false,
+          'last_sign_in_provider':
+              userData['last_sign_in_provider'] as String? ?? '',
+          'preferred_login_provider':
+              userData['preferred_login_provider'] as String? ?? '',
           'google_email': userData['google_email'] as String? ?? '',
           'apple_email': userData['apple_email'] as String? ?? '',
+          'email': userData['email'] as String? ?? '',
         },
         'name': '',
         'phone_number': '',
@@ -214,6 +224,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
         'fcm_token': '',
       }, SetOptions(merge: true));
       await batch.commit();
+      await context.read<AuthService>().markCurrentUserPhoneIndexDeleted();
 
       if (context.mounted) {
         context.read<LocaleProvider>().reset();
@@ -401,6 +412,16 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                   leading: Icon(Icons.logout, color: colorScheme.primary),
                   title: Text(l.logout),
                   onTap: () => _showLogoutDialog(context, l),
+                ),
+                ListTile(
+                  leading: Icon(Icons.link, color: colorScheme.primary),
+                  title: const Text('계정 연결 관리'),
+                  subtitle: const Text('Google/Apple/Phone 연결 상태 관리'),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AccountLinkManagementScreen(),
+                    ),
+                  ),
                 ),
 
                 const Divider(),

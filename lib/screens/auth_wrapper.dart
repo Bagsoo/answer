@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
@@ -11,16 +12,22 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // We listen to the AuthService to determine what to show
+    debugPrint('AuthWrapper build started');
+    final isMobile = !kIsWeb && (defaultTargetPlatform == TargetPlatform.android ||
+                                  defaultTargetPlatform == TargetPlatform.iOS);
+
     final authService = context.watch<AuthService>();
+    debugPrint('AuthWrapper got authService');
     final user = authService.currentUser;
+    debugPrint('AuthWrapper user: $user');
     final isRegistered = authService.isRegisteredUser;
+    debugPrint('AuthWrapper isRegistered: $isRegistered');
 
     if (user == null) {
-      // 1. Not logged in -> Show Login
+      debugPrint('AuthWrapper returning LoginScreen');
       return const LoginScreen();
     } else if (isRegistered == null) {
-      // 2. Checking Firestore... Show loading
+      debugPrint('AuthWrapper returning Scaffold with CircularProgressIndicator');
       return Scaffold(
         body: Center(
           child: CircularProgressIndicator(
@@ -29,14 +36,16 @@ class AuthWrapper extends StatelessWidget {
         ),
       );
     } else if (isRegistered == false) {
-      // 3. Logged in, but document doesn't exist -> Show Registration
+      debugPrint('AuthWrapper returning RegistrationScreen');
       return const RegistrationScreen();
     } else {
-      // 로그인 완료 시 FCM 토큰 저장 (로그인 상태이므로 uid 있음)
+      // 로그인 완료 시 FCM 토큰 저장 (모바일만)
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        NotificationService().saveFcmTokenOnLogin();
+        if (isMobile) {
+          NotificationService().saveFcmTokenOnLogin();
+        }
       });
-      // 4. Logged in and registered -> Show Home
+      debugPrint('AuthWrapper returning HomeScreen');
       return const HomeScreen();
     }
   }

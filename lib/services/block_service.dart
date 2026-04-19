@@ -46,6 +46,14 @@ class BlockService {
         (snap) => snap.docs.map((d) => d.id).toSet());
   }
 
+  /// Windows 등: `blocked` 컬렉션에 snapshots 리스너를 붙이면 프로세스가 끊기는
+  /// 환경이 있어, 일회 조회로 대체할 때 사용한다.
+  Future<Set<String>> fetchBlockedUidSetOnce() async {
+    if (_uid.isEmpty) return {};
+    final snap = await _blockedRef.get();
+    return snap.docs.map((d) => d.id).toSet();
+  }
+
   // ── 그룹 차단 여부 확인 ──────────────────────────────────────────────────
   Future<bool> isGroupBanned(String groupId) async {
     final doc = await _db

@@ -318,6 +318,7 @@ class AppLocalizations {
   String get loginGoogleFailed => _s.loginGoogleFailed;
   String get loginInvalidOtp => _s.loginInvalidOtp;
   String get loginPhoneError => _s.loginPhoneError;
+  String get loginPcInfo => _s.loginPcInfo;
   String get loginAgreeToTerms => _s.loginAgreeToTerms;
   String get goToRegister => _s.goToRegister;
 
@@ -1052,7 +1053,8 @@ abstract class _AppStrings {
   String get loginGoogleFailed;    // 'Google sign in failed. Please try again.' / 'Google 로그인 실패. 다시 시도해주세요.' / 'Googleログインに失敗しました。'
   String get loginInvalidOtp;      // 'Invalid OTP Code.' / '잘못된 인증번호입니다.' / '無効な認証番号です。'
   String get loginPhoneError;      // 'Please enter a valid number with country code (e.g. +82...)' / ...
-  String get loginAgreeToTerms;    // 'By logging in, you agree to our Privacy Policy and Terms of Service.' / '로그인하면 개인정보처리방침과 이용약관에 동의하는 것으로 간주합니다.' / 'ログインすると、プライバシーポリシーと利用規約に同意したことになります。'
+  String get loginPcInfo;
+  String get loginAgreeToTerms;    // 'By logging in, you agree to our Privacy Policy and Terms of Service.' / '로그인하면 개인정보처리방침과 이용약관에 동의하는 것으로 간주합니다.' / 'ログインすると、プライバシーポリシーと利用規約に同意한 것になります。'
   String get goToRegister;         // 'Go to Registration' / '회원가입으로 이동' / '登録画面へ'
 
   // ── 회원가입 화면 ──
@@ -1808,6 +1810,7 @@ class _EnStrings extends _AppStrings {
   @override String get loginGoogleFailed => 'Google sign in failed. Please try again.';
   @override String get loginInvalidOtp => 'Invalid OTP Code.';
   @override String get loginPhoneError => 'Please enter a valid number with country code (e.g. +82...)';
+  @override String get loginPcInfo => 'To use on PC version, link Google/Apple account in settings.';
   @override String get loginAgreeToTerms => 'By logging in, you agree to our Privacy Policy and Terms of Service.';
   @override String get goToRegister => 'Sign up';
 
@@ -2542,6 +2545,7 @@ class _KoStrings extends _AppStrings {
   @override String get loginGoogleFailed => 'Google 로그인 실패. 다시 시도해주세요.';
   @override String get loginInvalidOtp => '잘못된 인증번호입니다.';
   @override String get loginPhoneError => '국가번호를 포함한 유효한 번호를 입력해주세요 (예: +82...)';
+  @override String get loginPcInfo => 'PC 버전에서 사용하려면 설정에서 Google/Apple 계정과 연결하세요.';
   @override String get loginAgreeToTerms => '로그인하면 개인정보처리방침과 이용약관에 동의하는 것으로 간주합니다.';
   @override String get goToRegister => '회원가입으로 이동';
 
@@ -3275,6 +3279,7 @@ class _JaStrings extends _AppStrings {
   @override String get loginGoogleFailed => 'Googleログインに失敗しました。';
   @override String get loginInvalidOtp => '無効な認証番号です。';
   @override String get loginPhoneError => '国番号を含む有効な番号を入力してください (例: +82...)';
+  @override String get loginPcInfo => 'PC版で利用するには、設定でGoogle/Appleアカウントを連携してください。';
   @override String get loginAgreeToTerms => 'ログインすると、プライバシーポリシーと利用規約に同意したことになります。';
   @override String get goToRegister => '登録画面へ';
 

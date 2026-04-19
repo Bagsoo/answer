@@ -14,7 +14,7 @@ class AdController extends ChangeNotifier {
 
   AdState get state => _state;
 
-  String get _adUnitId => defaultTargetPlatform == TargetPlatform.iOS
+  String get _adUnitId => defaultTargetPlatform == TargetPlatform.iOS 
       ? _adUnitIos
       : _adUnitAndroid;
 

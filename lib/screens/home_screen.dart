@@ -1,5 +1,7 @@
 import 'dart:async';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart'; // 추가
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -33,11 +35,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const _prefKeyUnread = 'chat_total_unread';
+  static bool get _isWindows =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
 
   int _currentIndex = 0;
-  int _unreadCount = 0;
-  StreamSubscription<int>? _unreadSub;
   bool _showingIncomingShare = false;
   IncomingShareService? _incomingShareService;
   String? _activeMemoId;
@@ -57,41 +58,50 @@ class _HomeScreenState extends State<HomeScreen> {
     _incomingShareService ??= context.read<IncomingShareService>();
   }
 
+  Future<void> _bootstrapAfterFirstFrame() async {
+    if (!mounted) return;
+    final isMobile = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
+    // 데스크톱(Windows 등)에서 동일 사용자 문서에 대한 Firestore get/update가
+    // 한꺼번에 겹치면 네이티브 SDK가 불안정해지는 증상이 있어 순차 실행한다.
+    final sequentialUserFetch = !kIsWeb &&
+        defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS;
+    try {
+      if (sequentialUserFetch) {
+        await context.read<UserProvider>().loadUser();
+        if (!mounted) return;
+        await context.read<LocaleProvider>().loadFromFirestore();
+        if (!mounted) return;
+        await context.read<ThemeProvider>().loadFromFirestore();
+      } else {
+        await Future.wait<void>([
+          context.read<UserProvider>().loadUser(),
+          context.read<LocaleProvider>().loadFromFirestore(),
+          context.read<ThemeProvider>().loadFromFirestore(),
+        ]);
+      }
+    } catch (e, st) {
+      debugPrint('HomeScreen bootstrap error: $e\n$st');
+    }
+    if (!mounted) return;
+    if (isMobile) {
+      _incomingShareService?.addListener(_handleIncomingShare);
+      _handleIncomingShare();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _loadCachedUnread();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.wait<void>([
-        context.read<UserProvider>().loadUser(),
-        context.read<LocaleProvider>().loadFromFirestore(),
-        context.read<ThemeProvider>().loadFromFirestore(),
-      ]);
-      _subscribeUnread();
-      _incomingShareService?.addListener(_handleIncomingShare);
-      _handleIncomingShare();
+      _bootstrapAfterFirstFrame();
     });
-  }
-
-  Future<void> _loadCachedUnread() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cached = prefs.getInt(_prefKeyUnread) ?? 0;
-    if (mounted) setState(() => _unreadCount = cached);
-  }
-
-  void _subscribeUnread() {
-    _unreadSub = context.read<ChatService>().totalUnreadStream().listen(
-      (count) async {
-        if (mounted) setState(() => _unreadCount = count);
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setInt(_prefKeyUnread, count);
-      },
-    );
   }
 
   @override
   void dispose() {
-    _unreadSub?.cancel();
     _incomingShareService?.removeListener(_handleIncomingShare);
     super.dispose();
   }
@@ -124,6 +134,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final userProvider = context.watch<UserProvider>();
+    
+    if (!userProvider.isLoaded) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     final photoUrl = userProvider.photoUrl ?? '';
 
     return LayoutBuilder(
@@ -150,12 +169,16 @@ class _HomeScreenState extends State<HomeScreen> {
       GroupListScreen(),
     ];
 
+    final isMobile = !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        const MethodChannel('com.answer.messenger/background')
-            .invokeMethod('moveToBackground');
+        if (isMobile) {
+          const MethodChannel('com.answer.messenger/background')
+              .invokeMethod('moveToBackground');
+        }
       },
       child: Scaffold(
         appBar: _buildAppBar(context, l, userProvider, photoUrl),
@@ -165,9 +188,49 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── 데스크톱 레이아웃 ─────────────────────────────────────────────────────────
   Widget _buildDesktopLayout(BuildContext context, AppLocalizations l,
       UserProvider userProvider, String photoUrl) {
+    final isMobile = !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
+
+    // Windows: 채팅 탭이 아닐 때는 ChatProvider를 watch하지 않는다.
+    // 하단 네비의 Selector까지 겹치면 앱 기동 직후 Firestore 전역 구독이 붙어 프로세스가 끊기는 환경이 있었다.
+    if (_isWindows && _currentIndex != 1) {
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          if (isMobile) {
+            const MethodChannel('com.answer.messenger/background')
+                .invokeMethod('moveToBackground');
+          }
+        },
+        child: Scaffold(
+          body: Row(
+            children: [
+              SizedBox(
+                width: 320,
+                child: Scaffold(
+                  appBar: _buildAppBar(context, l, userProvider, photoUrl),
+                  body: _buildDesktopSidebar(context, l, null),
+                  bottomNavigationBar: _buildBottomNav(l),
+                ),
+              ),
+              const VerticalDivider(width: 1, thickness: 1),
+              Expanded(
+                child: _currentIndex == 2
+                    ? _buildDesktopMemoArea(context, l)
+                    : _currentIndex == 3
+                        ? _buildDesktopScheduleArea(context, l)
+                        : _currentIndex == 4
+                            ? _buildDesktopGroupArea(context, l)
+                            : _buildDesktopOtherTab(context, l),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final chatProvider = context.watch<ChatProvider>();
     final visitedRooms = chatProvider.visitedRooms;
     final activeRoomId = chatProvider.activeRoomId;
@@ -176,8 +239,10 @@ class _HomeScreenState extends State<HomeScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        const MethodChannel('com.answer.messenger/background')
-            .invokeMethod('moveToBackground');
+        if (isMobile) {
+          const MethodChannel('com.answer.messenger/background')
+              .invokeMethod('moveToBackground');
+        }
       },
       child: Scaffold(
         body: Row(
@@ -204,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ? _buildDesktopScheduleArea(context, l)
                   : _currentIndex == 4
                       ? _buildDesktopGroupArea(context, l)
-                  : _buildDesktopOtherTab(context, l),
+                      : _buildDesktopOtherTab(context, l),
             ),
           ],
         ),
@@ -213,14 +278,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildDesktopSidebar(
-      BuildContext context, AppLocalizations l, ChatProvider chatProvider) {
+      BuildContext context, AppLocalizations l, ChatProvider? chatProvider) {
     switch (_currentIndex) {
       case 0:
         return FriendsScreen();
       case 1:
+        final cp = chatProvider ?? context.read<ChatProvider>();
         return ChatListScreen(
           onRoomSelected: (roomId) {
-            chatProvider.selectRoom(roomId);
+            cp.selectRoom(roomId);
           },
         );
       case 2:
@@ -487,6 +553,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   AppBar _buildAppBar(BuildContext context, AppLocalizations l,
       UserProvider userProvider, String photoUrl) {
+    final useRemoteAvatar = !_isWindows && photoUrl.isNotEmpty;
     return AppBar(
       leading: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -496,12 +563,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           child: CircleAvatar(
             radius: 12,
-            backgroundColor:
-                Theme.of(context).colorScheme.primaryContainer,
-            backgroundImage: photoUrl.isNotEmpty
-                ? CachedNetworkImageProvider(photoUrl)
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            backgroundImage: useRemoteAvatar
+                ? ResizeImage(
+                    NetworkImage(photoUrl),
+                    width: 64,
+                    height: 64,
+                    allowUpscaling: false,
+                  )
                 : null,
-            child: photoUrl.isEmpty
+            child: !useRemoteAvatar
                 ? Text(
                     userProvider.name.isNotEmpty
                         ? userProvider.name[0].toUpperCase()
@@ -541,7 +612,14 @@ class _HomeScreenState extends State<HomeScreen> {
           label: l.navFriends,
         ),
         BottomNavigationBarItem(
-          icon: _ChatTabIcon(unreadCount: _unreadCount),
+          icon: _isWindows
+              ? const Icon(Icons.chat_bubble)
+              : Selector<ChatProvider, int>(
+                  selector: (_, provider) => provider.totalUnreadCount,
+                  builder: (context, totalUnreadCount, child) {
+                    return _ChatTabIcon(unreadCount: totalUnreadCount);
+                  },
+                ),
           label: l.navChats,
         ),
         BottomNavigationBarItem(

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/user_cache.dart';
@@ -135,37 +136,60 @@ class FriendService {
   // ── 친구 목록 스트림 ──────────────────────────────────────────────────────
   Stream<List<Map<String, dynamic>>> getFriends() {
     if (currentUserId.isEmpty) return Stream.value([]);
-    return _db
+    final friendsQuery = _db
         .collection('users')
         .doc(currentUserId)
         .collection('friends')
-        .orderBy('added_at', descending: false)
-        .snapshots()
-        .asyncMap((snap) async {
-          final list = snap.docs.map((doc) {
-            final data = Map<String, dynamic>.from(doc.data());
-            data['uid'] = doc.id;
-            return data;
-          }).toList();
+        .orderBy('added_at', descending: false);
 
-          final uids = list
-              .map((friend) => friend['uid'] as String? ?? '')
-              .where((uid) => uid.isNotEmpty)
-              .toSet();
-          if (uids.isNotEmpty) {
-            await UserCache.prefetch(uids);
-          }
+    // Windows 등: snapshots().asyncMap(비동기) 경로가 Firestore C++ SDK와
+    // 맞물려 프로세스가 종료되는 환경이 있어, 데스크톱은 동기 .map만 사용한다.
+    final useAsyncEnrichment = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
 
-          final visible = list.where((friend) {
-            final uid = friend['uid'] as String? ?? '';
-            final cached = uid.isEmpty ? null : UserCache.getCached(uid);
-            return cached?['is_deleted'] != true;
-          }).toList();
+    if (!useAsyncEnrichment) {
+      final deferPrefs = !kIsWeb &&
+          defaultTargetPlatform == TargetPlatform.windows;
+      return friendsQuery.snapshots().map((snap) {
+        final list = snap.docs.map((doc) {
+          final data = Map<String, dynamic>.from(doc.data());
+          data['uid'] = doc.id;
+          return data;
+        }).toList();
+        if (deferPrefs) {
+          Future.microtask(() => _saveFriendCount(list.length));
+        } else {
+          _saveFriendCount(list.length);
+        }
+        return list;
+      });
+    }
 
-          // 스트림에서 실제 개수 확인될 때마다 캐시 동기화
-          _saveFriendCount(visible.length);
-          return visible;
-        });
+    return friendsQuery.snapshots().asyncMap((snap) async {
+      final list = snap.docs.map((doc) {
+        final data = Map<String, dynamic>.from(doc.data());
+        data['uid'] = doc.id;
+        return data;
+      }).toList();
+
+      final uids = list
+          .map((friend) => friend['uid'] as String? ?? '')
+          .where((uid) => uid.isNotEmpty)
+          .toSet();
+      if (uids.isNotEmpty) {
+        await UserCache.prefetch(uids);
+      }
+
+      final visible = list.where((friend) {
+        final uid = friend['uid'] as String? ?? '';
+        final cached = uid.isEmpty ? null : UserCache.getCached(uid);
+        return cached?['is_deleted'] != true;
+      }).toList();
+
+      _saveFriendCount(visible.length);
+      return visible;
+    });
   }
 
   // ── 친구 여부 확인 ────────────────────────────────────────────────────────

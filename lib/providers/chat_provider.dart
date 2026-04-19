@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart'; // 추가
 import 'package:flutter/material.dart';
 import '../utils/user_cache.dart';
 
@@ -157,16 +158,43 @@ class ChatProvider extends ChangeNotifier {
   List<Map<String, dynamic>> get chatRooms => _chatRooms;
   bool get isRoomsLoaded => _isRoomsLoaded;
 
+  int get totalUnreadCount {
+    if (_currentUserId.isEmpty) return 0;
+    int total = 0;
+    for (final room in _chatRooms) {
+      final unreadCounts = room['unread_counts'] as Map<String, dynamic>? ?? {};
+      total += (unreadCounts[_currentUserId] as int? ?? 0);
+    }
+    return total;
+  }
+
   // ── 초기화 및 전역 스트림 캐싱 ──────────────────────────────────────────────
   void initialize() {
-    _subscribeToRooms();
+    // Windows: `chat_rooms` 전역 스냅샷을 앱 기동 직후에 걸면 Firestore 네이티브와
+    // 다른 초기화가 겹쳐 프로세스가 종료되는 환경이 있어, [attachGlobalRoomsStreamWhenReady]로 이월.
+    final deferGlobalRooms = !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.windows;
+
+    if (!deferGlobalRooms) {
+      _subscribeToRooms();
+    }
+
     FirebaseAuth.instance.authStateChanges().listen((user) {
       if (user != null) {
-        _subscribeToRooms();
+        if (!deferGlobalRooms) {
+          _subscribeToRooms();
+        }
       } else {
         clearAll();
       }
     });
+  }
+
+  /// Windows 전용: 채팅 목록 화면이 마운트된 뒤 전역 방 스트림을 연결한다.
+  void attachGlobalRoomsStreamWhenReady() {
+    if (kIsWeb) return;
+    if (defaultTargetPlatform != TargetPlatform.windows) return;
+    _subscribeToRooms();
   }
 
   void _subscribeToRooms() {
@@ -195,8 +223,12 @@ class ChatProvider extends ChangeNotifier {
               return data;
             }).toList();
 
-            // 화면에 그리기 전 필요한 유저 프로필 일괄 prefetch
-            UserCache.prefetch(allMemberUids);
+            // Windows: 방 목록 수신 직후 대량 prefetch가 Firestore 네이티브와 겹칠 수 있음
+            final prefetchMembers = !kIsWeb &&
+                defaultTargetPlatform != TargetPlatform.windows;
+            if (prefetchMembers && allMemberUids.isNotEmpty) {
+              UserCache.prefetch(allMemberUids);
+            }
 
             rooms.sort((a, b) {
               final aTime = a['last_time'] as Timestamp?;

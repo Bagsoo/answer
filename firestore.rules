@@ -36,6 +36,20 @@ service cloud.firestore {
     }
 
     // ── 유저 ────────────────────────────────────────────────────────────────
+    match /phone_index/{phoneE164} {
+      allow read: if isLoggedIn() && (isAdmin() || resource == null || resource.data.uid == request.auth.uid);
+
+      allow create: if isLoggedIn() &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.is_deleted == false;
+
+      allow update: if isLoggedIn() &&
+        (resource.data.uid == request.auth.uid || resource.data.is_deleted == true) &&
+        request.resource.data.uid == request.auth.uid;
+
+      allow delete: if false;
+    }
+
     match /users/{uid} {
       allow read: if isLoggedIn();
       allow write: if isOwner(uid);
