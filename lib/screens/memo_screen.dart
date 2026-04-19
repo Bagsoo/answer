@@ -13,6 +13,7 @@ class MemoScreen extends StatefulWidget {
   final String? selectedMemoId;
   final void Function(String? memoId, Map<String, dynamic>? data)? onMemoSelected;
   final VoidCallback? onCreateRequested;
+  final String filterQuery;
 
   const MemoScreen({
     super.key,
@@ -20,6 +21,7 @@ class MemoScreen extends StatefulWidget {
     this.selectedMemoId,
     this.onMemoSelected,
     this.onCreateRequested,
+    this.filterQuery = '',
   });
 
   @override
@@ -31,9 +33,7 @@ class _MemoScreenState extends State<MemoScreen> {
 
   SharedPreferences? _prefs;
   List<_CachedMemo> _cachedMemos = [];
-  bool _cacheLoaded = false;
-  final TextEditingController _searchCtrl = TextEditingController();
-  String _searchQuery = '';
+  bool _cacheLoaded = false;  
 
   @override
   void initState() {
@@ -42,8 +42,7 @@ class _MemoScreenState extends State<MemoScreen> {
   }
 
   @override
-  void dispose() {
-    _searchCtrl.dispose();
+  void dispose() {    
     super.dispose();
   }
 
@@ -166,35 +165,7 @@ class _MemoScreenState extends State<MemoScreen> {
 
     return Scaffold(
       body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: TextField(
-              controller: _searchCtrl,
-              onChanged: (val) => setState(() => _searchQuery = val),
-              decoration: InputDecoration(
-                hintText: '${l.search} (제목, 내용)',
-                hintStyle: TextStyle(color: cs.onSurface.withOpacity(0.5)),
-                prefixIcon: Icon(Icons.search, color: cs.onSurface.withOpacity(0.5)),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
-                filled: true,
-                fillColor: cs.surfaceContainerHighest.withOpacity(0.3),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-              ),
-            ),
-          ),
+        children: [          
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: service.memosStream(),
@@ -218,7 +189,7 @@ class _MemoScreenState extends State<MemoScreen> {
                   items = [];
                 }
 
-                final query = _searchQuery.toLowerCase().trim();
+                final query = widget.filterQuery.toLowerCase().trim();
                 final filteredItems = query.isEmpty 
                     ? items 
                     : items.where((i) {

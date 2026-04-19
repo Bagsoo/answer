@@ -11,16 +11,14 @@ import '../widgets/friends/friend_tile.dart';
 import '../widgets/friends/add_friend_dialog.dart';
 
 class FriendsScreen extends StatefulWidget {
-  const FriendsScreen({super.key});
+  final String filterQuery;
+  const FriendsScreen({super.key, this.filterQuery = ''});
 
   @override
   State<FriendsScreen> createState() => _FriendsScreenState();
 }
 
-class _FriendsScreenState extends State<FriendsScreen> {
-  final TextEditingController _filterController = TextEditingController();
-  String _filterQuery = '';
-  bool _isFiltering = false;
+class _FriendsScreenState extends State<FriendsScreen> {  
 
   List<Map<String, dynamic>> _friends = [];
   Set<String> _blockedUids = {};
@@ -126,7 +124,6 @@ class _FriendsScreenState extends State<FriendsScreen> {
     _blockedPollTimer?.cancel();
     _friendsSub?.cancel();
     _blockedSub?.cancel();
-    _filterController.dispose();
     super.dispose();
   }
 
@@ -244,17 +241,17 @@ class _FriendsScreenState extends State<FriendsScreen> {
     final displayCount =
         _loading && _cachedFriendCount >= 0 ? _cachedFriendCount : allFriends.length;
 
-    final filtered = _filterQuery.isEmpty
+    final filtered = widget.filterQuery.isEmpty
         ? allFriends
         : allFriends.where((f) {
             final name =
                 (f['display_name'] as String? ?? '').toLowerCase();
             final phone = f['phone_number'] as String? ?? '';
-            final q = _filterQuery.toLowerCase();
+            final q = widget.filterQuery.toLowerCase();
             if (name.contains(q)) return true;
             final digitsStored = phone.replaceAll(RegExp(r'\D'), '');
             final digitsQuery =
-                _filterQuery.replaceAll(RegExp(r'\D'), '');
+                widget.filterQuery.replaceAll(RegExp(r'\D'), '');
             if (digitsQuery.isEmpty) return false;
             if (digitsStored.contains(digitsQuery)) return true;
             final localStored = _stripCountryCode(digitsStored);
@@ -272,93 +269,6 @@ class _FriendsScreenState extends State<FriendsScreen> {
       ),
       body: Column(
         children: [
-          // ── 헤더 + 필터 검색 ────────────────────────────────────────
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 8, 6),
-                child: Row(children: [
-                  Text(
-                    l.friendsList,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface.withOpacity(0.5),
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  // 캐시 값으로 즉시 표시, Firebase 응답 후 실제 값으로 교체
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text('$displayCount',
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onPrimaryContainer)),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: Icon(
-                      _isFiltering ? Icons.search_off : Icons.search,
-                      size: 20,
-                      color: _isFiltering
-                          ? colorScheme.primary
-                          : colorScheme.onSurface.withOpacity(0.5),
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isFiltering = !_isFiltering;
-                        if (!_isFiltering) {
-                          _filterController.clear();
-                          _filterQuery = '';
-                        }
-                      });
-                    },
-                  ),
-                ]),
-              ),
-              if (_isFiltering)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                  child: TextField(
-                    controller: _filterController,
-                    autofocus: true,
-                    onChanged: (v) =>
-                        setState(() => _filterQuery = v.trim()),
-                    decoration: InputDecoration(
-                      hintText: l.searchPlaceholder,
-                      prefixIcon: const Icon(Icons.search, size: 18),
-                      suffixIcon: _filterQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.close, size: 16),
-                              onPressed: () => setState(() {
-                                _filterController.clear();
-                                _filterQuery = '';
-                              }),
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: colorScheme.surfaceContainerHighest,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-
           // ── 친구 목록 ──────────────────────────────────────────────
           Expanded(
             child: _loading && _friends.isEmpty

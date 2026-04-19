@@ -199,6 +199,8 @@ export const onGroupNoticeCreatedV2 = onDocumentCreated(
     const groupData = groupDoc.data();
     if (!groupData) return null;
 
+    if (groupData.plan !== "pro") return null;
+
     const groupName = (groupData.name as string | undefined) ?? "그룹";
     const groupProfileImage =
       (groupData.group_profile_image as string | undefined) ?? "";

@@ -16,16 +16,14 @@ import '../utils/ad_interleaver.dart';
 
 class ChatListScreen extends StatefulWidget {
   final void Function(String roomId)? onRoomSelected;
-  const ChatListScreen({super.key, this.onRoomSelected});  
+  final String filterQuery;
+  const ChatListScreen({super.key, this.onRoomSelected, this.filterQuery = ''});  
 
   @override
   State<ChatListScreen> createState() => _ChatListScreenState();
 }
 
-class _ChatListScreenState extends State<ChatListScreen> {
-  final TextEditingController _filterController = TextEditingController();
-  bool _isFiltering = false;
-  String _filterQuery = '';
+class _ChatListScreenState extends State<ChatListScreen> {  
 
   String get _myUid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
@@ -42,7 +40,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   @override
   void dispose() {
-    _filterController.dispose();
     super.dispose();
   }
 
@@ -170,7 +167,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
           final allRooms = chatProvider.chatRooms;
           final rooms = allRooms
-              .where((room) => _matchesRoom(room, _filterQuery))
+              .where((room) => _matchesRoom(room, widget.filterQuery))
               .toList();
 
           if (allRooms.isEmpty) {
@@ -264,87 +261,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   ),
                 ];
 
-          // 2) 섹션 렌더링
-          return Column(
+          return ListView(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _isFiltering = !_isFiltering;
-                          if (!_isFiltering) {
-                            _filterController.clear();
-                            _filterQuery = '';
-                          }
-                        });
-                      },
-                      child: Icon(
-                        _isFiltering ? Icons.search_off : Icons.search,
-                        size: 20,
-                        color: _isFiltering
-                            ? colorScheme.primary
-                            : colorScheme.onSurface.withOpacity(0.5),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    if (_isFiltering)
-                      Expanded(
-                        child: TextField(
-                          controller: _filterController,
-                          autofocus: true,
-                          onChanged: (v) =>
-                              setState(() => _filterQuery = v.trim()),
-                          decoration: InputDecoration(
-                            hintText: l.searchPlaceholder,
-                            prefixIcon: const Icon(Icons.search, size: 18),
-                            suffixIcon: _filterQuery.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.close, size: 16),
-                                    onPressed: () => setState(() {
-                                      _filterController.clear();
-                                      _filterQuery = '';
-                                    }),
-                                  )
-                                : null,
-                            filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                          ),
-                        ),
-                      )
-                    else
-                      const Spacer(),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: rooms.isEmpty
-                    ? Center(
-                        child: Text(
-                          l.noSearchResults,
-                          style: TextStyle(
-                            color: colorScheme.onSurface.withOpacity(0.4),
-                          ),
-                        ),
-                      )
-                    : ListView(
-                        children: [
-                          ...privateSection,
-                          ...interleaveAds(groupWidgets, keyPrefix: 'group_ad'),
-                        ],
-                      ),
-              ),
+              ...privateSection,
+              ...interleaveAds(groupWidgets, keyPrefix: 'group_ad'),
             ],
           );
         },

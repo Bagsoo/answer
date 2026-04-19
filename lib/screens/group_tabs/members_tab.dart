@@ -338,7 +338,7 @@ class _MembersTabState extends State<MembersTab> {
                     onChanged: (v) => setState(() => _searchQuery = v),
                     style: const TextStyle(fontSize: 14),
                     decoration: InputDecoration(
-                      hintText: '이름으로 검색...',
+                      hintText: l.searchPlaceholder,
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 8),

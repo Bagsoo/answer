@@ -40,6 +40,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   int _currentIndex = 0;
   bool _showingIncomingShare = false;
+
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _isSearching = false;
+
   IncomingShareService? _incomingShareService;
   String? _activeMemoId;
   Map<String, dynamic>? _activeMemoData;
@@ -103,6 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _incomingShareService?.removeListener(_handleIncomingShare);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -162,9 +168,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildMobileLayout(BuildContext context, AppLocalizations l,
       UserProvider userProvider, String photoUrl) {
     final pages = [
-      FriendsScreen(),
-      const ChatListScreen(),
-      const MemoScreen(),
+      FriendsScreen(filterQuery: _currentIndex == 0 ? _searchQuery : ''),
+      ChatListScreen(filterQuery: _currentIndex == 1 ? _searchQuery : ''),
+      MemoScreen(filterQuery: _currentIndex == 2 ? _searchQuery : ''),
       const MySchedulesScreen(),
       GroupListScreen(),
     ];
@@ -281,13 +287,14 @@ class _HomeScreenState extends State<HomeScreen> {
       BuildContext context, AppLocalizations l, ChatProvider? chatProvider) {
     switch (_currentIndex) {
       case 0:
-        return FriendsScreen();
+        return FriendsScreen(filterQuery: _currentIndex == 0 ? _searchQuery : '');
       case 1:
         final cp = chatProvider ?? context.read<ChatProvider>();
         return ChatListScreen(
           onRoomSelected: (roomId) {
             cp.selectRoom(roomId);
           },
+          filterQuery: _currentIndex == 1 ? _searchQuery : '',
         );
       case 2:
         return MemoScreen(
@@ -553,7 +560,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   AppBar _buildAppBar(BuildContext context, AppLocalizations l,
       UserProvider userProvider, String photoUrl) {
-    final useRemoteAvatar = !_isWindows && photoUrl.isNotEmpty;
+    final useRemoteAvatar = !_isWindows && photoUrl.isNotEmpty;    
     return AppBar(
       leading: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -589,9 +596,39 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      title: Text(_getAppBarTitle(l, _currentIndex)),
+      title: _isSearching
+        ? TextField(
+            controller: _searchController,
+            autofocus: true,
+            onChanged: (v) => setState(() => _searchQuery = v.trim()),
+            decoration: InputDecoration(
+              // hintText: l.searchPlaceholder,
+              hintText: switch (_currentIndex) {
+                0 => l.searchPlaceholder,
+                1 => l.searchChatPlaceholder,
+                2 => l.searchMemoPlaceholder,
+                4 => l.searchGroupsHint,
+                _ => l.searchPlaceholder,
+              },
+              border: InputBorder.none,
+            ),
+          )
+        : Text(_getAppBarTitle(l, _currentIndex)),
       centerTitle: true,
       actions: [
+        if(_currentIndex != 3 && _currentIndex != 4)
+          IconButton(
+            icon: Icon(_isSearching ? Icons.search_off : Icons.search),
+            onPressed: () {
+              setState(() {
+                _isSearching = !_isSearching;
+                if (!_isSearching) {
+                  _searchController.clear();
+                  _searchQuery = '';
+                }
+              });
+            },
+          ),
         IconButton(
           icon: const Icon(Icons.settings),
           onPressed: () => Navigator.of(context).push(
@@ -605,7 +642,12 @@ class _HomeScreenState extends State<HomeScreen> {
   BottomNavigationBar _buildBottomNav(AppLocalizations l) {
     return BottomNavigationBar(
       currentIndex: _currentIndex,
-      onTap: (index) => setState(() => _currentIndex = index),
+      onTap: (index) => setState(() {
+        _currentIndex = index;
+        _isSearching = false;
+        _searchController.clear();
+        _searchQuery = '';
+      }),
       items: [
         BottomNavigationBarItem(
           icon: const Icon(Icons.person),

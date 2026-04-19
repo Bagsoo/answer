@@ -30,6 +30,8 @@ class AppLocalizations {
   String get joinFailed => _s.joinFailed;
   String get alreadyJoined => _s.alreadyJoined;
   String get searchPlaceholder => _s.searchPlaceholder;
+  String get searchMemoPlaceholder => _s.searchMemoPlaceholder;
+  String get searchChatPlaceholder => _s.searchChatPlaceholder;
   String get tabMembers => _s.tabMembers;
   String get tabApprovals => _s.tabApprovals;
   String get tabSchedules => _s.tabSchedules;
@@ -780,6 +782,8 @@ abstract class _AppStrings {
   String get bannedUserNotice;
   String get alreadyJoined;
   String get searchPlaceholder;
+  String get searchMemoPlaceholder;
+  String get searchChatPlaceholder;
   String get tabMembers;
   String get tabApprovals;
   String get tabSchedules;
@@ -1537,6 +1541,8 @@ class _EnStrings extends _AppStrings {
   @override String get joinFailed => 'Failed to join the group.';
   @override String get alreadyJoined => 'Joined';
   @override String get searchPlaceholder => 'Search by name...';
+  @override String get searchMemoPlaceholder => 'Search (title, content)';
+  @override String get searchChatPlaceholder => 'Search by chatroom name...';
   @override String get tabMembers => 'Members';
   @override String get tabApprovals => 'Approvals';
   @override String get tabSchedules => 'Schedules';
@@ -2270,6 +2276,8 @@ class _KoStrings extends _AppStrings {
   @override String get joinFailed => '그룹 가입에 실패했습니다.';
   @override String get alreadyJoined => '가입됨';
   @override String get searchPlaceholder => '이름으로 검색...';
+  @override String get searchMemoPlaceholder => '검색 (제목, 내용)';
+  @override String get searchChatPlaceholder => '채팅방 이름으로 검색...';
   @override String get tabMembers => '멤버';
   @override String get tabApprovals => '승인';
   @override String get tabSchedules => '일정';
@@ -3005,6 +3013,8 @@ class _JaStrings extends _AppStrings {
   @override String get joinFailed => 'グループへの参加に失敗しました。';
   @override String get alreadyJoined => '参加済み';
   @override String get searchPlaceholder => '名前で検索...';
+  @override String get searchChatPlaceholder => 'チャットルーム名で検索...';
+  @override String get searchMemoPlaceholder => '検索 (タイトル, 内容)';
   @override String get tabMembers => 'メンバー';
   @override String get tabApprovals => '承認';
   @override String get tabSchedules => 'スケジュール';
