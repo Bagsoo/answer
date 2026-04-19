@@ -2321,7 +2321,7 @@ class _KoStrings extends _AppStrings {
   @override String get save => '저장';
   @override String get close => '닫기';
   @override String get loading => '로딩 중...';
-  @override String get roleOwner => '방장';
+  @override String get roleOwner => '소유자';
   @override String get roleMember => '멤버';
   @override String get unknown => '알 수 없음';
   @override String get deletedUser => '탈퇴한 사용자';

@@ -230,10 +230,13 @@ class _GroupNoticeSheetState extends State<GroupNoticeSheet> {
                           const SizedBox(height: 12),
                           FilledButton.tonal(
                             onPressed: () {
+                              final gp = context.read<GroupProvider>();
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) =>
-                                      PlanScreen(groupId: widget.groupId),
+                                  builder: (_) => ChangeNotifierProvider.value(
+                                    value: gp,
+                                    child: PlanScreen(groupId: widget.groupId),
+                                  ),
                                 ),
                               );
                             },
