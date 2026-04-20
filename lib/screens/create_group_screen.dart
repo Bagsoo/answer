@@ -6,7 +6,7 @@ import '../providers/user_provider.dart';
 import '../l10n/app_localizations.dart';
 import 'group_detail_screen.dart';
 import 'group_tabs/group_type_category_data.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../../config/env_config.dart';
 import '../widgets/common/location_picker_sheet.dart';
 import '../services/purchase_service.dart';
 
@@ -692,7 +692,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   }
 
   Future<void> _pickGroupLocation(AppLocalizations l) async {
-    final apiKey = dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
+    final apiKey = EnvConfig.mapsApiKey;
     final locale = context.read<UserProvider>().locale;
   
     final result = await showModalBottomSheet<LocationResult>(

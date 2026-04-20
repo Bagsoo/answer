@@ -7,7 +7,7 @@ import '../models/schedule.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/user_provider.dart';
 import '../widgets/common/location_picker_sheet.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../../config/env_config.dart';
 
 class PersonalScheduleFormScreen extends StatefulWidget {
   final Schedule? existing;
@@ -81,7 +81,7 @@ class _PersonalScheduleFormScreenState extends State<PersonalScheduleFormScreen>
   }
 
   Future<void> _pickLocation() async {
-    final apiKey = dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
+    final apiKey = EnvConfig.mapsApiKey;
     final locale = context.read<UserProvider>().locale;
 
     final result = await showModalBottomSheet<LocationResult>(

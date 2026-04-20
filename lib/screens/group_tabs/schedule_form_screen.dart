@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../../config/env_config.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:async';
@@ -145,7 +145,7 @@ class _ScheduleFormScreenState extends State<ScheduleFormScreen> {
 
     return _LocationAutocompleteField(
       controller: _locationNameController,
-      apiKey: dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '',
+      apiKey: EnvConfig.mapsApiKey,
       label: l.location,
       locale: googleLocale,
       onLocationSelected: (location) {
@@ -459,8 +459,7 @@ class _LocationAutocompleteFieldState
         'https://maps.googleapis.com/maps/api/place/autocomplete/json'
         '?input=${Uri.encodeComponent(query)}'
         '&key=${widget.apiKey}'
-        '&language=${widget.locale}'
-        '&components=country:kr',
+        '&language=${widget.locale}',
       );
       final res = await http.get(uri);
       if (!mounted) return;

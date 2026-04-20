@@ -1,7 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import '../../config/env_config.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/local_preferences_service.dart';
 import 'location_picker_map_screen.dart';
@@ -10,11 +13,15 @@ class LocationShareResult {
   final double lat;
   final double lng;
   final String type; // 'current' or 'destination'
+  final String? name;
+  final String? address;
 
   const LocationShareResult({
     required this.lat,
     required this.lng,
     required this.type,
+    this.name,
+    this.address,
   });
 }
 
@@ -104,6 +111,31 @@ class _LocationShareSheetState extends State<LocationShareSheet> {
               ),
       );
 
+      String? name;
+      String? address;
+
+      // ── 역지오코딩 (주소 획득) ──────────────────
+      try {
+        final uri = Uri.https(
+          'maps.googleapis.com',
+          '/maps/api/geocode/json',
+          {
+            'latlng': '${position.latitude},${position.longitude}',
+            'key': EnvConfig.mapsApiKey,
+            'language': Localizations.localeOf(context).languageCode,
+          },
+        );
+        final response = await http.get(uri);
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'OK') {
+          final results = data['results'] as List;
+          if (results.isNotEmpty) {
+            address = results.first['formatted_address'];
+            // 현재 위치의 경우 '내 현재 위치'가 이름이 됨 (필요시 상세 장소명 추출 가능)
+          }
+        }
+      } catch (_) {}
+
       // 4. 결과 반환
       if (mounted) {
         await _saveLastUsedType('current');
@@ -113,6 +145,8 @@ class _LocationShareSheetState extends State<LocationShareSheet> {
             lat: position.latitude,
             lng: position.longitude,
             type: 'current',
+            name: name,
+            address: address,
           ),
         );
       }

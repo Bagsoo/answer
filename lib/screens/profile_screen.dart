@@ -7,7 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../../screens/group_tabs/group_type_category_data.dart';
 import '../../widgets/common/location_picker_sheet.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../../config/env_config.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -79,7 +79,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ── 활동 위치 선택 ────────────────────────────────────────────────────────
   Future<void> _pickLocation(UserProvider userProvider) async {
-    final apiKey = dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
+    final apiKey = EnvConfig.mapsApiKey;
     final locale = userProvider.locale;
 
     final result = await showModalBottomSheet<LocationResult>(

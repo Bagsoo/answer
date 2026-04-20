@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../../config/env_config.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/group_provider.dart';
 import '../../services/group_service.dart';
@@ -764,7 +764,7 @@ class _SettingsTabState extends State<SettingsTab> {
 
 Future<void> _pickGroupLocation(
     BuildContext context, AppLocalizations l, String groupId) async {
-  final apiKey = dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
+  final apiKey = EnvConfig.mapsApiKey;
   final gp = context.read<GroupProvider>();
  
   final result = await showModalBottomSheet<LocationResult>(

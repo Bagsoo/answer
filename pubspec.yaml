@@ -33,7 +33,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   google_sign_in: ^6.2.2
-  google_sign_in_all_platforms: ^1.2.1
+  googleapis_auth: ^1.6.0
   sign_in_with_apple: ^6.1.4
   intl_phone_field: ^3.2.0
   shared_preferences: ^2.2.0
@@ -72,7 +72,6 @@ dependencies:
   google_places_flutter: ^2.1.1
   google_maps_flutter: ^2.9.0
   geocoding: ^3.0.0
-  flutter_dotenv: ^6.0.0
   image_picker: ^1.2.1
   flutter_image_compress: ^2.4.0
   path_provider: ^2.1.5
@@ -116,7 +115,6 @@ flutter_launcher_icons:
 # The following section is specific to Flutter packages.
 flutter:
   assets:
-    - .env
     - assets/images/answer_logo.png
     - assets/markdown/
 

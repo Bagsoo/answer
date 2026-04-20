@@ -154,47 +154,14 @@ class LocationMessageBubble extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 2),
-
-                        /// 🔥 핵심: 주소 변환
-                        FutureBuilder<String>(
-                          future: _getAddress(lat, lng),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return Text(
-                                l.loadingAddress,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: colorScheme.onSurface
-                                      .withOpacity(0.5),
-                                ),
-                              );
-                            }
-
-                            final address = snapshot.data;
-
-                            if (address == null || address.isEmpty) {
-                              return Text(
-                                '$lat, $lng',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: colorScheme.onSurface
-                                      .withOpacity(0.5),
-                                ),
-                              );
-                            }
-
-                            return Text(
-                              address,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: colorScheme.onSurface
-                                    .withOpacity(0.5),
-                              ),
-                            );
-                          },
+                        Text(
+                          data['location_name'] ?? data['location_address'] ?? '$lat, $lng',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: colorScheme.onSurface.withOpacity(0.5),
+                          ),
                         ),
                       ],
                     ),

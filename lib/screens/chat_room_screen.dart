@@ -2672,6 +2672,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           'location_lat': result.lat,
           'location_lng': result.lng,
           'location_type': result.type,
+          'location_name': result.name,
+          'location_address': result.address,
           'sender_id': _currentUserId,
           'sender_name': _myName,
           'created_at': FieldValue.serverTimestamp(),

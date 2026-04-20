@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../../config/env_config.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import '../../l10n/app_localizations.dart';
@@ -19,11 +19,48 @@ class _LocationPickerMapScreenState
     extends State<LocationPickerMapScreen> {
   final TextEditingController _searchController = TextEditingController();
   LatLng _selected = const LatLng(37.5665, 126.9780); // 서울 기본
+  String? _selectedName;
+  String? _selectedAddress;
   GoogleMapController? _controller;
   bool _searching = false;
 
   void _onTap(LatLng latLng) {
-    setState(() => _selected = latLng);
+    setState(() {
+      _selected = latLng;
+      _selectedName = null;
+      _selectedAddress = null;
+    });
+    _reverseGeocode(latLng);
+  }
+
+  Future<void> _reverseGeocode(LatLng latLng) async {
+    final apiKey = EnvConfig.mapsApiKey;
+    if (apiKey.isEmpty) return;
+
+    try {
+      final uri = Uri.https(
+        'maps.googleapis.com',
+        '/maps/api/geocode/json',
+        {
+          'latlng': '${latLng.latitude},${latLng.longitude}',
+          'key': apiKey,
+          'language': Localizations.localeOf(context).languageCode,
+        },
+      );
+
+      final response = await http.get(uri);
+      final data = jsonDecode(response.body);
+
+      if (data['status'] == 'OK') {
+        final results = data['results'] as List;
+        if (results.isNotEmpty) {
+          setState(() {
+            _selectedAddress = results.first['formatted_address'];
+            // 이름은 보통 첫번째 결과의 name이나 특정 컴포넌트인데 geocoding은 주소 위주임.
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -35,18 +72,19 @@ class _LocationPickerMapScreenState
   Future<void> _searchLocation() async {
     final l = AppLocalizations.of(context);
     final query = _searchController.text.trim();
-    final apiKey = dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
+    final apiKey = EnvConfig.mapsApiKey;
 
     if (query.isEmpty || apiKey.isEmpty) return;
 
     setState(() => _searching = true);
 
     try {
+      // ── Google Places Text Search 사용 (가게 이름 등으로 검색 가능) ──
       final uri = Uri.https(
         'maps.googleapis.com',
-        '/maps/api/geocode/json',
+        '/maps/api/place/textsearch/json',
         {
-          'address': query,
+          'query': query,
           'key': apiKey,
           'language': Localizations.localeOf(context).languageCode,
         },
@@ -65,8 +103,8 @@ class _LocationPickerMapScreenState
         return;
       }
 
-      final location =
-          results.first['geometry']?['location'] as Map<String, dynamic>?;
+      final first = results.first;
+      final location = first['geometry']?['location'] as Map<String, dynamic>?;
       if (location == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l.noSearchResults)),
@@ -79,7 +117,11 @@ class _LocationPickerMapScreenState
         (location['lng'] as num).toDouble(),
       );
 
-      setState(() => _selected = latLng);
+      setState(() {
+        _selected = latLng;
+        _selectedAddress = first['formatted_address'];
+        _selectedName = first['name']; // 장소 이름 (예: 스타벅스 강남점)
+      });
       await _controller?.animateCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(target: latLng, zoom: 16),
@@ -104,6 +146,8 @@ class _LocationPickerMapScreenState
         lat: _selected.latitude,
         lng: _selected.longitude,
         type: 'destination',
+        name: _selectedName,
+        address: _selectedAddress,
       ),
     );
   }

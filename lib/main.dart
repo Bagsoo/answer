@@ -5,9 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-// import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'utils/ads_helper.dart';
 
 import 'services/chat_service.dart';
@@ -32,12 +30,6 @@ import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  try {
-    await dotenv.load(fileName: ".env");
-  } catch (e) {
-    debugPrint('.env load error: $e');
-  }
 
   // Firebase 초기화 가능 플랫폼 (Android, iOS, Windows, Web)
   final isFirebaseSupported = !kIsWeb 
@@ -52,68 +44,53 @@ void main() async {
           .catchError((e) => debugPrint('Firebase init error: $e'));
     }
 
-    // Windows 등 데스크톱에서 Firestore 디스크 persistence(LevelDB)가
-    // 네이티브 크래시를 유발하는 사례가 있어(FlutterFire #12987, #13145),
-    // 모바일에서만 디스크 persistence를 켠다.
-    final useDiskPersistence = !kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.android ||
-            defaultTargetPlatform == TargetPlatform.iOS);
-    final isWindows =
-        !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+    final isWindows = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
     if (isWindows) {
-      // 메모리 캐시 무제한이 일부 Windows 빌드에서 불안정해질 수 있어 상한을 둔다.
       FirebaseFirestore.instance.settings = const Settings(
         persistenceEnabled: false,
         cacheSizeBytes: 40 * 1024 * 1024,
       );
     } else {
+      final isMobile = defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS;
       FirebaseFirestore.instance.settings = Settings(
-        persistenceEnabled: useDiskPersistence,
+        persistenceEnabled: isMobile,
         cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
       );
     }
 
-    // 모바일 전용 서비스
     final isMobile = defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS;
     if (isMobile) {
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       NotificationService().init();
-      // MobileAds.instance.initialize();
       await initializeAds();
     }
   }
   
   final prefs = await SharedPreferences.getInstance();
-  debugPrint('prefs initialized');
 
   runApp(
     MultiProvider(
       providers: [
         Provider<SharedPreferences>.value(value: prefs),
-        ChangeNotifierProvider<AuthService>(create: (_) { debugPrint('Init AuthService'); return AuthService(); }),
-        ChangeNotifierProvider<LocaleProvider>(create: (_) { debugPrint('Init LocaleProvider'); return LocaleProvider(); }),
-        ChangeNotifierProvider<ThemeProvider>(create: (_) { debugPrint('Init ThemeProvider'); return ThemeProvider(); }),
-        ChangeNotifierProvider<UserProvider>(create: (_) { debugPrint('Init UserProvider'); return UserProvider(); }),
-        ChangeNotifierProvider<ChatProvider>(create: (_) { debugPrint('Init ChatProvider'); return ChatProvider()..initialize(); }),
-        Provider<ChatService>(create: (_) { debugPrint('Init ChatService'); return ChatService(); }),
-        Provider<GroupService>(create: (_) { debugPrint('Init GroupService'); return GroupService(); }),
-        Provider<FriendService>(create: (_) { debugPrint('Init FriendService'); return FriendService(); }),
-        Provider<BlockService>(create: (_) { debugPrint('Init BlockService'); return BlockService(); }),
-        Provider<MemoService>(create: (_) { debugPrint('Init MemoService'); return MemoService(); }),
-        Provider<NotificationService>(create: (_) { debugPrint('Init NotificationService'); return NotificationService(); }),
-        Provider<PollService>(create: (_) { debugPrint('Init PollService'); return PollService(); }),
-        Provider<ReportService>(create: (_) { debugPrint('Init ReportService'); return ReportService(); }),
-        Provider<MyScheduleService>(create: (_) { debugPrint('Init MyScheduleService'); return MyScheduleService(); }),
+        ChangeNotifierProvider<AuthService>(create: (_) => AuthService()),
+        ChangeNotifierProvider<LocaleProvider>(create: (_) => LocaleProvider()),
+        ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider<UserProvider>(create: (_) => UserProvider()),
+        ChangeNotifierProvider<ChatProvider>(create: (_) => ChatProvider()..initialize()),
+        Provider<ChatService>(create: (_) => ChatService()),
+        Provider<GroupService>(create: (_) => GroupService()),
+        Provider<FriendService>(create: (_) => FriendService()),
+        Provider<BlockService>(create: (_) => BlockService()),
+        Provider<MemoService>(create: (_) => MemoService()),
+        Provider<NotificationService>(create: (_) => NotificationService()),
+        Provider<PollService>(create: (_) => PollService()),
+        Provider<ReportService>(create: (_) => ReportService()),
+        Provider<MyScheduleService>(create: (_) => MyScheduleService()),
         ChangeNotifierProvider<IncomingShareService>(
-          create: (_) { debugPrint('Init IncomingShareService'); return IncomingShareService()..initialize(); },
+          create: (_) => IncomingShareService()..initialize(),
         ),
       ],
-      child: Builder(
-        builder: (context) {
-          debugPrint('Providers loaded, building MessengerApp');
-          return const MessengerApp();
-        }
-      ),
+      child: const MessengerApp(),
     ),
   );
 }
@@ -127,7 +104,7 @@ class MessengerApp extends StatelessWidget {
     final themeMode = context.watch<ThemeProvider>().themeMode;
 
     return MaterialApp(
-      title: 'Group Messenger',
+      title: 'Answer Messenger',
       navigatorKey: NotificationService.navigatorKey,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
