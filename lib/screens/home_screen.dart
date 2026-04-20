@@ -27,6 +27,9 @@ import 'incoming_share_screen.dart';
 import '../widgets/memo/memo_detail_sheet.dart';
 import '../widgets/memo/memo_form_sheet.dart';
 
+import 'notification_screen.dart';
+import '../services/user_notification_service.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -616,7 +619,7 @@ class _HomeScreenState extends State<HomeScreen> {
         : Text(_getAppBarTitle(l, _currentIndex)),
       centerTitle: true,
       actions: [
-        if(_currentIndex != 3 && _currentIndex != 4)
+        if (_currentIndex != 3 && _currentIndex != 4)
           IconButton(
             icon: Icon(_isSearching ? Icons.search_off : Icons.search),
             onPressed: () {
@@ -629,6 +632,36 @@ class _HomeScreenState extends State<HomeScreen> {
               });
             },
           ),
+        // ── 알림 종 아이콘 ──
+        StreamBuilder<bool>(
+          stream: context.read<UserNotificationService>().hasUnreadNotifications(),
+          builder: (context, snapshot) {
+            final hasUnread = snapshot.data ?? false;
+            return IconButton(
+              icon: Stack(
+                children: [
+                  const Icon(Icons.notifications_none_outlined),
+                  if (hasUnread)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFE0C1B3), // 로즈골드 색상
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationScreen()),
+              ),
+            );
+          },
+        ),
         IconButton(
           icon: const Icon(Icons.settings),
           onPressed: () => Navigator.of(context).push(

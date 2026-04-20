@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:flutter/rendering.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/group_provider.dart';
 import 'schedule_form_screen.dart';
@@ -26,6 +27,8 @@ class SchedulesTab extends StatefulWidget {
 }
 
 class _SchedulesTabState extends State<SchedulesTab> {
+  final ScrollController _scrollController = ScrollController();
+  bool _fabVisible = true;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   bool _showCalendar = true;
@@ -36,6 +39,33 @@ class _SchedulesTabState extends State<SchedulesTab> {
   static const double _calendarMinHeight = 80;
 
   String get currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDay = _focusedDay;
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    final isScrollingDown = _scrollController.position.userScrollDirection
+        == ScrollDirection.reverse;
+    final isScrollingUp = _scrollController.position.userScrollDirection
+        == ScrollDirection.forward;
+
+    if (isScrollingDown && _fabVisible) {
+      setState(() => _fabVisible = false);
+    } else if (isScrollingUp && !_fabVisible) {
+      setState(() => _fabVisible = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   Stream<List<Map<String, dynamic>>> _schedulesStream(String groupId) {
     if (groupId.isEmpty) return Stream.value([]);
@@ -101,21 +131,30 @@ class _SchedulesTabState extends State<SchedulesTab> {
         return Scaffold(
           backgroundColor: colorScheme.surface,
           floatingActionButton: canCreateSchedule
-              ? FloatingActionButton.small(
-                  onPressed: () {
-                    final gp = context.read<GroupProvider>();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ChangeNotifierProvider.value(
-                          value: gp,
-                          child: ScheduleFormScreen(groupId: groupId),
+            ? AnimatedSlide(
+                offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                child: AnimatedOpacity(
+                  opacity: _fabVisible ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 250),
+                  child: FloatingActionButton(
+                    onPressed: () {
+                      final gp = context.read<GroupProvider>();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ChangeNotifierProvider.value(
+                            value: gp,
+                            child: ScheduleFormScreen(groupId: groupId),
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                  child: const Icon(Icons.add),
-                )
-              : null,
+                      );
+                    },
+                    child: const Icon(Icons.add),
+                  ),
+                ),
+              )
+            : null,
           body: Column(
             children: [
               // ── 캘린더 / 리스트 토글 ─────────────────────────────
@@ -284,6 +323,7 @@ class _SchedulesTabState extends State<SchedulesTab> {
                                         isDesktopMode: widget.isDesktopMode,
                                         selectedScheduleId: widget.selectedScheduleId,
                                         onScheduleSelected: widget.onScheduleSelected,
+                                        scrollController: _scrollController,
                                       ),
                           ),
                         ],
@@ -320,6 +360,7 @@ class _SchedulesTabState extends State<SchedulesTab> {
                           isDesktopMode: widget.isDesktopMode,
                           selectedScheduleId: widget.selectedScheduleId,
                           onScheduleSelected: widget.onScheduleSelected,
+                          scrollController: _scrollController,
                         ),
                 ),
             ],
@@ -339,6 +380,7 @@ class _ScheduleList extends StatelessWidget {
   final bool isDesktopMode;
   final String? selectedScheduleId;
   final ValueChanged<Map<String, dynamic>>? onScheduleSelected;
+  final ScrollController? scrollController;
 
   const _ScheduleList({
     required this.schedules,
@@ -348,6 +390,7 @@ class _ScheduleList extends StatelessWidget {
     this.isDesktopMode = false,
     this.selectedScheduleId,
     this.onScheduleSelected,
+    this.scrollController,
   });
 
   @override
@@ -355,6 +398,7 @@ class _ScheduleList extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return ListView.separated(
+      controller: scrollController,
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: schedules.length,
       itemBuilder: (context, index) {

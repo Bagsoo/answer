@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:flutter/rendering.dart';
 import '../services/my_schedule_service.dart';
 import '../models/schedule.dart';
 import '../l10n/app_localizations.dart';
@@ -18,6 +19,8 @@ class MySchedulesScreen extends StatefulWidget {
 }
 
 class _MySchedulesScreenState extends State<MySchedulesScreen> {
+  final ScrollController _scrollController = ScrollController();
+  bool _fabVisible = true;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   bool _showCalendar = true;
@@ -33,6 +36,7 @@ class _MySchedulesScreenState extends State<MySchedulesScreen> {
 
     // Stream 초기화
     _schedulesStream = context.read<MyScheduleService>().getMySchedules();
+    _scrollController.addListener(_onScroll);
 
     // 기기 변경 등을 고려하여 다가오는 개인 일정 알림 동기화
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -41,6 +45,26 @@ class _MySchedulesScreenState extends State<MySchedulesScreen> {
         context.read<MyScheduleService>().syncPersonalNotifications(l.scheduleStartingSoon);
       }
     });
+  }
+
+  void _onScroll() {
+    final isScrollingDown = _scrollController.position.userScrollDirection
+        == ScrollDirection.reverse;
+    final isScrollingUp = _scrollController.position.userScrollDirection
+        == ScrollDirection.forward;
+
+    if (isScrollingDown && _fabVisible) {
+      setState(() => _fabVisible = false);
+    } else if (isScrollingUp && !_fabVisible) {
+      setState(() => _fabVisible = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
   }
 
   List<Schedule> _eventsForDay(DateTime day, List<Schedule> all) {
@@ -69,11 +93,20 @@ class _MySchedulesScreenState extends State<MySchedulesScreen> {
 
         return Scaffold(
           backgroundColor: colorScheme.surface,
-          floatingActionButton: FloatingActionButton.small(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const PersonalScheduleFormScreen()),
+          floatingActionButton: AnimatedSlide(
+            offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            child: AnimatedOpacity(
+              opacity: _fabVisible ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 250),
+              child: FloatingActionButton(  // .small 제거된 상태
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PersonalScheduleFormScreen()),
+                ),
+                child: const Icon(Icons.add),
+              ),
             ),
-            child: const Icon(Icons.add),
           ),
           body: Column(
             children: [
@@ -184,7 +217,7 @@ class _MySchedulesScreenState extends State<MySchedulesScreen> {
                                 ? Center(child: Text(l.selectDayToSeeSchedules, style: TextStyle(color: colorScheme.onSurface.withOpacity(0.4))))
                                 : selectedEvents.isEmpty
                                     ? Center(child: Text(l.noSchedulesOnDay, style: TextStyle(color: colorScheme.onSurface.withOpacity(0.4))))
-                                    : _ScheduleListView(schedules: selectedEvents),
+                                    : _ScheduleListView(schedules: selectedEvents, scrollController: _scrollController,),
                           ),
                         ],
                       );
@@ -204,7 +237,7 @@ class _MySchedulesScreenState extends State<MySchedulesScreen> {
                             ],
                           ),
                         )
-                      : _ScheduleListView(schedules: all),
+                      : _ScheduleListView(schedules: all, scrollController: _scrollController,),
                 ),
             ],
           ),
@@ -216,7 +249,8 @@ class _MySchedulesScreenState extends State<MySchedulesScreen> {
 
 class _ScheduleListView extends StatelessWidget {
   final List<Schedule> schedules;
-  const _ScheduleListView({required this.schedules});
+  final ScrollController? scrollController;
+  const _ScheduleListView({required this.schedules, this.scrollController});
 
   @override
   Widget build(BuildContext context) {
@@ -224,6 +258,7 @@ class _ScheduleListView extends StatelessWidget {
     final l = AppLocalizations.of(context);
 
     return ListView.separated(
+      controller: scrollController,
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: schedules.length,
       separatorBuilder: (_, __) => const Divider(height: 1, indent: 72),

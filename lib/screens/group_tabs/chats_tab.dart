@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/rendering.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/group_provider.dart';
@@ -29,6 +30,8 @@ class ChatsTab extends StatefulWidget {
 
 class _ChatsTabState extends State<ChatsTab> {
   final TextEditingController _filterController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  bool _fabVisible = true;
   bool _isFiltering = false;
   String _filterQuery = '';
   final Set<String> _warmedRoomIds = {};
@@ -36,7 +39,28 @@ class _ChatsTabState extends State<ChatsTab> {
   String get currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    final isScrollingDown = _scrollController.position.userScrollDirection
+        == ScrollDirection.reverse;
+    final isScrollingUp = _scrollController.position.userScrollDirection
+        == ScrollDirection.forward;
+
+    if (isScrollingDown && _fabVisible) {
+      setState(() => _fabVisible = false);
+    } else if (isScrollingUp && !_fabVisible) {
+      setState(() => _fabVisible = true);
+    }
+  }
+
+  @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _filterController.dispose();
     super.dispose();
   }
@@ -77,13 +101,21 @@ class _ChatsTabState extends State<ChatsTab> {
     return Scaffold(
       // FutureBuilder로 권한 확인하던 부분 → GroupProvider로 대체
       floatingActionButton: canCreateSubChat
-          ? FloatingActionButton(
-              onPressed: () =>
-                  _showCreateSubChatSheet(context, l, colorScheme, groupId),
-              mini: true,
-              child: const Icon(Icons.add),
-            )
-          : null,
+        ? AnimatedSlide(
+            offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            child: AnimatedOpacity(
+              opacity: _fabVisible ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 250),
+              child: FloatingActionButton(
+                onPressed: () =>
+                    _showCreateSubChatSheet(context, l, colorScheme, groupId),
+                child: const Icon(Icons.add), // mini: true 제거
+              ),
+            ),
+          )
+        : null,
       body: !chatProvider.isRoomsLoaded && allChats.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : allChats.isEmpty
@@ -175,6 +207,7 @@ class _ChatsTabState extends State<ChatsTab> {
                         ),
                       )
                     : ListView.separated(
+                      controller: _scrollController,
                         padding: const EdgeInsets.only(bottom: 80),
                         itemCount: chats.length,
                         itemBuilder: (context, index) {

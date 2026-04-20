@@ -18,6 +18,7 @@ import 'services/memo_service.dart';
 import 'services/poll_service.dart';
 import 'services/report_service.dart';
 import 'services/incoming_share_service.dart';
+import 'services/user_notification_service.dart';
 import 'services/my_schedule_service.dart';
 import 'providers/locale_provider.dart';
 import 'providers/theme_provider.dart';
@@ -82,6 +83,7 @@ void main() async {
         Provider<FriendService>(create: (_) => FriendService()),
         Provider<BlockService>(create: (_) => BlockService()),
         Provider<MemoService>(create: (_) => MemoService()),
+        Provider<UserNotificationService>(create: (_) => UserNotificationService()),
         Provider<NotificationService>(create: (_) => NotificationService()),
         Provider<PollService>(create: (_) => PollService()),
         Provider<ReportService>(create: (_) => ReportService()),

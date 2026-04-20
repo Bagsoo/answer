@@ -82,6 +82,20 @@ service cloud.firestore {
       match /personal_schedules/{scheduleId} {
         allow read, write: if isOwner(uid);
       }
+
+      match /notifications/{notiId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow delete: if isOwner(uid) || isAdmin();
+        
+        // 초대를 보내거나 갱신하는 로직
+        allow create, update: if isLoggedIn() && (
+          isOwner(uid) || 
+          (
+            request.resource.data.type == 'invite' && 
+            request.resource.data.data.inviter_uid == request.auth.uid
+          )
+        );
+      }
     }
 
     // ── 채팅방 ──────────────────────────────────────────────────────────────
@@ -90,7 +104,10 @@ service cloud.firestore {
         request.auth.uid in resource.data.member_ids || 
         (
           resource.data.ref_group_id != null && 
-          exists(/databases/$(database)/documents/groups/$(resource.data.ref_group_id)/members/$(request.auth.uid))
+          (
+            exists(/databases/$(database)/documents/groups/$(resource.data.ref_group_id)/members/$(request.auth.uid)) ||
+            exists(/databases/$(database)/documents/users/$(request.auth.uid)/notifications/invite_$(resource.data.ref_group_id))
+          )
         )
       ));
       allow create: if isLoggedIn();
@@ -181,8 +198,14 @@ service cloud.firestore {
     match /groups/{groupId} {
       allow read: if isLoggedIn();
       allow create: if isLoggedIn();
-      allow update: if isAdmin() || (isLoggedIn() &&
-        exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)));
+      allow update: if isAdmin() || (
+        isLoggedIn() &&
+        (
+          exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid))
+          ||
+          getAfter(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data != null
+        )
+      );
 
       match /members/{memberId} {
         allow read: if isLoggedIn();

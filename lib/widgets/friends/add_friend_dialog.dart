@@ -87,93 +87,93 @@ class _AddFriendDialogState extends State<AddFriendDialog> {
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       insetPadding:
-          const EdgeInsets.symmetric(horizontal: 32, vertical: 80),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(children: [
-              Icon(Icons.person_search_outlined, color: colorScheme.primary),
-              const SizedBox(width: 8),
-              Text(l.addFriend,
-                  style: const TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.bold)),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.close, size: 20),
-                onPressed: () => Navigator.pop(context),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ]),
-            const SizedBox(height: 16),
-            Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  keyboardType: TextInputType.phone,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    hintText: l.searchByPhone,
-                    prefixIcon: const Icon(Icons.phone_outlined),
-                    suffixIcon: _controller.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () => setState(() {
-                              _controller.clear();
-                              _result = null;
-                              _error = '';
-                            }),
-                          )
-                        : null,
-                    isDense: true,
-                    border: OutlineInputBorder(
+          const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(children: [
+                Icon(Icons.person_search_outlined, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(l.addFriend,
+                    style: const TextStyle(
+                        fontSize: 17, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () => Navigator.pop(context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ]),
+              const SizedBox(height: 16),
+              Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    keyboardType: TextInputType.phone,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: l.searchByPhone,
+                      prefixIcon: const Icon(Icons.phone_outlined),
+                      suffixIcon: _controller.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () => setState(() {
+                                _controller.clear();
+                                _result = null;
+                                _error = '';
+                              }),
+                            )
+                          : null,
+                      isDense: true,
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                    onSubmitted: (_) => _search(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: _searching ? null : _search,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 14),
+                    shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
-                  onChanged: (_) => setState(() {}),
-                  onSubmitted: (_) => _search(),
+                  child: _searching
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.search, size: 20),
                 ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: _searching ? null : _search,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: _searching
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.search, size: 20),
-              ),
-            ]),
-            if (_error.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Row(children: [
-                Icon(Icons.info_outline,
-                    size: 14,
-                    color: colorScheme.onSurface.withOpacity(0.4)),
-                const SizedBox(width: 6),
-                Text(_error,
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.onSurface.withOpacity(0.5))),
               ]),
+              if (_error.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Row(children: [
+                  const Icon(Icons.info_outline, size: 14, color: Colors.orange),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(_error,
+                        style: const TextStyle(fontSize: 13)),
+                  ),
+                ]),
+              ],
+              if (_result != null) ...[
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+                _buildResultTile(colorScheme, l),
+              ],
             ],
-            if (_result != null) ...[
-              const SizedBox(height: 16),
-              const Divider(height: 1),
-              const SizedBox(height: 12),
-              _buildResultTile(colorScheme, l),
-            ],
-          ],
+          ),
         ),
       ),
     );
