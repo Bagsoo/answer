@@ -78,6 +78,12 @@ class NotificationService {
     );
     debugPrint('FCM permission: ${settings2.authorizationStatus}');
 
+    await _fcm.setForegroundNotificationPresentationOptions(
+      alert: false,
+      badge: true,
+      sound: false,
+    );
+
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     FirebaseMessaging.onMessage.listen(_onForegroundMessage);
     FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpenedApp);

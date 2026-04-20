@@ -48,11 +48,22 @@ export const acceptInviteV2 = onCall(async (request) => {
     const query = db.collection("chat_rooms").where("ref_group_id", "==", groupId).where("type", "==", "group_all").limit(1);
     const chatSnap = await tx.get(query);
 
+    const memberRef = db.collection("groups").doc(groupId).collection("members").doc(uid);
+    const memberSnap = await tx.get(memberRef);
+    if (memberSnap.exists) {
+      throw new HttpsError("already-exists", "User is already a member of this group");
+    }
+
+    const notiRef = db.collection("users").doc(uid).collection("notifications").doc(notiId);
+    const notiSnap = await tx.get(notiRef);
+    if (!notiSnap.exists) {
+      throw new HttpsError("not-found", "Invite not found or already processed");
+    }
+
     // 2. Writes
     const displayName = userData.name ?? "알 수 없음";
     const profileImage = userData.profile_image ?? "";
 
-    const memberRef = db.collection("groups").doc(groupId).collection("members").doc(uid);
     tx.set(memberRef, {
       uid: uid,
       user_id: uid,
@@ -76,7 +87,6 @@ export const acceptInviteV2 = onCall(async (request) => {
       name: groupData.name ?? "그룹",
     });
 
-    const notiRef = db.collection("users").doc(uid).collection("notifications").doc(notiId);
     tx.delete(notiRef);
 
     tx.update(groupRef, { member_count: admin.firestore.FieldValue.increment(1) });
@@ -123,17 +133,33 @@ export const onMessageSentV2 = onDocumentCreated("chat_rooms/{roomId}/messages/{
   const roomName = roomData.name as string | undefined;
   const roomType = roomData.type as string | undefined;
   const groupProfileImage = (roomData.group_profile_image as string | undefined) ?? "";
-  const activeFcmTokens = (roomData.active_fcm_tokens as string[]) ?? [];
   let avatarUrl = groupProfileImage;
   if (roomType === "direct") {
     const senderDoc = await db.collection("users").doc(senderId).get();
     avatarUrl = (senderDoc.data()?.profile_image as string | undefined) ?? "";
   }
-  const senderTokensSnap = await db.collection("users").doc(senderId).collection("fcm_tokens").get();
-  const senderTokens = senderTokensSnap.docs.map((d) => d.data().token as string);
-  const targets = activeFcmTokens.filter((t) => !senderTokens.includes(t));
+  const memberIds = (roomData.member_ids as string[]) ?? [];
+  const receiverIds = memberIds.filter((uid) => uid !== senderId);
+
+  const filteredReceiverIds: string[] = [];
+  const userDocs = await Promise.all(receiverIds.map((uid) => db.collection("users").doc(uid).get()));
+  for (const doc of userDocs) {
+    if (!doc.exists) continue;
+    const data = doc.data();
+    if (data?.active_room_id === roomId) continue;
+    filteredReceiverIds.push(doc.id);
+  }
+
+  if (filteredReceiverIds.length === 0) return null;
+
+  const targets = await getTokensForUids(filteredReceiverIds);
   if (targets.length === 0) return null;
+
   const payload: Omit<admin.messaging.MulticastMessage, "tokens"> = {
+    notification: {
+      title: roomName ?? senderName,
+      body: `${senderName}: ${body}`,
+    },
     data: {
       type: "chat",
       roomId,
@@ -144,6 +170,9 @@ export const onMessageSentV2 = onDocumentCreated("chat_rooms/{roomId}/messages/{
     android: {
       priority: "high",
       collapseKey: roomId,
+      notification: {
+        channelId: "chat_channel",
+      },
     },
     apns: {
       headers: { "apns-collapse-id": roomId },
@@ -171,6 +200,10 @@ export const onJoinRequestV2 = onDocumentCreated("groups/{groupId}/join_requests
   const groupName = (groupData.name as string | undefined) ?? "그룹";
   const groupProfileImage = (groupData.group_profile_image as string | undefined) ?? "";
   const payload: Omit<admin.messaging.MulticastMessage, "tokens"> = {
+    notification: {
+      title: groupName,
+      body: `${requesterName}님이 가입을 요청했습니다`,
+    },
     data: {
       type: "join_request",
       groupId,
@@ -178,7 +211,10 @@ export const onJoinRequestV2 = onDocumentCreated("groups/{groupId}/join_requests
       notificationBody: `${requesterName}님이 가입을 요청했습니다`,
       avatarUrl: groupProfileImage,
     },
-    android: { priority: "high" },
+    android: {
+      priority: "high",
+      notification: { channelId: "join_request_channel" },
+    },
     apns: { payload: { aps: { sound: "default", badge: 1, contentAvailable: true } } },
   };
   const invalidTokens = await sendChunked(tokens, payload);
@@ -212,6 +248,10 @@ export const onGroupNoticeCreatedV2 = onDocumentCreated("groups/{groupId}/notice
   if (targets.length === 0) return null;
   const summary = text.length > 80 ? `${text.slice(0, 77)}...` : text;
   const payload: Omit<admin.messaging.MulticastMessage, "tokens"> = {
+    notification: {
+      title: groupName,
+      body: `공지: ${summary}`,
+    },
     data: {
       type: "group_notice",
       groupId,
@@ -220,7 +260,10 @@ export const onGroupNoticeCreatedV2 = onDocumentCreated("groups/{groupId}/notice
       notificationBody: `공지: ${summary}`,
       avatarUrl: groupProfileImage,
     },
-    android: { priority: "high" },
+    android: {
+      priority: "high",
+      notification: { channelId: "chat_channel" },
+    },
     apns: { payload: { aps: { sound: "default", badge: 1, contentAvailable: true } } },
   };
   const invalidTokens = await sendChunked(targets, payload);
@@ -249,7 +292,11 @@ export const onScheduleAddedV2 = onDocumentCreated("groups/{groupId}/schedules/{
   const payload: Omit<admin.messaging.MulticastMessage, "tokens"> = {
     notification: { title: groupName, body: `새 일정이 추가됐습니다: ${title}` },
     data: { type: "schedule", groupId },
-    android: { notification: { channelId: "schedule_channel" } },
+    android: {
+      priority: "high",
+      notification: { channelId: "schedule_channel" },
+    },
+    apns: { payload: { aps: { sound: "default", badge: 1, contentAvailable: true } } },
   };
   const invalidTokens = await sendChunked(targets, payload);
   await cleanupInvalidTokens(invalidTokens);

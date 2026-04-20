@@ -56,7 +56,7 @@ class ChatRoomScreen extends StatefulWidget {
   State<ChatRoomScreen> createState() => _ChatRoomScreenState();
 }
 
-class _ChatRoomScreenState extends State<ChatRoomScreen> {
+class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObserver {
   final _msgController = TextEditingController();
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
@@ -143,10 +143,34 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       _highlightMessageId = widget.initialScrollToMessageId;
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToTarget());
     }
+
+    WidgetsBinding.instance.addObserver(this);
+    _setActiveRoomId(widget.roomId);
+  }
+
+  void _setActiveRoomId(String? roomId) {
+    if (_currentUserId.isEmpty) return;
+    FirebaseFirestore.instance.collection('users').doc(_currentUserId).update({
+      'active_room_id': roomId,
+    }).catchError((_) {}); // ignore if doc doesn't exist or permission denied
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _setActiveRoomId(widget.roomId);
+    } else if (state == AppLifecycleState.paused || 
+               state == AppLifecycleState.inactive || 
+               state == AppLifecycleState.detached) {
+      _setActiveRoomId(null);
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _setActiveRoomId(null);
+
     _previewTimer?.cancel();
     _scrollController.removeListener(_onScroll);
     _persistMessageDraft();
