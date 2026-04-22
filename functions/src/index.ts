@@ -268,6 +268,33 @@ export const onGroupNoticeCreatedV2 = onDocumentCreated("groups/{groupId}/notice
   };
   const invalidTokens = await sendChunked(targets, payload);
   await cleanupInvalidTokens(invalidTokens);
+
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 30);
+
+  const chunkSize = 500;
+  for (let i = 0; i < memberUids.length; i += chunkSize) {
+    const chunk = memberUids.slice(i, i + chunkSize);
+    const batch = db.batch();
+    for (const uid of chunk) {
+      const ref = db.collection("users").doc(uid).collection("notifications").doc(event.params.noticeId);
+      batch.set(ref, {
+        type: "groupNotice",
+        is_read: false,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        expires_at: admin.firestore.Timestamp.fromDate(expiresAt),
+        data: {
+          group_id: groupId,
+          group_name: groupName,
+          notice_id: event.params.noticeId,
+          group_photo_url: groupProfileImage,
+        },
+      }, { merge: true });
+    }
+    await batch.commit();
+  }
+
   return null;
 });
 

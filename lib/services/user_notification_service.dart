@@ -7,6 +7,7 @@ enum NotificationType {
   invite,
   friendRequest,
   system,
+  groupNotice,
 }
 
 class UserNotification {

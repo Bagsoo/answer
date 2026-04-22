@@ -13,31 +13,45 @@ import 'group_tabs/settings_tab.dart';
 import 'user_profile_detail_screen.dart';
 import 'chat_room_screen.dart';
 
+enum GroupDetailTab {
+  members,
+  boards,
+  schedules,
+  chats,
+  settings
+}
+
 class GroupDetailScreen extends StatelessWidget {
   final String groupId;
   final String groupName;
   final Map<String, dynamic>? initialGroupData;
+  final GroupDetailTab initialTab;
 
   const GroupDetailScreen({
     super.key,
     required this.groupId,
     required this.groupName,
     this.initialGroupData,
+    this.initialTab = GroupDetailTab.chats,
   });
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => GroupProvider(groupId, initialData: initialGroupData),
-      child: _GroupDetailBody(groupName: groupName),
+      child: _GroupDetailBody(groupName: groupName, initialTab: initialTab),
     );
   }
 }
 
 class _GroupDetailBody extends StatefulWidget {
   final String groupName;
+  final GroupDetailTab initialTab;
 
-  const _GroupDetailBody({required this.groupName});
+  const _GroupDetailBody({
+    required this.groupName,
+    required this.initialTab,
+  });
 
   @override
   State<_GroupDetailBody> createState() => _GroupDetailBodyState();
@@ -60,8 +74,11 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this)
-      ..addListener(_handleTabChanged);
+    _tabController = TabController(
+      initialIndex: widget.initialTab.index,
+      length: 5, 
+      vsync: this
+    )..addListener(_handleTabChanged);
   }
 
   @override

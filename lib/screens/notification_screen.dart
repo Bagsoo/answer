@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../services/user_notification_service.dart';
+import 'group_detail_screen.dart';
 
 class NotificationScreen extends StatelessWidget {
   const NotificationScreen({super.key});
@@ -31,13 +32,13 @@ class NotificationScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
+                  const Text(
                     '🙂',
                     style: TextStyle(fontSize: 48),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    '새 알림이 없습니다',
+                    l.noNewNotifications,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                     ),
@@ -71,9 +72,39 @@ class _NotificationItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final service = context.read<UserNotificationService>();
+    final l = AppLocalizations.of(context);
+
+    // Compute title & body based on type
+    final title = notification.type == NotificationType.groupNotice 
+        ? (notification.data['group_name'] ?? l.groupNotice)
+        : notification.title;
+        
+    final body = notification.type == NotificationType.groupNotice
+        ? l.groupNoticeTapToOpen
+        : notification.body;
 
     return InkWell(
-      onTap: () => service.markAsRead(notification.id),
+      onTap: () async {
+        if (notification.type == NotificationType.groupNotice) {
+          final groupId = notification.data['group_id'];
+          if (groupId != null) {
+            final navigator = Navigator.of(context);
+            final success = await navigator.push<bool>(
+              MaterialPageRoute(
+                builder: (_) => GroupDetailScreen(
+                  groupId: groupId,
+                  groupName: notification.data['group_name'] ?? '',
+                  initialTab: GroupDetailTab.members,
+                ),
+              ),
+            );
+            // After successful transition, mark as read
+            service.markAsRead(notification.id);
+          }
+        } else {
+          service.markAsRead(notification.id);
+        }
+      },
       child: Container(
         padding: const EdgeInsets.all(16),
         color: notification.isRead ? null : cs.primary.withOpacity(0.03),
@@ -90,7 +121,7 @@ class _NotificationItem extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        notification.title,
+                        title,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
@@ -98,7 +129,7 @@ class _NotificationItem extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        notification.body,
+                        body,
                         style: TextStyle(
                           color: cs.onSurface.withOpacity(0.7),
                           fontSize: 13,
@@ -164,13 +195,17 @@ class _NotificationItem extends StatelessWidget {
         icon = Icons.person_add_outlined;
         color = Colors.green;
         break;
+      case NotificationType.groupNotice:
+        icon = Icons.campaign_outlined;
+        color = Colors.purple;
+        break;
       case NotificationType.system:
         icon = Icons.info_outline;
         color = Colors.orange;
         break;
     }
 
-    if (notification.type == NotificationType.invite && 
+    if ((notification.type == NotificationType.invite || notification.type == NotificationType.groupNotice) && 
         notification.data['group_photo_url'] != null && 
         notification.data['group_photo_url'].toString().isNotEmpty) {
       return CircleAvatar(

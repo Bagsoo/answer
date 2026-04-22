@@ -540,6 +540,7 @@ class AppLocalizations {
   String get sharedStarAction => _s.sharedStarAction;
   String get sharedUnstarAction => _s.sharedUnstarAction;
   String get noNotices => _s.noNotices;
+  String get noNewNotifications => _s.noNewNotifications;
   String get currentNotice => _s.currentNotice;
   String get groupNotice => _s.groupNotice;
   String get groupNoticeTapToOpen => _s.groupNoticeTapToOpen;
@@ -1295,6 +1296,7 @@ abstract class _AppStrings {
   String get sharedStarAction;
   String get sharedUnstarAction;
   String get noNotices;
+  String get noNewNotifications;
   String get currentNotice;
   String get groupNotice;
   String get groupNoticeTapToOpen;
@@ -2054,6 +2056,7 @@ class _EnStrings extends _AppStrings {
   @override String get sharedStarAction => 'Star';
   @override String get sharedUnstarAction => 'Remove star';
   @override String get noNotices => 'No notices yet';
+  @override String get noNewNotifications => 'No new notifications';
   @override String get currentNotice => 'Current';
   @override String get groupNotice => 'Group Notice';
   @override String get groupNoticeTapToOpen => 'Tap to view notice details and history.';
@@ -2791,6 +2794,7 @@ class _KoStrings extends _AppStrings {
   @override String get sharedStarAction => '즐겨찾기';
   @override String get sharedUnstarAction => '즐겨찾기 해제';
   @override String get noNotices => '등록된 공지가 없습니다';
+  @override String get noNewNotifications => '새 알림이 없습니다';
   @override String get currentNotice => '현재 공지';
   @override String get groupNotice => '그룹 공지';
   @override String get groupNoticeTapToOpen => '탭해서 공지 상세 내용과 이전 공지를 확인해보세요.';
@@ -3527,6 +3531,7 @@ class _JaStrings extends _AppStrings {
   @override String get sharedStarAction => 'お気に入り';
   @override String get sharedUnstarAction => 'お気に入り解除';
   @override String get noNotices => 'まだお知らせはありません';
+  @override String get noNewNotifications => '新しい通知はありません';
   @override String get currentNotice => '現在のお知らせ';
   @override String get groupNotice => 'グループお知らせ';
   @override String get groupNoticeTapToOpen => 'タップしてお知らせの詳細と過去のお知らせを確認できます。';
