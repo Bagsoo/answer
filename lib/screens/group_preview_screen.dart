@@ -4,6 +4,7 @@ import '../services/group_service.dart';
 import '../providers/user_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../utils/user_display.dart';
+import '../services/analytics_service.dart';
 import 'group_detail_screen.dart';
 import 'group_tabs/group_type_category_data.dart';
 import 'user_profile_detail_screen.dart';
@@ -19,6 +20,20 @@ class GroupPreviewScreen extends StatefulWidget {
 
 class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
   bool _joining = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<AnalyticsService>().logViewGroup(
+              groupId: group['id'] as String? ?? '',
+              groupName: group['name'] as String? ?? '',
+              category: group['category'] as String? ?? '',
+            );
+      }
+    });
+  }
 
   Map<String, dynamic> get group => widget.group;
 
@@ -52,6 +67,13 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
     setState(() => _joining = false);
 
     if (result == 'ok') {
+      // ── Analytics 로그 (그룹 가입 성공) ──
+      context.read<AnalyticsService>().logJoinGroup(
+        groupId: groupId,
+        groupName: groupName,
+        category: groupCategory,
+      );
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(requireApproval ? l.joinRequestSent : l.joinedSuccess),

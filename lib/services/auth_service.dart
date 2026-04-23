@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import '../config/env_config.dart';
+import 'analytics_service.dart';
 
 class AuthService extends ChangeNotifier {
   FirebaseAuth get _auth => FirebaseAuth.instance;
@@ -82,9 +83,15 @@ class AuthService extends ChangeNotifier {
   Future<void> _checkAndSetRegisteredUser(String uid) async {
     try {
       final doc = await _db.collection('users').doc(uid).get();
-      final registered = doc.exists && (doc.data()?['account_status'] as String? ?? 'active') == 'active';
+      final data = doc.data() ?? {};
+      final registered = doc.exists && (data['account_status'] as String? ?? 'active') == 'active';
       _isRegisteredUser = registered;
       notifyListeners();
+
+      // ── Analytics 로그 (유저 속성 설정) ──
+      final locale = data['locale'] as String?;
+      final analytics = AnalyticsService(); // 혹은 Provider를 통해 접근 가능하지만 여기선 신규 인스턴스/싱글톤화 고려
+      await analytics.setUserProperties(uid: uid, locale: locale);
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_keyIsRegistered, registered);

@@ -11,6 +11,7 @@ import 'group_tabs/schedule_detail_screen.dart';
 import 'group_tabs/schedules_tab.dart';
 import 'group_tabs/settings_tab.dart';
 import 'user_profile_detail_screen.dart';
+import '../services/analytics_service.dart';
 import 'chat_room_screen.dart';
 
 enum GroupDetailTab {
@@ -79,6 +80,18 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
       length: 5, 
       vsync: this
     )..addListener(_handleTabChanged);
+
+    // ── Analytics 로그 (그룹 상세 조회) ──
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final gp = context.read<GroupProvider>();
+        context.read<AnalyticsService>().logViewGroup(
+          groupId: gp.groupId,
+          groupName: gp.name,
+          category: gp.category,
+        );
+      }
+    });
   }
 
   @override

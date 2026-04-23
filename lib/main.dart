@@ -19,6 +19,7 @@ import 'services/poll_service.dart';
 import 'services/report_service.dart';
 import 'services/incoming_share_service.dart';
 import 'services/user_notification_service.dart';
+import 'services/analytics_service.dart';
 import 'services/my_schedule_service.dart';
 import 'providers/locale_provider.dart';
 import 'providers/theme_provider.dart';
@@ -87,6 +88,7 @@ void main() async {
         Provider<NotificationService>(create: (_) => NotificationService()),
         Provider<PollService>(create: (_) => PollService()),
         Provider<ReportService>(create: (_) => ReportService()),
+        Provider<AnalyticsService>(create: (_) => AnalyticsService()),
         Provider<MyScheduleService>(create: (_) => MyScheduleService()),
         ChangeNotifierProvider<IncomingShareService>(
           create: (_) => IncomingShareService()..initialize(),
@@ -108,6 +110,9 @@ class MessengerApp extends StatelessWidget {
     return MaterialApp(
       title: 'Answer Messenger',
       navigatorKey: NotificationService.navigatorKey,
+      navigatorObservers: [
+        context.read<AnalyticsService>().getAnalyticsObserver(),
+      ],
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeMode,

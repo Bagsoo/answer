@@ -19,6 +19,8 @@ import 'group_tabs/group_qr_scanner_screen.dart';
 import 'dart:convert';
 import '../utils/ad_interleaver.dart';
 
+import '../services/analytics_service.dart';
+
 class GroupListScreen extends StatefulWidget {
   final bool isDesktopMode;
   final String? selectedGroupId;
@@ -175,6 +177,9 @@ class _GroupListScreenState extends State<GroupListScreen>
       return;
     }
 
+    // ── Analytics 로그 (검색) ──
+    context.read<AnalyticsService>().logSearchGroup(query);
+
     context.read<GroupService>().searchGroups(query).listen((list) {
       if (mounted) {
         setState(() {
@@ -220,6 +225,15 @@ class _GroupListScreenState extends State<GroupListScreen>
   }
 
   void _handleGroupTap(Map<String, dynamic> group, bool isAlreadyJoined) {
+    // ── Analytics 로그 (추천 클릭 시) ──
+    if (_tabController.index == 1) {
+      context.read<AnalyticsService>().logClickRecommendation(
+        groupId: group['id'] as String? ?? '',
+        groupName: group['name'] as String? ?? '',
+        score: (group['_score'] as num?)?.toDouble() ?? 0.0,
+      );
+    }
+
     if (isAlreadyJoined) {
       if (widget.isDesktopMode && widget.onGroupSelected != null) {
         widget.onGroupSelected!(group);

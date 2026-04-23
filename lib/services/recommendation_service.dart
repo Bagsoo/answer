@@ -8,19 +8,24 @@ class RecommendationService {
 
   String get _uid => _auth.currentUser?.uid ?? '';
 
-  // ── 추천 그룹 목록 조회 ───────────────────────────────────────────────────
+  // ── 추천 그룹 목록 조회 (2차 고도화: 가중치 추천) ─────────────────────────────
   Future<List<Map<String, dynamic>>> getRecommendedGroups({
     int limit = 20,
   }) async {
     if (_uid.isEmpty) return [];
 
-    // 1. 유저 정보 조회 (위치, 관심사, 이미 가입한 그룹)
+    // 1. 유저 정보 조회 (위치, 관심사, 행동 데이터, 이미 가입한 그룹)
     final userDoc = await _db.collection('users').doc(_uid).get();
     final userData = userDoc.data() ?? {};
 
     final userLocation = userData['activity_location'] as GeoPoint?;
     final userInterests =
         List<String>.from(userData['interests'] as List? ?? []);
+    
+    // 행동 데이터 (view_counts, join_attempts)
+    final behaviorStats = userData['behavior_stats'] as Map<String, dynamic>? ?? {};
+    final viewCounts = behaviorStats['view_counts'] as Map<String, dynamic>? ?? {};
+    final joinAttempts = behaviorStats['join_attempts'] as Map<String, dynamic>? ?? {};
 
     final joinedSnap = await _db
         .collection('users')
@@ -46,10 +51,20 @@ class RecommendationService {
       if ((data['status'] as String? ?? 'active') == 'deleted') continue;
       data['id'] = doc.id;
 
-      // 점수 계산
+      // 점수 계산 (Total 100점 만점 설계)
       double score = 0;
+      final groupCategory = data['category'] as String? ?? '';
+      final groupType = data['type'] as String? ?? '';
 
-      // ── 거리 점수 (최대 40점) ─────────────────────────────────────
+      // ── A. 행동 데이터 점수 (최대 30점) ──
+      // 자주 조회한 카테고리: 횟수당 5점 (최대 15점)
+      // 가입 시도한 카테고리: 횟수당 10점 (최대 15점)
+      final categoryViews = (viewCounts[groupCategory] as num?)?.toDouble() ?? 0;
+      final categoryJoins = (joinAttempts[groupCategory] as num?)?.toDouble() ?? 0;
+      score += (categoryViews * 5).clamp(0, 15).toDouble();
+      score += (categoryJoins * 10).clamp(0, 15).toDouble();
+
+      // ── B. 거리 점수 (최대 30점) ──
       final groupLocation = data['location'] as GeoPoint?;
       if (userLocation != null && groupLocation != null) {
         final distKm = _distanceKm(
@@ -58,57 +73,36 @@ class RecommendationService {
           groupLocation.latitude,
           groupLocation.longitude,
         );
-        // 5km 이내: 40점 / 10km: 30점 / 20km: 20점 / 50km: 10점 / 그 이상: 0점
-        if (distKm <= 5) {
-          score += 40;
-        } else if (distKm <= 10) {
-          score += 30;
-        } else if (distKm <= 20) {
-          score += 20;
-        } else if (distKm <= 50) {
-          score += 10;
-        }
+        if (distKm <= 5) score += 30;
+        else if (distKm <= 10) score += 20;
+        else if (distKm <= 30) score += 10;
         data['distance_km'] = distKm.toStringAsFixed(1);
       }
 
-      // ── 카테고리/타입 매칭 점수 (최대 25점) ──────────────────────
+      // ── C. 관심사(Profile) 점수 (최대 20점) ──
       if (userInterests.isNotEmpty) {
-        final groupCategory = data['category'] as String? ?? '';
-        final groupType = data['type'] as String? ?? '';
-        if (userInterests.contains(groupCategory)) score += 20;
+        if (userInterests.contains(groupCategory)) score += 15;
         if (userInterests.contains(groupType)) score += 5;
       }
 
-      // ── 유저 관심사 태그 매칭 점수 (최대 20점) ───────────────────
+      // ── D. 태그 매칭 점수 (최대 10점) ──
       if (userInterests.isNotEmpty) {
-        final groupTags =
-            List<String>.from(data['tags'] as List? ?? []);
-        final matchCount = groupTags
-            .where((tag) => userInterests.contains(tag))
-            .length;
-        score += (matchCount * 5).clamp(0, 20).toDouble();
+        final groupTags = List<String>.from(data['tags'] as List? ?? []);
+        final matchCount = groupTags.where((tag) => userInterests.contains(tag)).length;
+        score += (matchCount * 5).clamp(0, 10).toDouble();
       }
 
-      // ── 인기 점수 (최대 10점) ─────────────────────────────────────
+      // ── E. 인기 및 최신성 점수 (최대 10점) ──
       final memberCount = (data['member_count'] as num?)?.toInt() ?? 0;
       final memberLimit = (data['member_limit'] as num?)?.toInt() ?? 50;
       if (memberLimit > 0) {
-        final fillRate = memberCount / memberLimit;
-        score += (fillRate * 10).clamp(0, 10);
+        score += (memberCount / memberLimit * 5).clamp(0, 5);
       }
-
-      // ── 신규 그룹 점수 (최대 5점) ─────────────────────────────────
       final createdAt = data['created_at'] as Timestamp?;
       if (createdAt != null) {
-        final daysSinceCreation =
-            now.difference(createdAt.toDate()).inDays;
-        if (daysSinceCreation <= 7) {
-          score += 5;
-        } else if (daysSinceCreation <= 30) {
-          score += 3;
-        } else if (daysSinceCreation <= 90) {
-          score += 1;
-        }
+        final days = now.difference(createdAt.toDate()).inDays;
+        if (days <= 14) score += 5;
+        else if (days <= 30) score += 3;
       }
 
       data['_score'] = score;
@@ -116,8 +110,7 @@ class RecommendationService {
     }
 
     // 3. 점수 내림차순 정렬
-    groups.sort((a, b) =>
-        (b['_score'] as double).compareTo(a['_score'] as double));
+    groups.sort((a, b) => (b['_score'] as double).compareTo(a['_score'] as double));
 
     return groups.take(limit).toList();
   }
