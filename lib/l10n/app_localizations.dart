@@ -7,6 +7,11 @@ class AppLocalizations {
   static AppLocalizations of(BuildContext context) =>
       Localizations.of<AppLocalizations>(context, AppLocalizations)!;
 
+  // Static methods for background tasks
+  static AppLocalizations en() => const AppLocalizations(_EnStrings());
+  static AppLocalizations ko() => const AppLocalizations(_KoStrings());
+  static AppLocalizations ja() => const AppLocalizations(_JaStrings());
+
   String get navFriends => _s.navFriends;
   String get navChats => _s.navChats;
   String get navGroups => _s.navGroups;

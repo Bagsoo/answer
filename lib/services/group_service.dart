@@ -1,7 +1,11 @@
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:rxdart/rxdart.dart';
+import '../utils/search_dictionary.dart';
+import '../l10n/app_localizations.dart';
+import '../screens/group_tabs/group_type_category_data.dart';
 
 class GroupService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -45,6 +49,18 @@ class GroupService {
     final maxMemberLimit = defaultMaxMemberLimitForPlan(plan);
     final initialMemberLimit = memberLimit ?? maxMemberLimit;
 
+    // ── 다국어 카테고리 맵 생성 ──
+    // GroupTypeCategoryData.localizeKey를 모든 언어 객체에 대해 수행
+    final lEn = AppLocalizations.en();
+    final lKo = AppLocalizations.ko();
+    final lJa = AppLocalizations.ja();
+
+    final Map<String, String> localizedCategories = {
+      'en': GroupTypeCategoryData.localizeKey(category, lEn),
+      'ko': GroupTypeCategoryData.localizeKey(category, lKo),
+      'ja': GroupTypeCategoryData.localizeKey(category, lJa),
+    };
+
     List<String> keywords = name.toLowerCase().split(' ');
     keywords.add(name.toLowerCase());
 
@@ -59,12 +75,17 @@ class GroupService {
       'member_limit': initialMemberLimit,
       'max_member_limit': maxMemberLimit,
       'plan': plan,
-      'status': status,
       'invite_token': null,
       'qr_enabled': false,
       'allow_plan_upgrade': allowPlanUpgrade,
       'created_at': FieldValue.serverTimestamp(),
       'searchable_keywords': keywords,
+      'search_tokens': SearchDictionary.generateSearchTokens(
+        name: name,
+        localizedCategories: localizedCategories,
+        tags: [], // 필요 시 tags 전달
+        locationName: locationName,
+      ),
       'owner_name': ownerName,
       'owner_photo_url': ownerPhotoUrl,
     });
@@ -131,26 +152,64 @@ class GroupService {
     }
   }
 
-  // ── 그룹 검색 ──────────────────────────────────────────────────────────────
-  Stream<List<Map<String, dynamic>>> searchGroups(String query) {
-    if (query.trim().isEmpty) return Stream.value([]);
-    final lowerQuery = query.toLowerCase();
+  // ── 그룹 검색 (고도화: 연관어 + 위치 기반 랭킹) ─────────────────────────────
+  Stream<List<Map<String, dynamic>>> searchGroups(String query, {GeoPoint? userLocation}) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return Stream.value([]);
+    
+    final expandedTerms = SearchDictionary.expandQuery(trimmed);
+
     return _db
         .collection('groups')
-        .where('searchable_keywords', arrayContains: lowerQuery)
-        .limit(20)
+        .where('search_tokens', arrayContainsAny: expandedTerms)
+        .limit(40) 
         .snapshots()
-        .map((snapshot) => snapshot.docs
+        .map((snapshot) {
+          final results = snapshot.docs
             .map((doc) {
               final data = doc.data();
-              if ((data['status'] as String? ?? 'active') == 'deleted') {
-                return null;
-              }
+              if ((data['status'] as String? ?? 'active') == 'deleted') return null;
               data['id'] = doc.id;
+              
+              // ── 위치 점수 및 가중치 계산 ──
+              double rankingScore = 0;
+              final groupLoc = data['location'] as GeoPoint?;
+              final groupName = (data['name'] as String? ?? '').toLowerCase();
+              
+              // 1. 텍스트 일치도 가점 (검색어가 이름에 포함되면 강력 가점)
+              if (groupName.contains(trimmed.toLowerCase())) rankingScore += 100;
+              
+              // 2. 거리 점수 가점 (최대 50점)
+              if (userLocation != null && groupLoc != null) {
+                final dist = _calculateDistance(
+                  userLocation.latitude, userLocation.longitude,
+                  groupLoc.latitude, groupLoc.longitude
+                );
+                data['distance_km'] = dist.toStringAsFixed(1);
+                
+                if (dist <= 5) rankingScore += 50;
+                else if (dist <= 15) rankingScore += 30;
+                else if (dist <= 30) rankingScore += 10;
+              }
+              
+              data['_ranking_score'] = rankingScore;
               return data;
             })
             .whereType<Map<String, dynamic>>()
-            .toList());
+            .toList();
+
+          // 최종 정렬: 랭킹 점수 내림차순
+          results.sort((a, b) => (b['_ranking_score'] as double).compareTo(a['_ranking_score'] as double));
+          return results;
+        });
+  }
+
+  // 거리 계산 유틸리티 (Haversine formula)
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    var p = 0.017453292519943295;
+    var a = 0.5 - cos((lat2 - lat1) * p) / 2 +
+        cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2;
+    return 12742 * asin(sqrt(a));
   }
 
   // ── 그룹 가입 요청 ──────────────────────────────────────────────────────────
