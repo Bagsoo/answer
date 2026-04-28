@@ -12,6 +12,7 @@ import 'group_tabs/schedules_tab.dart';
 import 'group_tabs/settings_tab.dart';
 import 'user_profile_detail_screen.dart';
 import '../services/analytics_service.dart';
+import '../services/local_preferences_service.dart';
 import 'chat_room_screen.dart';
 
 enum GroupDetailTab {
@@ -26,14 +27,14 @@ class GroupDetailScreen extends StatelessWidget {
   final String groupId;
   final String groupName;
   final Map<String, dynamic>? initialGroupData;
-  final GroupDetailTab initialTab;
+  final GroupDetailTab? initialTab;
 
   const GroupDetailScreen({
     super.key,
     required this.groupId,
     required this.groupName,
     this.initialGroupData,
-    this.initialTab = GroupDetailTab.chats,
+    this.initialTab,
   });
 
   @override
@@ -47,11 +48,11 @@ class GroupDetailScreen extends StatelessWidget {
 
 class _GroupDetailBody extends StatefulWidget {
   final String groupName;
-  final GroupDetailTab initialTab;
+  final GroupDetailTab? initialTab;
 
   const _GroupDetailBody({
     required this.groupName,
-    required this.initialTab,
+    this.initialTab,
   });
 
   @override
@@ -64,6 +65,7 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
   Map<String, dynamic>? _selectedMember;
   Map<String, dynamic>? _selectedSchedule;
   String? _selectedRoomId;
+  bool _tabsInitialized = false;
 
   bool get _showMemberPanel =>
       _tabController.index == 0 && _selectedMember != null;
@@ -76,10 +78,16 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
   void initState() {
     super.initState();
     _tabController = TabController(
-      initialIndex: widget.initialTab.index,
-      length: 5, 
-      vsync: this
+      initialIndex: widget.initialTab?.index ?? 0,
+      length: 5,
+      vsync: this,
     )..addListener(_handleTabChanged);
+
+    if (widget.initialTab == null) {
+      _initLastTab();
+    } else {
+      _tabsInitialized = true;
+    }
 
     // ── Analytics 로그 (그룹 상세 조회) ──
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -94,6 +102,17 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
     });
   }
 
+  Future<void> _initLastTab() async {
+    final gp = context.read<GroupProvider>();
+    final key = 'last_tab_${gp.groupId}';
+    final lastIndex = await LocalPreferencesService.getInt(key) ?? 0;
+
+    if (mounted && lastIndex < _tabController.length) {
+      _tabController.index = lastIndex;
+      setState(() => _tabsInitialized = true);
+    }
+  }
+
   @override
   void dispose() {
     _tabController.removeListener(_handleTabChanged);
@@ -103,6 +122,11 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
 
   void _handleTabChanged() {
     if (!mounted || _tabController.indexIsChanging) return;
+    
+    // 최근 탭 기억하기 (직접 지정해서 들어온 경우가 아닐 때만)
+    final gp = context.read<GroupProvider>();
+    LocalPreferencesService.setInt('last_tab_${gp.groupId}', _tabController.index);
+    
     setState(() {});
   }
 
@@ -209,7 +233,7 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
     final colorScheme = Theme.of(context).colorScheme;
     final isDesktopMode = MediaQuery.sizeOf(context).width >= 900;
 
-    if (!loaded) {
+    if (!loaded || !_tabsInitialized) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );

@@ -759,6 +759,9 @@ class AppLocalizations {
       _s.hoursAgo.replaceAll('__n__', n.toString());
   String daysAgo(int n) =>
       _s.daysAgo.replaceAll('__n__', n.toString());
+  String get adminPermissions => _s.adminPermissions;
+  String get roleGeneralMember => _s.roleGeneralMember;
+  String get roleManager => _s.roleManager;
 }
 
 abstract class _AppStrings {
@@ -1494,6 +1497,9 @@ abstract class _AppStrings {
   String get catOther2;
   String get catFoodGourmet;
   String get memberLimitPlanHint;
+  String get adminPermissions;
+  String get roleGeneralMember;
+  String get roleManager;
 }
 
 class AppLocalizationsDelegate
@@ -2254,6 +2260,10 @@ class _EnStrings extends _AppStrings {
   @override String get catOther2 => 'Other';
   @override String get catFoodGourmet => 'Food / Gourmet';
   @override String get memberLimitPlanHint => 'Member limit can be adjusted in Settings based on your plan.';
+  @override String get adminPermissions => 'Admin Permissions';
+  @override String get roleGeneralMember => 'General Member';
+  @override String get roleManager => 'Manager';
+
 }
 
 // ── Korean ────────────────────────────────────────────────────────────────────
@@ -2992,6 +3002,9 @@ class _KoStrings extends _AppStrings {
   @override String get catOther2 => '기타';
   @override String get catFoodGourmet => '맛집/미식';
   @override String get memberLimitPlanHint => '플랜에 따라 설정 탭에서 최대 인원수를 조정할 수 있습니다.';
+  @override String get adminPermissions => '운영 권한 설정';
+  @override String get roleGeneralMember => '일반 멤버';
+  @override String get roleManager => '매니저';
 }
 
 // ── Japanese ──────────────────────────────────────────────────────────────────
@@ -3729,4 +3742,7 @@ class _JaStrings extends _AppStrings {
   @override String get catOther2 => 'その他';
   @override String get catFoodGourmet => 'グルメ・食べ歩き';
   @override String get memberLimitPlanHint => 'プランに応じて、設定タブで最大メンバー数を調整できます。';
+  @override String get adminPermissions => '運営権限設定';
+  @override String get roleGeneralMember => '一般メンバー';
+  @override String get roleManager => 'マネージャー';
 }

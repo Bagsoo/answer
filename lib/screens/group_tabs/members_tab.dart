@@ -107,20 +107,44 @@ class _MembersTabState extends State<MembersTab> with SingleTickerProviderStateM
   }
 
   void _subscribeMembers(String groupId) {
+    final myUid = context.read<UserProvider>().uid;
     _membersSub = FirebaseFirestore.instance
         .collection('groups')
         .doc(groupId)
         .collection('members')
-        .orderBy('joined_at', descending: false)
         .snapshots()
         .listen((snap) {
       if (!mounted) return;
       final sorted = [...snap.docs]..sort((a, b) {
-          final aRole = (a.data() as Map)['role'] as String? ?? '';
-          final bRole = (b.data() as Map)['role'] as String? ?? '';
-          if (aRole == 'owner') return -1;
-          if (bRole == 'owner') return 1;
-          return 0;
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+          final aUid = a.id;
+          final bUid = b.id;
+          final aRole = aData['role'] as String? ?? 'member';
+          final bRole = bData['role'] as String? ?? 'member';
+          final aJoined = aData['joined_at'] as Timestamp? ?? Timestamp.now();
+          final bJoined = bData['joined_at'] as Timestamp? ?? Timestamp.now();
+
+          // 1. 나 (Me) 우선순위
+          if (aUid == myUid) return -1;
+          if (bUid == myUid) return 1;
+
+          // 2. 역할 가중치 계산 (owner: 10, manager: 5, member: 0)
+          int getRoleWeight(String role) {
+            if (role == 'owner') return 10;
+            if (role == 'manager') return 5;
+            return 0;
+          }
+
+          final aWeight = getRoleWeight(aRole);
+          final bWeight = getRoleWeight(bRole);
+
+          if (aWeight != bWeight) {
+            return bWeight.compareTo(aWeight); // 높은 가중치(owner)가 위로
+          }
+
+          // 3. 같은 역할(매니저끼리, 멤버끼리)일 경우 가입 순 (오래된 순)
+          return aJoined.compareTo(bJoined);
         });
       setState(() {
         _members = sorted;
@@ -276,18 +300,43 @@ class _MembersTabState extends State<MembersTab> with SingleTickerProviderStateM
                   final displayName = data['display_name'] as String? ?? l.unknown;
                   final photoUrl = data['profile_image'] as String? ?? '';
                   final isOwner = role == 'owner';
+                  final isManager = role == 'manager';
                   final isMe = uid == gp.currentUserId;
 
                   return ListTile(
                     onTap: () => _showMemberProfile(context, uid, displayName, role, data['permissions'] ?? {}, List<String>.from(data['tags'] ?? []), isMe, canManagePerms, gp.myRole, gp.myPerms, groupId, l, colorScheme, photoUrl),
-                    leading: CircleAvatar(
-                      backgroundColor: isOwner ? colorScheme.primary : colorScheme.surfaceContainerHighest,
-                      backgroundImage: photoUrl.isNotEmpty ? CachedNetworkImageProvider(photoUrl) : null,
-                      child: photoUrl.isEmpty ? Text(displayName.isNotEmpty ? displayName[0].toUpperCase() : '?', style: TextStyle(color: isOwner ? colorScheme.onPrimary : colorScheme.onSurface, fontWeight: FontWeight.bold)) : null,
+                    leading: Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundColor: isOwner ? colorScheme.primary : (isManager ? colorScheme.secondary : colorScheme.surfaceContainerHighest),
+                          backgroundImage: photoUrl.isNotEmpty ? CachedNetworkImageProvider(photoUrl) : null,
+                          child: photoUrl.isEmpty ? Text(displayName.isNotEmpty ? displayName[0].toUpperCase() : '?', style: TextStyle(color: isOwner ? colorScheme.onPrimary : (isManager ? colorScheme.onSecondary : colorScheme.onSurface), fontWeight: FontWeight.bold)) : null,
+                        ),
+                        if (isOwner || isManager)
+                          Positioned(
+                            right: -2,
+                            bottom: -2,
+                            child: Icon(
+                              Icons.star_rounded,
+                              size: 18,
+                              color: isOwner 
+                                ? Colors.amber[700] 
+                                : const Color(0xFFE0C1B3), // Rose Gold
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withOpacity(0.3),
+                                  offset: const Offset(1, 1),
+                                  blurRadius: 3,
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
-                    title: Text(isMe ? '$displayName (${l.me})' : displayName, style: TextStyle(fontWeight: isOwner ? FontWeight.bold : FontWeight.normal)),
-                    subtitle: Text(isOwner ? l.roleOwner : l.roleMember, style: TextStyle(color: isOwner ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.5), fontSize: 12)),
-                    trailing: isOwner ? Icon(Icons.star_rounded, color: colorScheme.primary, size: 18) : (canManagePerms && !isMe ? Icon(Icons.manage_accounts_outlined, color: colorScheme.onSurface.withOpacity(0.4)) : null),
+                    title: Text(isMe ? '$displayName (${l.me})' : displayName, style: TextStyle(fontWeight: (isOwner || isManager) ? FontWeight.bold : FontWeight.normal)),
+                    subtitle: Text(isOwner ? l.roleOwner : (isManager ? l.roleManager : l.roleMember), style: TextStyle(color: isOwner ? colorScheme.primary : (isManager ? colorScheme.secondary : colorScheme.onSurface.withOpacity(0.5)), fontSize: 12)),
+                    trailing: (canManagePerms && !isMe && !isOwner) ? Icon(Icons.manage_accounts_outlined, color: colorScheme.onSurface.withOpacity(0.4)) : null,
                   );
                 },
               ),
@@ -554,7 +603,7 @@ class _TagDropdownButton extends StatelessWidget {
   }
 }
 
-// ── 멤버 프로필 바텀시트 (기존 구현 유지) ──
+// ── 멤버 프로필 바텀시트 ──
 class _MemberProfileSheet extends StatefulWidget {
   final String uid;
   final String displayName;
@@ -575,29 +624,69 @@ class _MemberProfileSheet extends StatefulWidget {
 }
 
 class _MemberProfileSheetState extends State<_MemberProfileSheet> {
-  bool _isFriend = false; bool _loadingData = true; bool _processing = false; String _phoneNumber = '';
-  late bool _canCreateChat; late bool _canPostSchedule; late bool _canEditGroupInfo; late bool _canManagePermissions; bool _savingPerms = false;
+  bool _isFriend = false;
+  bool _loadingData = true;
+  bool _processing = false;
+  String _phoneNumber = '';
+  late bool _canCreateChat;
+  late bool _canPostSchedule;
+  late bool _canEditGroupInfo;
+  late bool _canManagePermissions;
+  late String _currentRole;
+  bool _savingPerms = false;
 
   @override
   void initState() {
     super.initState();
+    _currentRole = widget.role;
     _canCreateChat = widget.perms['can_create_sub_chat'] as bool? ?? false;
     _canPostSchedule = widget.perms['can_post_schedule'] as bool? ?? false;
     _canEditGroupInfo = widget.perms['can_edit_group_info'] as bool? ?? false;
-    _canManagePermissions = widget.perms['can_manage_permissions'] as bool? ?? false;
+    _canManagePermissions =
+        widget.perms['can_manage_permissions'] as bool? ?? false;
     _loadData();
   }
 
   Future<void> _loadData() async {
     final friendService = context.read<FriendService>();
-    final results = await Future.wait([friendService.isFriend(widget.uid), FirebaseFirestore.instance.collection('users').doc(widget.uid).get()]);
-    if (mounted) setState(() { _isFriend = results[0] as bool; final userDoc = results[1] as DocumentSnapshot; _phoneNumber = (userDoc.data() as Map<String, dynamic>?)?['phone_number'] as String? ?? ''; _loadingData = false; });
+    final results = await Future.wait([
+      friendService.isFriend(widget.uid),
+      FirebaseFirestore.instance.collection('users').doc(widget.uid).get()
+    ]);
+    if (mounted) {
+      setState(() {
+        _isFriend = results[0] as bool;
+        final userDoc = results[1] as DocumentSnapshot;
+        _phoneNumber =
+            (userDoc.data() as Map<String, dynamic>?)?['phone_number'] as String? ??
+                '';
+        _loadingData = false;
+      });
+    }
   }
 
   Future<void> _savePermissions() async {
     setState(() => _savingPerms = true);
-    await FirebaseFirestore.instance.collection('groups').doc(widget.groupId).collection('members').doc(widget.uid).update({'permissions': {'can_create_sub_chat': _canCreateChat, 'can_post_schedule': _canPostSchedule, 'can_edit_group_info': _canEditGroupInfo, 'can_manage_permissions': _canManagePermissions, 'can_write_post': true}});
-    if (mounted) { setState(() => _savingPerms = false); Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.l.permissionsSaved))); }
+    final success = await context.read<GroupService>().updateMemberRoleAndPermissions(
+          groupId: widget.groupId,
+          targetUid: widget.uid,
+          role: _currentRole,
+          permissions: {
+            'can_create_sub_chat': _canCreateChat,
+            'can_post_schedule': _canPostSchedule,
+            'can_edit_group_info': _canEditGroupInfo,
+            'can_manage_permissions': _canManagePermissions,
+            'can_write_post': true,
+          },
+        );
+    if (mounted) {
+      setState(() => _savingPerms = false);
+      if (success) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(widget.l.permissionsSaved)));
+      }
+    }
   }
 
   Future<void> _transferOwnership() async {
@@ -638,45 +727,227 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = widget.colorScheme; final l = widget.l; final isOwner = widget.role == 'owner'; final showPerms = widget.canManagePerms && !widget.isMe && !isOwner;
+    final cs = widget.colorScheme;
+    final l = widget.l;
+    final gp = context.watch<GroupProvider>();
+    final isTargetOwner = widget.role == 'owner';
+    final isTargetManager = widget.role == 'manager';
+
+    final canIEdit = gp.isOwner || (gp.myRole == 'manager' && gp.canManagePermissions);
+    final showPermsSection = canIEdit && !widget.isMe && !isTargetOwner;
+
     return DraggableScrollableSheet(
-      expand: false, initialChildSize: showPerms ? 0.75 : 0.45, minChildSize: 0.3, maxChildSize: 0.9,
+      expand: false,
+      initialChildSize: showPermsSection ? 0.85 : 0.45,
+      minChildSize: 0.3,
+      maxChildSize: 0.9,
       builder: (_, scrollController) => SingleChildScrollView(
-        controller: scrollController, padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+        controller: scrollController,
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Center(child: Container(margin: const EdgeInsets.only(top: 12, bottom: 20), width: 40, height: 4, decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.2), borderRadius: BorderRadius.circular(2)))),
-            CircleAvatar(radius: 40, backgroundColor: isOwner ? cs.primary : cs.primaryContainer, backgroundImage: (widget.photoUrl.isNotEmpty) ? CachedNetworkImageProvider(widget.photoUrl) : null, child: (widget.photoUrl.isEmpty) ? Text(widget.displayName.isNotEmpty ? widget.displayName[0].toUpperCase() : '?', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: isOwner ? cs.onPrimary : cs.onPrimaryContainer)) : null),
-            const SizedBox(height: 12), Text(widget.isMe ? '${widget.displayName} (${l.me})' : widget.displayName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            if (isOwner) ...[const SizedBox(height: 4), Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.star_rounded, color: cs.primary, size: 16), const SizedBox(width: 4), Text(l.roleOwner, style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600))])],
+            Center(
+                child: Container(
+                    margin: const EdgeInsets.only(top: 12, bottom: 20),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: cs.onSurface.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(2)))),
+            CircleAvatar(
+                radius: 40,
+                backgroundColor: isTargetOwner ? cs.primary : cs.primaryContainer,
+                backgroundImage: (widget.photoUrl.isNotEmpty)
+                    ? CachedNetworkImageProvider(widget.photoUrl)
+                    : null,
+                child: (widget.photoUrl.isEmpty)
+                    ? Text(
+                        widget.displayName.isNotEmpty
+                            ? widget.displayName[0].toUpperCase()
+                            : '?',
+                        style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: isTargetOwner
+                                ? cs.onPrimary
+                                : cs.onPrimaryContainer))
+                    : null),
+            const SizedBox(height: 12),
+            Text(widget.isMe ? '${widget.displayName} (${l.me})' : widget.displayName,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: isTargetOwner ? cs.primary : (isTargetManager ? cs.secondary : cs.surfaceContainerHighest),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                isTargetOwner ? l.roleOwner : (isTargetManager ? '매니저' : l.roleMember),
+                style: TextStyle(
+                  color: isTargetOwner ? cs.onPrimary : (isTargetManager ? cs.onSecondary : cs.onSurfaceVariant),
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+
             const SizedBox(height: 24),
             if (!widget.isMe) ...[
               Row(children: [
-                Expanded(child: OutlinedButton.icon(onPressed: _openDm, icon: const Icon(Icons.chat_bubble_outline, size: 18), label: Text(l.sendDm), style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
+                Expanded(
+                    child: OutlinedButton.icon(
+                        onPressed: _openDm,
+                        icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                        label: Text(l.sendDm),
+                        style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12))))),
                 const SizedBox(width: 12),
-                Expanded(child: _isFriend ? OutlinedButton.icon(onPressed: null, icon: Icon(Icons.check_circle, size: 18, color: cs.primary), label: Text(l.alreadyFriend, style: TextStyle(color: cs.primary)), style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), side: BorderSide(color: cs.primary))) : ElevatedButton.icon(onPressed: _processing ? null : _addFriend, icon: _processing ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.person_add, size: 18), label: Text(l.addFriend), style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
+                Expanded(
+                    child: _isFriend
+                        ? OutlinedButton.icon(
+                            onPressed: null,
+                            icon: Icon(Icons.check_circle,
+                                size: 18, color: cs.primary),
+                            label: Text(l.alreadyFriend,
+                                style: TextStyle(color: cs.primary)),
+                            style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                side: BorderSide(color: cs.primary)))
+                        : ElevatedButton.icon(
+                            onPressed: _processing ? null : _addFriend,
+                            icon: _processing
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2))
+                                : const Icon(Icons.person_add, size: 18),
+                            label: Text(l.addFriend),
+                            style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12))))),
               ]),
             ],
-            if (context.watch<GroupProvider>().canManagePermissions) ...[
-              const SizedBox(height: 16), const Divider(), const SizedBox(height: 8),
-              Row(children: [Icon(Icons.label_outline, color: cs.primary, size: 20), const SizedBox(width: 8), Text(l.memberTags, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))]),
-              const SizedBox(height: 8), _MemberTagEditor(groupId: widget.groupId, uid: widget.uid, currentTags: widget.memberTags, colorScheme: cs),
+
+            if (gp.canManagePermissions) ...[
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              Row(children: [
+                Icon(Icons.label_outline, color: cs.primary, size: 20),
+                const SizedBox(width: 8),
+                Text(l.memberTags,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))
+              ]),
+              const SizedBox(height: 8),
+              _MemberTagEditor(
+                  groupId: widget.groupId,
+                  uid: widget.uid,
+                  currentTags: widget.memberTags,
+                  colorScheme: cs),
             ],
-            if (showPerms) ...[
-              const SizedBox(height: 24), const Divider(), const SizedBox(height: 8),
-              Row(children: [Icon(Icons.manage_accounts, color: cs.primary, size: 20), const SizedBox(width: 8), Text(l.permissions, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))]),
-              _PermSwitch(label: l.permCreateChat, value: _canCreateChat, enabled: context.watch<GroupProvider>().canCreateSubChat, onChanged: (v) => setState(() => _canCreateChat = v), colorScheme: cs),
-              _PermSwitch(label: l.permPostSchedule, value: _canPostSchedule, enabled: context.watch<GroupProvider>().canPostSchedule, onChanged: (v) => setState(() => _canPostSchedule = v), colorScheme: cs),
-              _PermSwitch(label: l.permEditGroupInfo, value: _canEditGroupInfo, enabled: context.watch<GroupProvider>().canEditGroupInfo, onChanged: (v) => setState(() => _canEditGroupInfo = v), colorScheme: cs),
-              _PermSwitch(label: l.permManagePermissions, value: _canManagePermissions, enabled: context.watch<GroupProvider>().isOwner, onChanged: (v) => setState(() => _canManagePermissions = v), colorScheme: cs),
-              const SizedBox(height: 16), SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _savingPerms ? null : _savePermissions, child: _savingPerms ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : Text(l.savePermissions))),
+
+            if (showPermsSection) ...[
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 8),
+              Row(children: [
+                Icon(Icons.manage_accounts, color: cs.primary, size: 20),
+                const SizedBox(width: 8),
+                Text(l.adminPermissions,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))
+              ]),
+              
+              if (gp.isOwner)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: SegmentedButton<String>(
+                    segments: [
+                      ButtonSegment(value: 'member', label: Text(l.roleGeneralMember)),
+                      ButtonSegment(value: 'manager', label: Text(l.roleManager)),
+                    ],
+                    selected: {_currentRole},
+                    onSelectionChanged: (Set<String> newSelection) {
+                      setState(() => _currentRole = newSelection.first);
+                    },
+                  ),
+                ),
+
+              if (_currentRole == 'manager') ...[
+                _PermSwitch(
+                    label: l.permCreateChat,
+                    value: _canCreateChat,
+                    onChanged: (v) => setState(() => _canCreateChat = v),
+                    colorScheme: cs),
+                _PermSwitch(
+                    label: l.permPostSchedule,
+                    value: _canPostSchedule,
+                    onChanged: (v) => setState(() => _canPostSchedule = v),
+                    colorScheme: cs),
+                _PermSwitch(
+                    label: l.permEditGroupInfo,
+                    value: _canEditGroupInfo,
+                    onChanged: (v) => setState(() => _canEditGroupInfo = v),
+                    colorScheme: cs),
+                _PermSwitch(
+                    label: l.permManagePermissions,
+                    value: _canManagePermissions,
+                    onChanged: (v) => setState(() => _canManagePermissions = v),
+                    colorScheme: cs),
+              ],
+              
+              const SizedBox(height: 16),
+              SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                      onPressed: _savingPerms ? null : _savePermissions,
+                      child: _savingPerms
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : Text(l.savePermissions))),
             ],
-            if (context.watch<GroupProvider>().isOwner && !widget.isMe) ...[
-              const SizedBox(height: 16), const Divider(),
-              SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _processing ? null : _transferOwnership, icon: const Icon(Icons.star_outline, size: 18), label: Text(l.transferOwnership), style: OutlinedButton.styleFrom(foregroundColor: cs.primary, side: BorderSide(color: cs.primary), padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
-              const SizedBox(height: 12),
-              SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _processing ? null : _kickMember, icon: const Icon(Icons.person_off_outlined, size: 18), label: Text(l.kickMember), style: OutlinedButton.styleFrom(foregroundColor: cs.error, side: BorderSide(color: cs.error), padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
+
+            if (canIEdit && !widget.isMe && !isTargetOwner) ...[
+              const SizedBox(height: 16),
+              const Divider(),
+              if (gp.isOwner)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                          onPressed: _processing ? null : _transferOwnership,
+                          icon: const Icon(Icons.star_outline, size: 18),
+                          label: Text(l.transferOwnership),
+                          style: OutlinedButton.styleFrom(
+                              foregroundColor: cs.primary,
+                              side: BorderSide(color: cs.primary),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12))))),
+                ),
+              SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                      onPressed: _processing ? null : _kickMember,
+                      icon: const Icon(Icons.person_off_outlined, size: 18),
+                      label: Text(l.kickMember),
+                      style: OutlinedButton.styleFrom(
+                          foregroundColor: cs.error,
+                          side: BorderSide(color: cs.error),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12))))),
             ],
           ],
         ),
