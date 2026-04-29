@@ -230,6 +230,7 @@ export const joinGroupByQr = onCall(
         permissions: {
           can_post_schedule: false,
           can_create_sub_chat: false,
+          can_start_voice_call: false,
           can_write_post: true,
           can_edit_group_info: false,
           can_manage_permissions: false,

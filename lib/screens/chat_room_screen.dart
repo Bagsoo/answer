@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,8 +19,10 @@ import '../services/video_service.dart';
 import '../services/file_service.dart';
 import '../services/audio_service.dart';
 import '../services/local_preferences_service.dart';
+import '../services/voice_call_service.dart';
 import '../utils/user_cache.dart';
 import '../utils/user_display.dart';
+import 'voice_room_screen.dart';
 import 'chat_room_more/chat_room_participants_screen.dart';
 import 'chat_room_more/chat_room_invite_screen.dart';
 import 'chat_room_more/notices_screen.dart';
@@ -84,6 +87,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
   String? _replyToId;
   bool _noticeBannerDismissed = false;
   bool _showScrollToBottom = false;
+  bool _voiceCallBusy = false;
 
   // ── 새 메시지 배너 ─────────────────────────────────────────────────────────
   String? _newMessagePreviewText;
@@ -112,6 +116,122 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
 
   String get _chatDraftKey =>
       LocalPreferencesService.chatDraftKey(_prefsUserId, widget.roomId);
+
+  String _getAppBarTitle(AppLocalizations l) {
+    final meta = _roomMeta;
+    final isDm = meta?.roomType == 'direct';
+    final dmDisplayName = (meta?.otherUserDeleted ?? false)
+        ? l.deletedUser
+        : meta?.otherUserName ?? '';
+    final title = isDm && dmDisplayName.isNotEmpty
+        ? dmDisplayName
+        : (meta?.roomName ?? '');
+    return title.isNotEmpty ? title : 'Chat Room';
+  }
+
+  Future<void> _joinVoiceCall(
+    AppLocalizations l, {
+    String? preferredCallId,
+    bool startIfMissing = true,
+  }) async {
+    if (_voiceCallBusy) return;
+    setState(() {
+      _showAttachPanel = false;
+      _voiceCallBusy = true;
+    });
+
+    final voiceCallService = context.read<VoiceCallService>();
+    if (!voiceCallService.tryBeginVoiceRoomTransition()) {
+      setState(() => _voiceCallBusy = false);
+      return;
+    }
+    try {
+      var callId = preferredCallId;
+      if (callId == null || callId.isEmpty) {
+        if (!startIfMissing) {
+          final activeCallId =
+              await voiceCallService.getActiveCallId(widget.roomId);
+          if (activeCallId == null || activeCallId.isEmpty) {
+            throw StateError(l.voiceCallNotFound);
+          }
+          callId = activeCallId;
+        } else {
+          try {
+            callId = await voiceCallService.startVoiceCall(widget.roomId);
+          } on FirebaseFunctionsException catch (error) {
+            if (error.code == 'already-exists') {
+              final activeCallId =
+                  await voiceCallService.getActiveCallId(widget.roomId);
+              if (activeCallId == null || activeCallId.isEmpty) {
+                throw StateError(l.voiceCallNotFound);
+              }
+              callId = activeCallId;
+            } else {
+              rethrow;
+            }
+          }
+        }
+      }
+
+      if (callId == null || callId.isEmpty) {
+        throw StateError(l.voiceCallNotFound);
+      }
+
+      final joinResult = await voiceCallService.joinVoiceCall(
+        roomId: widget.roomId,
+        callId: callId,
+        device: _deviceType,
+      );
+
+      if (!mounted) return;
+
+      final appBarTitle = _getAppBarTitle(l);
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VoiceRoomScreen(
+            roomId: widget.roomId,
+            roomName: appBarTitle,
+            callId: callId!,
+            token: joinResult.token,
+            appId: joinResult.appId,
+            channelName: joinResult.channelName,
+            agoraUid: joinResult.uid,
+          ),
+        ),
+      );
+    } on FirebaseFunctionsException catch (error) {
+      if (!mounted) return;
+      final message = error.message ?? l.voiceCallStartFailed;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.voiceCallStartFailed)),
+      );
+    } finally {
+      if (!voiceCallService.isInVoiceRoom.value) {
+        voiceCallService.endVoiceRoomTransition();
+      }
+      if (mounted) {
+        setState(() => _voiceCallBusy = false);
+      }
+    }
+  }
+
+  Future<void> _handleVoiceCallTap(AppLocalizations l) =>
+      _joinVoiceCall(l, startIfMissing: true);
+
+  String get _deviceType {
+    if (Platform.isAndroid) return 'android';
+    if (Platform.isIOS) return 'ios';
+    if (Platform.isWindows) return 'windows';
+    if (Platform.isMacOS) return 'macos';
+    if (Platform.isLinux) return 'linux';
+    return 'unknown';
+  }
 
   // ──────────────────────────────────────────────────────────────────────────
   // Lifecycle
@@ -1516,9 +1636,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
     final dmDisplayName = (meta?.otherUserDeleted ?? false)
         ? l.deletedUser
         : meta?.otherUserName ?? '';
-    final appBarTitle = isDm && dmDisplayName.isNotEmpty
-        ? dmDisplayName
-        : (meta?.roomName ?? '');
+    final appBarTitle = _getAppBarTitle(l);
     final otherUserPhoto = meta?.otherUserPhoto ?? '';
     final hasOtherPhoto =
         otherUserPhoto.isNotEmpty && !(meta?.otherUserDeleted ?? false);
@@ -1650,6 +1768,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
       body: Column(
         children: [
           _buildNoticeBanner(colorScheme),
+          _buildActiveVoiceCallBanner(l, colorScheme),
           if (_isSearching && _searchLoading)
             LinearProgressIndicator(
               minHeight: 2,
@@ -1867,6 +1986,131 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildActiveVoiceCallBanner(
+    AppLocalizations l,
+    ColorScheme colorScheme,
+  ) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('chat_rooms')
+          .doc(widget.roomId)
+          .snapshots(),
+      builder: (context, roomSnap) {
+        final roomData = roomSnap.data?.data();
+        final activeCallId = roomData?['active_call_id'] as String?;
+        if (activeCallId == null || activeCallId.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('chat_rooms')
+              .doc(widget.roomId)
+              .collection('calls')
+              .doc(activeCallId)
+              .snapshots(),
+          builder: (context, callSnap) {
+            final callData = callSnap.data?.data();
+            if (callData == null || callData['status'] != 'active') {
+              return const SizedBox.shrink();
+            }
+
+            final participantCount =
+                (callData['participant_count'] as num?)?.toInt() ?? 0;
+
+            return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('chat_rooms')
+                  .doc(widget.roomId)
+                  .collection('calls')
+                  .doc(activeCallId)
+                  .collection('participants')
+                  .doc(_currentUserId)
+                  .snapshots(),
+              builder: (context, participantSnap) {
+                final participantData = participantSnap.data?.data();
+                final isActiveParticipant =
+                    participantData != null && participantData['left_at'] == null;
+
+                return Material(
+                  color: colorScheme.primaryContainer,
+                  child: InkWell(
+                    onTap: _voiceCallBusy
+                        ? null
+                        : () => _joinVoiceCall(
+                              l,
+                              preferredCallId: activeCallId,
+                              startIfMissing: false,
+                            ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  l.voiceCallOngoing,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: colorScheme.onPrimaryContainer,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  l.voiceCallParticipants(participantCount),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: colorScheme.onPrimaryContainer
+                                        .withOpacity(0.75),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          FilledButton.tonal(
+                            onPressed: _voiceCallBusy
+                                ? null
+                                : () => _joinVoiceCall(
+                                      l,
+                                      preferredCallId: activeCallId,
+                                      startIfMissing: false,
+                                    ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: colorScheme.surface,
+                              foregroundColor: colorScheme.primary,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            child: Text(
+                              isActiveParticipant
+                                  ? l.voiceCallRejoin
+                                  : l.voiceCallJoinNow,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
     );
   }
 
@@ -2575,7 +2819,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
         icon: Icons.call_outlined,
         label: l.attachCall,
         color: Colors.blue,
-        onTap: () {},
+        onTap: () => _handleVoiceCallTap(l),
       ),
       AttachItem(
         icon: Icons.videocam,

@@ -62,6 +62,8 @@ class GroupProvider extends ChangeNotifier {
       isOwner || myPerms['can_edit_group_info'] == true;
   bool get canCreateSubChat =>
       isOwner || myPerms['can_create_sub_chat'] == true;
+  bool get canStartVoiceCall =>
+      isOwner || myPerms['can_start_voice_call'] == true;
   bool get canWritePost =>
       isOwner || myPerms['can_write_post'] == true;
 

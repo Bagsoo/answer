@@ -58,6 +58,25 @@ service cloud.firestore {
         )
       );
 
+      match /calls/{callId} {
+        allow read: if isAdmin() || (isLoggedIn() && request.auth.uid in get(/databases/$(database)/documents/chat_rooms/$(roomId)).data.member_ids);
+        allow write: if false;
+
+        match /participants/{uid} {
+          allow read: if isAdmin() || (isLoggedIn() && request.auth.uid in get(/databases/$(database)/documents/chat_rooms/$(roomId)).data.member_ids);
+          allow create, delete: if false;
+          allow update: if request.auth != null
+            && request.auth.uid == uid
+            && request.resource.data.diff(resource.data).changedKeys().hasOnly(['last_seen', 'is_muted'])
+            && request.resource.data.uid == resource.data.uid
+            && request.resource.data.joined_at == resource.data.joined_at
+            && request.resource.data.left_at == resource.data.left_at
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.device == resource.data.device
+            && request.resource.data.is_speaking == resource.data.is_speaking;
+        }
+      }
+
       match /{allSubcollections=**} {
         allow read: if isAdmin() || (isLoggedIn() && request.auth.uid in get(/databases/$(database)/documents/chat_rooms/$(roomId)).data.member_ids);
         allow write: if isAdmin() || (isLoggedIn() && (

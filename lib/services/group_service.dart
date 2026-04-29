@@ -97,6 +97,7 @@ class GroupService {
       'permissions': {
         'can_post_schedule': true,
         'can_create_sub_chat': true,
+        'can_start_voice_call': true,
         'can_write_post': true,
         'can_edit_group_info': true,
         'can_manage_permissions': true,
@@ -221,7 +222,7 @@ class GroupService {
           'profile_image': profileImage,
           'joined_at': FieldValue.serverTimestamp(),
           'role': 'member',
-          'permissions': {'can_post_schedule': false, 'can_create_sub_chat': false, 'can_write_post': true, 'can_edit_group_info': false, 'can_manage_permissions': false},
+          'permissions': {'can_post_schedule': false, 'can_create_sub_chat': false, 'can_start_voice_call': false, 'can_write_post': true, 'can_edit_group_info': false, 'can_manage_permissions': false},
         });
         batch.update(_db.collection('groups').doc(groupId), {'member_count': FieldValue.increment(1)});
         batch.set(_db.collection('users').doc(currentUserId).collection('joined_groups').doc(groupId), {
@@ -322,7 +323,7 @@ class GroupService {
         'profile_image': profileImage,
         'joined_at': FieldValue.serverTimestamp(),
         'role': 'member',
-        'permissions': {'can_post_schedule': false, 'can_create_sub_chat': false, 'can_write_post': true, 'can_edit_group_info': false, 'can_manage_permissions': false},
+        'permissions': {'can_post_schedule': false, 'can_create_sub_chat': false, 'can_start_voice_call': false, 'can_write_post': true, 'can_edit_group_info': false, 'can_manage_permissions': false},
       });
       batch.update(_db.collection('groups').doc(groupId), {'member_count': FieldValue.increment(1)});
       batch.set(_db.collection('users').doc(applicantUid).collection('joined_groups').doc(groupId), {
@@ -489,8 +490,8 @@ class GroupService {
     try {
       final batch = _db.batch();
       final groupRef = _db.collection('groups').doc(groupId);
-      batch.update(groupRef.collection('members').doc(newOwnerUid), {'role': 'owner', 'permissions': {'can_post_schedule': true, 'can_create_sub_chat': true, 'can_write_post': true, 'can_edit_group_info': true, 'can_manage_permissions': true}});
-      batch.update(groupRef.collection('members').doc(currentUserId), {'role': 'member'});
+      batch.update(groupRef.collection('members').doc(newOwnerUid), {'role': 'owner', 'permissions': {'can_post_schedule': true, 'can_create_sub_chat': true, 'can_start_voice_call': true, 'can_write_post': true, 'can_edit_group_info': true, 'can_manage_permissions': true}});
+      batch.update(groupRef.collection('members').doc(currentUserId), {'role': 'member', 'permissions': {'can_post_schedule': false, 'can_create_sub_chat': false, 'can_start_voice_call': false, 'can_write_post': true, 'can_edit_group_info': false, 'can_manage_permissions': false}});
       batch.update(groupRef, {'owner_id': newOwnerUid, 'owner_name': newOwnerName, 'owner_photo_url': newOwnerPhotoUrl});
       
       final chatSnap = await _db.collection('chat_rooms').where('ref_group_id', isEqualTo: groupId).where('type', isEqualTo: 'group_all').get();

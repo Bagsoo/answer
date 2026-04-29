@@ -25,6 +25,44 @@ String _localizedLastMessage(BuildContext context, String lastMessage) {
   }
 }
 
+Widget _voiceLiveBadge(BuildContext context, {bool compact = false}) {
+  final cs = Theme.of(context).colorScheme;
+  final label = AppLocalizations.of(context).voiceCallOngoing;
+  return Container(
+    padding: EdgeInsets.symmetric(
+      horizontal: compact ? 6 : 8,
+      vertical: compact ? 3 : 4,
+    ),
+    decoration: BoxDecoration(
+      color: cs.errorContainer,
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            color: cs.error,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          compact ? 'LIVE' : label,
+          style: TextStyle(
+            color: cs.onErrorContainer,
+            fontSize: compact ? 10 : 11,
+            fontWeight: FontWeight.w700,
+            height: 1,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class ParticipantCountBadge extends StatelessWidget {
   final int count;
   final ColorScheme colorScheme;
@@ -130,6 +168,8 @@ class _DmTileState extends State<DmTile> {
       widget.room['last_message'] as String? ?? '',
     );
     final unreadCnt = widget.room['unread_cnt'] as int? ?? 0;
+    final hasActiveCall =
+        (widget.room['active_call_id'] as String? ?? '').isNotEmpty;
     final hasPhoto = _otherPhoto.isNotEmpty && !_otherDeleted;
     final displayName = _otherDeleted
         ? l.deletedUser
@@ -174,13 +214,24 @@ class _DmTileState extends State<DmTile> {
         ],
       ),
       subtitle: Text(
-        lastMessage,
+        hasActiveCall ? l.voiceCallOngoing : lastMessage,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(color: cs.onSurface.withOpacity(0.6)),
+        style: TextStyle(
+          color: hasActiveCall
+              ? cs.error.withOpacity(0.9)
+              : cs.onSurface.withOpacity(0.6),
+          fontWeight: hasActiveCall ? FontWeight.w600 : FontWeight.normal,
+        ),
       ),
-      trailing: unreadCnt > 0
-          ? CircleAvatar(
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (hasActiveCall) _voiceLiveBadge(context, compact: true),
+          if (hasActiveCall && unreadCnt > 0) const SizedBox(height: 6),
+          if (unreadCnt > 0)
+            CircleAvatar(
               radius: 12,
               backgroundColor: cs.error,
               child: Text(
@@ -190,8 +241,9 @@ class _DmTileState extends State<DmTile> {
                     fontSize: 11,
                     fontWeight: FontWeight.bold),
               ),
-            )
-          : null,
+            ),
+        ],
+      ),
       onTap: () {
         if (widget.onRoomSelected != null) {
           widget.onRoomSelected!(roomId); // 데스크톱
@@ -334,6 +386,7 @@ class ChatTile extends StatelessWidget {
       room['last_message'] as String? ?? '',
     );
     final unreadCnt = room['unread_cnt'] as int? ?? 0;
+    final hasActiveCall = (room['active_call_id'] as String? ?? '').isNotEmpty;
     final type = room['type'] as String? ?? 'direct';
     final memberIds = List<String>.from(room['member_ids'] as List? ?? []);
     final groupProfileImage = room['group_profile_image'] as String? ?? '';
@@ -397,12 +450,25 @@ class ChatTile extends StatelessWidget {
           ],
         ],
       ),
-      subtitle: Text(lastMessage,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6))),
-      trailing: unreadCnt > 0
-          ? CircleAvatar(
+      subtitle: Text(
+        hasActiveCall ? AppLocalizations.of(context).voiceCallOngoing : lastMessage,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: hasActiveCall
+              ? colorScheme.error.withOpacity(0.9)
+              : colorScheme.onSurface.withOpacity(0.6),
+          fontWeight: hasActiveCall ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (hasActiveCall) _voiceLiveBadge(context, compact: true),
+          if (hasActiveCall && unreadCnt > 0) const SizedBox(height: 6),
+          if (unreadCnt > 0)
+            CircleAvatar(
               radius: 12,
               backgroundColor: colorScheme.error,
               child: Text(
@@ -412,8 +478,9 @@ class ChatTile extends StatelessWidget {
                     fontSize: 11,
                     fontWeight: FontWeight.bold),
               ),
-            )
-          : null,
+            ),
+        ],
+      ),
       onTap: () {
         if (onRoomSelected != null) {
           onRoomSelected!(roomId); // 데스크톱

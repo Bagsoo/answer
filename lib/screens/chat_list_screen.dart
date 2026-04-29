@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -6,12 +7,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/chat_service.dart';
 import '../services/friend_service.dart';
 import '../services/local_preferences_service.dart';
+import '../services/voice_call_service.dart';
 import '../providers/user_provider.dart';
 import '../providers/chat_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/chat/chat_tiles.dart';
 import '../widgets/chat/chats_section.dart';
 import 'chat_room_screen.dart';
+import 'voice_room_screen.dart';
 import '../utils/ad_interleaver.dart';
 import 'package:flutter/rendering.dart';
 
@@ -27,6 +30,7 @@ class ChatListScreen extends StatefulWidget {
 class _ChatListScreenState extends State<ChatListScreen> {  
   final ScrollController _scrollController = ScrollController();
   bool _fabVisible = true;
+  bool _joiningVoiceCall = false;
   String get _myUid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
@@ -97,6 +101,76 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
     if (roomName.contains(normalized)) return true;
     return memberNames.any((name) => name.contains(normalized));
+  }
+
+  Future<void> _joinActiveVoiceCall(
+    BuildContext context,
+    Map<String, dynamic> room,
+  ) async {
+    if (_joiningVoiceCall) return;
+    final l = AppLocalizations.of(context);
+    final roomId = room['id'] as String? ?? '';
+    final callId = room['active_call_id'] as String? ?? '';
+    if (roomId.isEmpty || callId.isEmpty) return;
+    final voiceCallService = context.read<VoiceCallService>();
+    if (!voiceCallService.tryBeginVoiceRoomTransition()) return;
+
+    setState(() => _joiningVoiceCall = true);
+    try {
+      final result = await voiceCallService.joinVoiceCall(
+            roomId: roomId,
+            callId: callId,
+            device: _deviceType,
+          );
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VoiceRoomScreen(
+            roomId: roomId,
+            roomName: (room['name'] as String? ?? roomId),
+            callId: callId,
+            token: result.token,
+            appId: result.appId,
+            channelName: result.channelName,
+            agoraUid: result.uid,
+          ),
+        ),
+      );
+    } on FirebaseFunctionsException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message ?? l.voiceCallStartFailed)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.voiceCallStartFailed)),
+      );
+    } finally {
+      if (!voiceCallService.isInVoiceRoom.value) {
+        voiceCallService.endVoiceRoomTransition();
+      }
+      if (mounted) {
+        setState(() => _joiningVoiceCall = false);
+      }
+    }
+  }
+
+  String get _deviceType {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return 'android';
+      case TargetPlatform.iOS:
+        return 'ios';
+      case TargetPlatform.windows:
+        return 'windows';
+      case TargetPlatform.macOS:
+        return 'macos';
+      case TargetPlatform.linux:
+        return 'linux';
+      case TargetPlatform.fuchsia:
+        return 'fuchsia';
+    }
   }
 
   void _showNewChatSheet(BuildContext context) {
@@ -197,6 +271,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
           final rooms = allRooms
               .where((room) => _matchesRoom(room, widget.filterQuery))
               .toList();
+          final activeVoiceRooms = allRooms
+              .where((room) =>
+                  ((room['active_call_id'] as String?) ?? '').isNotEmpty)
+              .toList();
+          final featuredVoiceRoom =
+              activeVoiceRooms.isEmpty ? null : activeVoiceRooms.first;
 
           if (allRooms.isEmpty) {
             return Center(
@@ -292,11 +372,115 @@ class _ChatListScreenState extends State<ChatListScreen> {
           return ListView(
             controller: _scrollController,
             children: [
+              if (featuredVoiceRoom != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                  child: _ActiveVoiceCallCard(
+                    room: featuredVoiceRoom,
+                    joining: _joiningVoiceCall,
+                    onTap: () => _joinActiveVoiceCall(context, featuredVoiceRoom),
+                  ),
+                ),
               ...privateSection,
               ...interleaveAds(groupWidgets, keyPrefix: 'group_ad'),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _ActiveVoiceCallCard extends StatelessWidget {
+  const _ActiveVoiceCallCard({
+    required this.room,
+    required this.joining,
+    required this.onTap,
+  });
+
+  final Map<String, dynamic> room;
+  final bool joining;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    final roomName = (room['name'] as String? ?? '').trim();
+    final participantCount = (room['participant_count'] as num?)?.toInt() ?? 0;
+
+    return Material(
+      color: colorScheme.primaryContainer,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: joining ? null : onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Row(
+            children: [
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      l.voiceCallOngoing,
+                      style: TextStyle(
+                        color: colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      roomName.isNotEmpty ? roomName : l.voiceRoomTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colorScheme.onPrimaryContainer.withOpacity(0.88),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      l.voiceCallParticipants(participantCount),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onPrimaryContainer.withOpacity(0.72),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              joining
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: colorScheme.primary,
+                      ),
+                    )
+                  : FilledButton.tonal(
+                      onPressed: onTap,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colorScheme.surface,
+                        foregroundColor: colorScheme.primary,
+                      ),
+                      child: Text(l.voiceCallRejoin),
+                    ),
+            ],
+          ),
+        ),
       ),
     );
   }

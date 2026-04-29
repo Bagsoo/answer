@@ -13,9 +13,11 @@ import '../providers/user_provider.dart';
 import '../services/chat_service.dart';
 import '../services/incoming_share_service.dart';
 import '../services/memo_service.dart';
+import '../services/voice_call_service.dart';
 import '../l10n/app_localizations.dart';
 import 'chat_list_screen.dart' hide GroupListScreen;
 import 'chat_room_screen.dart';
+import 'voice_room_screen.dart';
 import 'group_list_screen.dart';
 import 'group_detail_screen.dart';
 import 'app_settings_screen.dart';
@@ -37,12 +39,13 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static bool get _isWindows =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
 
   int _currentIndex = 0;
   bool _showingIncomingShare = false;
+  bool _restoringVoiceCall = false;
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -98,11 +101,14 @@ class _HomeScreenState extends State<HomeScreen> {
       _incomingShareService?.addListener(_handleIncomingShare);
       _handleIncomingShare();
     }
+    await _handlePendingVoiceCallAction();
+    await _restoreVoiceCallIfNeeded();
   }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _bootstrapAfterFirstFrame();
     });
@@ -110,9 +116,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _incomingShareService?.removeListener(_handleIncomingShare);
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _handlePendingVoiceCallAction().then((_) => _restoreVoiceCallIfNeeded());
+    }
   }
 
   void _handleIncomingShare() {
@@ -137,6 +151,72 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       _showingIncomingShare = false;
     });
+  }
+
+  Future<void> _handlePendingVoiceCallAction() async {
+    if (!mounted) return;
+    final voiceCallService = context.read<VoiceCallService>();
+    final action = await voiceCallService.getAndClearPendingSystemAction();
+    if (action == null) return;
+
+    if (action == 'end') {
+      await voiceCallService.endSavedActiveSessionIfAny();
+      return;
+    }
+
+    if (action == 'return') {
+      await _restoreVoiceCallIfNeeded();
+    }
+  }
+
+  Future<void> _restoreVoiceCallIfNeeded() async {
+    if (!mounted || _restoringVoiceCall) return;
+    final voiceCallService = context.read<VoiceCallService>();
+    if (voiceCallService.isInVoiceRoom.value) return;
+    if (!voiceCallService.tryBeginVoiceRoomTransition()) return;
+
+    final session = await voiceCallService.getSavedActiveSession();
+    if (session == null) {
+      voiceCallService.endVoiceRoomTransition();
+      return;
+    }
+
+    final roomId = session['roomId'] as String? ?? '';
+    final callId = session['callId'] as String? ?? '';
+    if (roomId.isEmpty || callId.isEmpty) {
+      await voiceCallService.clearActiveSession();
+      voiceCallService.endVoiceRoomTransition();
+      return;
+    }
+
+    _restoringVoiceCall = true;
+    try {
+      final restored = await voiceCallService.restoreActiveSession(
+        device: _homeDeviceType,
+      );
+      if (!mounted || restored == null) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VoiceRoomScreen(
+            roomId: roomId,
+            roomName: session['roomName'] as String? ?? roomId,
+            callId: callId,
+            token: restored.token,
+            appId: restored.appId,
+            channelName: restored.channelName,
+            agoraUid: restored.uid,
+          ),
+        ),
+      );
+    } catch (_) {
+      await voiceCallService.clearActiveSession();
+      await voiceCallService.stopSystemCallNotification();
+    } finally {
+      _restoringVoiceCall = false;
+      if (!voiceCallService.isInVoiceRoom.value) {
+        voiceCallService.endVoiceRoomTransition();
+      }
+    }
   }
 
   @override
@@ -564,6 +644,14 @@ class _HomeScreenState extends State<HomeScreen> {
   AppBar _buildAppBar(BuildContext context, AppLocalizations l,
       UserProvider userProvider, String photoUrl) {
     final useRemoteAvatar = !_isWindows && photoUrl.isNotEmpty;    
+    final chatProvider = context.watch<ChatProvider>();
+    Map<String, dynamic>? activeVoiceRoom;
+    for (final room in chatProvider.chatRooms) {
+      if (((room['active_call_id'] as String?) ?? '').isNotEmpty) {
+        activeVoiceRoom = room;
+        break;
+      }
+    }
     return AppBar(
       leading: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -619,6 +707,70 @@ class _HomeScreenState extends State<HomeScreen> {
         : Text(_getAppBarTitle(l, _currentIndex)),
       centerTitle: true,
       actions: [
+        if (activeVoiceRoom != null)
+          IconButton(
+            tooltip: l.voiceCallRejoin,
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.graphic_eq),
+                Positioned(
+                  right: -1,
+                  top: -1,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE35D5D),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            onPressed: () async {
+              final room = activeVoiceRoom;
+              if (room == null) return;
+              final voiceCallService = context.read<VoiceCallService>();
+              if (!voiceCallService.tryBeginVoiceRoomTransition()) return;
+              final roomId = room['id'] as String? ?? '';
+              final callId = room['active_call_id'] as String? ?? '';
+              if (roomId.isEmpty || callId.isEmpty) {
+                voiceCallService.endVoiceRoomTransition();
+                return;
+              }
+              try {
+                final result = await voiceCallService.joinVoiceCall(
+                      roomId: roomId,
+                      callId: callId,
+                      device: _homeDeviceType,
+                    );
+                if (!context.mounted) return;
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => VoiceRoomScreen(
+                      roomId: roomId,
+                      roomName: (room['name'] as String? ?? roomId),
+                      callId: callId,
+                      token: result.token,
+                      appId: result.appId,
+                      channelName: result.channelName,
+                      agoraUid: result.uid,
+                    ),
+                  ),
+                );
+              } on Exception catch (_) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(l.voiceCallStartFailed)),
+                );
+              } finally {
+                if (!voiceCallService.isInVoiceRoom.value) {
+                  voiceCallService.endVoiceRoomTransition();
+                }
+              }
+            },
+          ),
         if (_currentIndex != 3 && _currentIndex != 4)
           IconButton(
             icon: Icon(_isSearching ? Icons.search_off : Icons.search),
@@ -670,6 +822,23 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ],
     );
+  }
+
+  String get _homeDeviceType {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return 'android';
+      case TargetPlatform.iOS:
+        return 'ios';
+      case TargetPlatform.windows:
+        return 'windows';
+      case TargetPlatform.macOS:
+        return 'macos';
+      case TargetPlatform.linux:
+        return 'linux';
+      case TargetPlatform.fuchsia:
+        return 'fuchsia';
+    }
   }
 
   BottomNavigationBar _buildBottomNav(AppLocalizations l) {

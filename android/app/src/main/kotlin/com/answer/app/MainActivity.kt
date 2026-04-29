@@ -3,6 +3,7 @@ package com.answer.app
 import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
@@ -17,6 +18,7 @@ import java.util.UUID
 
 class MainActivity : FlutterActivity() {
     private val backgroundChannel = "com.answer.messenger/background"
+    private val voiceCallChannel = "com.answer.messenger/voice_call"
     private val shareChannel = "com.answer.messenger/share"
     private val shareEventsChannel = "com.answer.messenger/share_events"
 
@@ -46,6 +48,41 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 } else {
                     result.notImplemented()
+                }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, voiceCallChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "startVoiceCallService" -> {
+                        val roomName = call.argument<String>("roomName") ?: "Voice Room"
+                        val ongoingText = call.argument<String>("ongoingText") ?: "Voice call in progress"
+                        val returnActionLabel = call.argument<String>("returnActionLabel") ?: "Return"
+                        val endActionLabel = call.argument<String>("endActionLabel") ?: "End"
+                        val serviceIntent = Intent(this, VoiceCallForegroundService::class.java).apply {
+                            putExtra(VoiceCallForegroundService.EXTRA_ROOM_NAME, roomName)
+                            putExtra(VoiceCallForegroundService.EXTRA_ONGOING_TEXT, ongoingText)
+                            putExtra(VoiceCallForegroundService.EXTRA_RETURN_ACTION_LABEL, returnActionLabel)
+                            putExtra(VoiceCallForegroundService.EXTRA_END_ACTION_LABEL, endActionLabel)
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(serviceIntent)
+                        } else {
+                            startService(serviceIntent)
+                        }
+                        result.success(null)
+                    }
+                    "stopVoiceCallService" -> {
+                        stopService(Intent(this, VoiceCallForegroundService::class.java))
+                        result.success(null)
+                    }
+                    "getAndClearPendingVoiceCallAction" -> {
+                        val prefs = getSharedPreferences(VoiceCallForegroundService.PREFS_NAME, MODE_PRIVATE)
+                        val action = prefs.getString(VoiceCallForegroundService.KEY_PENDING_ACTION, null)
+                        prefs.edit().remove(VoiceCallForegroundService.KEY_PENDING_ACTION).apply()
+                        result.success(action)
+                    }
+                    else -> result.notImplemented()
                 }
             }
 

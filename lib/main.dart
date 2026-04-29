@@ -21,6 +21,7 @@ import 'services/incoming_share_service.dart';
 import 'services/user_notification_service.dart';
 import 'services/analytics_service.dart';
 import 'services/my_schedule_service.dart';
+import 'services/voice_call_service.dart';
 import 'providers/locale_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/user_provider.dart';
@@ -83,6 +84,7 @@ void main() async {
         Provider<GroupService>(create: (_) => GroupService()),
         Provider<FriendService>(create: (_) => FriendService()),
         Provider<BlockService>(create: (_) => BlockService()),
+        Provider<VoiceCallService>(create: (_) => VoiceCallService()),
         Provider<MemoService>(create: (_) => MemoService()),
         Provider<UserNotificationService>(create: (_) => UserNotificationService()),
         Provider<NotificationService>(create: (_) => NotificationService()),

@@ -17,6 +17,13 @@ export {
   joinGroupByQr,
 } from "./groupQr";
 export { submitGroupPurchaseV1 } from "./billing";
+export {
+  startVoiceCall,
+  joinVoiceCall,
+  leaveVoiceCall,
+  refreshVoiceToken,
+  cleanupVoiceCalls,
+} from "./voiceCall";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -74,6 +81,7 @@ export const acceptInviteV2 = onCall(async (request) => {
       permissions: {
         can_post_schedule: false,
         can_create_sub_chat: false,
+        can_start_voice_call: false,
         can_write_post: true,
         can_edit_group_info: false,
         can_manage_permissions: false,

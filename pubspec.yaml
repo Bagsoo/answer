@@ -47,6 +47,9 @@ dependencies:
   file_picker: ^8.0.0
   open_filex: ^4.3.4
   just_audio: ^0.9.40
+  agora_rtc_engine: 6.5.3
+  crypto: ^3.0.6
+  flutter_callkit_incoming: ^3.0.0
   record: ^6.1.1
   in_app_purchase: ^3.2.0
   in_app_purchase_android: ^0.4.0+10

@@ -630,6 +630,7 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
   String _phoneNumber = '';
   late bool _canCreateChat;
   late bool _canPostSchedule;
+  late bool _canStartVoiceCall;
   late bool _canEditGroupInfo;
   late bool _canManagePermissions;
   late String _currentRole;
@@ -641,6 +642,8 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
     _currentRole = widget.role;
     _canCreateChat = widget.perms['can_create_sub_chat'] as bool? ?? false;
     _canPostSchedule = widget.perms['can_post_schedule'] as bool? ?? false;
+    _canStartVoiceCall =
+        widget.perms['can_start_voice_call'] as bool? ?? false;
     _canEditGroupInfo = widget.perms['can_edit_group_info'] as bool? ?? false;
     _canManagePermissions =
         widget.perms['can_manage_permissions'] as bool? ?? false;
@@ -674,6 +677,7 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
           permissions: {
             'can_create_sub_chat': _canCreateChat,
             'can_post_schedule': _canPostSchedule,
+            'can_start_voice_call': _canStartVoiceCall,
             'can_edit_group_info': _canEditGroupInfo,
             'can_manage_permissions': _canManagePermissions,
             'can_write_post': true,
@@ -891,6 +895,11 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
                     label: l.permPostSchedule,
                     value: _canPostSchedule,
                     onChanged: (v) => setState(() => _canPostSchedule = v),
+                    colorScheme: cs),
+                _PermSwitch(
+                    label: l.permStartVoiceCall,
+                    value: _canStartVoiceCall,
+                    onChanged: (v) => setState(() => _canStartVoiceCall = v),
                     colorScheme: cs),
                 _PermSwitch(
                     label: l.permEditGroupInfo,

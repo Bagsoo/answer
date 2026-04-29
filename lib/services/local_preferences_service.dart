@@ -43,6 +43,9 @@ class LocalPreferencesService {
   static String groupLocationSearchKey(String uid) =>
       'pref.group_location_search.$uid';
 
+  static String activeVoiceCallSessionKey(String uid) =>
+      'pref.voice_call_session.$uid';
+
   static Future<String?> getString(String key) async {
     final prefs = await _prefs;
     return prefs.getString(key);
