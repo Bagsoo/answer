@@ -32,51 +32,34 @@ class VideoRoomScreen extends StatefulWidget {
   State<VideoRoomScreen> createState() => _VideoRoomScreenState();
 }
 
-class _VideoRoomScreenState extends State<VideoRoomScreen> with WidgetsBindingObserver {
+class _VideoRoomScreenState extends State<VideoRoomScreen> {
   late RtcEngine _engine;
   bool _localUserJoined = false;
+  List<int> _remoteUids = []; // 참여 중인 원격 사용자 ID 목록
   bool _isMuted = false;
-  bool _isVideoEnabled = true;
+  bool _isCameraOff = false;
   bool _isFrontCamera = true;
-  List<int> _remoteUids = [];
-  Map<int, bool> _remoteVideoStates = {};
-  Map<int, String> _uidToName = {};
-
-  StreamSubscription? _participantsSub;
   Timer? _heartbeatTimer;
-
-  String get _currentUid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _initAgora();
-    _setupParticipantsListener();
     _startHeartbeat();
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _heartbeatTimer?.cancel();
-    _participantsSub?.cancel();
     _leaveChannel();
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      if (_isVideoEnabled) {
-        _toggleVideo(forceOff: true);
-      }
-    }
-  }
-
   Future<void> _initAgora() async {
+    // 권한 요청
     await [Permission.microphone, Permission.camera].request();
 
+    // 엔진 생성
     _engine = createAgoraRtcEngine();
     await _engine.initialize(RtcEngineContext(
       appId: widget.appId,
@@ -86,41 +69,44 @@ class _VideoRoomScreenState extends State<VideoRoomScreen> with WidgetsBindingOb
     _engine.registerEventHandler(
       RtcEngineEventHandler(
         onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
-          if (!mounted) return;
-          setState(() => _localUserJoined = true);
+          debugPrint("Local user joined: ${connection.localUid}");
+          if (mounted) {
+            setState(() => _localUserJoined = true);
+          }
+          _updateFirestoreStatus(joined: true);
         },
         onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
-          if (!mounted) return;
-          setState(() {
-            _remoteUids.add(remoteUid);
-            _updateVideoQuality();
-          });
+          debugPrint("Remote user joined: $remoteUid");
+          if (mounted) {
+            setState(() {
+              if (!_remoteUids.contains(remoteUid)) {
+                _remoteUids.add(remoteUid);
+              }
+            });
+          }
         },
         onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
-          if (!mounted) return;
-          setState(() {
-            _remoteUids.remove(remoteUid);
-            _remoteVideoStates.remove(remoteUid);
-            _updateVideoQuality();
-          });
+          debugPrint("Remote user offline: $remoteUid");
+          if (mounted) {
+            setState(() {
+              _remoteUids.remove(remoteUid);
+            });
+          }
         },
-        onRemoteVideoStateChanged: (RtcConnection connection, int remoteUid, RemoteVideoState state, RemoteVideoStateReason reason, int elapsed) {
-          if (!mounted) return;
-          setState(() {
-            _remoteVideoStates[remoteUid] = (state == RemoteVideoState.remoteVideoStateDecoding);
-          });
-        },
-        onNetworkQuality: (RtcConnection connection, int remoteUid, QualityType txQuality, QualityType rxQuality) {
-          // 6. 네트워크 품질 대응 (0은 로컬 사용자)
-          if (remoteUid == 0 && txQuality.index >= QualityType.qualityPoor.index) {
-            _showNetworkWarning();
+        onLeaveChannel: (RtcConnection connection, RtcStats stats) {
+          debugPrint("Local user left channel");
+          if (mounted) {
+            setState(() {
+              _localUserJoined = false;
+              _remoteUids.clear();
+            });
           }
         },
       ),
     );
 
     await _engine.enableVideo();
-    await _updateVideoQuality();
+    await _engine.startPreview();
 
     await _engine.joinChannel(
       token: widget.token,
@@ -134,287 +120,333 @@ class _VideoRoomScreenState extends State<VideoRoomScreen> with WidgetsBindingOb
     );
   }
 
-  Future<void> _updateVideoQuality() async {
-    int totalCount = _remoteUids.length + 1;
-    VideoEncoderConfiguration config;
-
-    if (totalCount <= 2) {
-      config = const VideoEncoderConfiguration(
-        dimensions: VideoDimensions(width: 720, height: 1280),
-        frameRate: 30,
-        bitrate: 1500,
-      );
-    } else {
-      config = const VideoEncoderConfiguration(
-        dimensions: VideoDimensions(width: 360, height: 640),
-        frameRate: 15,
-        bitrate: 600,
-      );
-    }
-    await _engine.setVideoEncoderConfiguration(config);
+  void _startHeartbeat() {
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _updateFirestoreStatus();
+    });
   }
 
-  void _showNetworkWarning() {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context).networkUnstable),
-        duration: const Duration(seconds: 2),
-        backgroundColor: Colors.orange,
-      ),
-    );
-  }
+  Future<void> _updateFirestoreStatus({bool joined = false}) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
 
-  void _setupParticipantsListener() {
-    _participantsSub = FirebaseFirestore.instance
+    final batch = FirebaseFirestore.instance.batch();
+    final callRef = FirebaseFirestore.instance
         .collection('chat_rooms')
         .doc(widget.roomId)
         .collection('calls')
-        .doc(widget.callId)
-        .collection('participants')
-        .snapshots()
-        .listen((snap) {
-      if (!mounted) return;
-      final newUidToName = <int, String>{};
+        .doc(widget.callId);
 
-      for (var doc in snap.docs) {
-        final data = doc.data();
-        final uidStr = data['uid'] as String? ?? '';
-        if (uidStr.isEmpty) continue;
-        
-        // Agora UID 매핑 로직 (단순화: 실제로는 서버와 맞춰야 함)
-        // 여기서는 임시로 전달받은 agoraUid를 기준으로 처리하거나 로직 보강 필요
-      }
+    final participantRef = callRef.collection('participants').doc(uid);
 
-      setState(() {
-        _uidToName = newUidToName;
+    if (joined) {
+      batch.set(participantRef, {
+        'joined_at': FieldValue.serverTimestamp(),
+        'last_heartbeat': FieldValue.serverTimestamp(),
+        'left_at': null,
+        'agora_uid': widget.agoraUid,
+      }, SetOptions(merge: true));
+    } else {
+      batch.update(participantRef, {
+        'last_heartbeat': FieldValue.serverTimestamp(),
       });
-    });
-  }
+    }
 
-  void _startHeartbeat() {
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
-      context.read<VoiceCallService>().updateHeartbeat(
-        roomId: widget.roomId,
-        callId: widget.callId,
-        uid: _currentUid,
-      );
-    });
+    try {
+      await batch.commit();
+    } catch (e) {
+      debugPrint("Firestore update failed: $e");
+    }
   }
 
   Future<void> _leaveChannel() async {
-    await _engine.leaveChannel();
-    await _engine.release();
+    _heartbeatTimer?.cancel();
+    
+    // Firestore 상태 업데이트 (참가자 수 감소 및 종료 처리)
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      final callRef = FirebaseFirestore.instance
+          .collection('chat_rooms')
+          .doc(widget.roomId)
+          .collection('calls')
+          .doc(widget.callId);
+
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final callSnap = await transaction.get(callRef);
+        if (!callSnap.exists) return;
+
+        final currentCount = (callSnap.data()?['participant_count'] as num?)?.toInt() ?? 0;
+        final newCount = (currentCount - 1).clamp(0, 100);
+
+        transaction.update(callRef.collection('participants').doc(uid), {
+          'left_at': FieldValue.serverTimestamp(),
+        });
+
+        transaction.update(callRef, {
+          'participant_count': newCount,
+          if (newCount == 0) 'status': 'ended',
+          if (newCount == 0) 'ended_at': FieldValue.serverTimestamp(),
+        });
+
+        if (newCount == 0) {
+          transaction.update(FirebaseFirestore.instance.collection('chat_rooms').doc(widget.roomId), {
+            'active_call_id': null,
+          });
+        }
+      });
+    }
+
+    // 아고라 리소스 해제
+    try {
+      await _engine.stopPreview();
+      await _engine.leaveChannel();
+      await _engine.release();
+    } catch (e) {
+      debugPrint("Agora release error: $e");
+    }
+
     if (mounted) {
-      context.read<VoiceCallService>().leaveVoiceCall(
-        roomId: widget.roomId,
-        callId: widget.callId,
-      );
+      Navigator.of(context).pop();
     }
   }
 
   void _toggleMute() {
     setState(() => _isMuted = !_isMuted);
     _engine.muteLocalAudioStream(_isMuted);
-    context.read<VoiceCallService>().setMuted(
-      roomId: widget.roomId,
-      callId: widget.callId,
-      uid: _currentUid,
-      isMuted: _isMuted,
+  }
+
+  void _toggleCamera() {
+    setState(() => _isCameraOff = !_isCameraOff);
+    _engine.enableLocalVideo(!_isCameraOff);
+  }
+
+  void _switchCamera() {
+    setState(() => _isFrontCamera = !_isFrontCamera);
+    _engine.switchCamera();
+  }
+
+  // ── 비디오 레이아웃 빌드 ──────────────────────────────────────────────────
+  Widget _buildVideoLayout() {
+    final List<Widget> views = [];
+    
+    // 1. 내 영상 (좌측 상단 혹은 격자)
+    if (_localUserJoined) {
+      views.add(_buildLocalView());
+    }
+
+    // 2. 상대방 영상들
+    for (var uid in _remoteUids) {
+      views.add(_buildRemoteView(uid));
+    }
+
+    if (views.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // 참여자 수에 따른 격자 구성
+    int count = views.length;
+    if (count == 1) {
+      return views[0];
+    } else if (count == 2) {
+      return Column(
+        children: [
+          Expanded(child: views[0]),
+          Expanded(child: views[1]),
+        ],
+      );
+    } else if (count <= 4) {
+      return Column(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: views[0]),
+                Expanded(child: views[1]),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: views[2]),
+                if (count == 4) Expanded(child: views[3]) else const Expanded(child: SizedBox()),
+              ],
+            ),
+          ),
+        ],
+      );
+    } else {
+      // 5명 이상일 경우 (현재는 최대 4명 가정)
+      return GridView.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2),
+        itemCount: views.length,
+        itemBuilder: (context, index) => views[index],
+      );
+    }
+  }
+
+  Widget _buildLocalView() {
+    return Container(
+      color: Colors.black,
+      child: Stack(
+        children: [
+          _isCameraOff
+              ? const Center(child: Icon(Icons.videocam_off, color: Colors.white, size: 50))
+              : AgoraVideoView(
+                  controller: VideoViewController(
+                    rtcEngine: _engine,
+                    canvas: const VideoCanvas(uid: 0),
+                  ),
+                ),
+          Positioned(
+            top: 10,
+            left: 10,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              color: Colors.black54,
+              child: const Text("Me", style: TextStyle(color: Colors.white, fontSize: 12)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  void _toggleVideo({bool forceOff = false}) {
-    if (!mounted) return;
-    setState(() {
-      _isVideoEnabled = forceOff ? false : !_isVideoEnabled;
-    });
-    _engine.enableLocalVideo(_isVideoEnabled);
-    FirebaseFirestore.instance
-        .collection('chat_rooms')
-        .doc(widget.roomId)
-        .collection('calls')
-        .doc(widget.callId)
-        .collection('participants')
-        .doc(_currentUid)
-        .update({'is_video_enabled': _isVideoEnabled});
-  }
-
-  void _flipCamera() {
-    _engine.switchCamera();
-    setState(() => _isFrontCamera = !_isFrontCamera);
+  Widget _buildRemoteView(int remoteUid) {
+    return Container(
+      color: Colors.black,
+      child: Stack(
+        children: [
+          AgoraVideoView(
+            controller: VideoViewController.remote(
+              rtcEngine: _engine,
+              canvas: VideoCanvas(uid: remoteUid),
+              connection: RtcConnection(channelId: widget.channelName),
+            ),
+          ),
+          Positioned(
+            top: 10,
+            left: 10,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              color: Colors.black54,
+              child: Text("User $remoteUid", style: const TextStyle(color: Colors.white, fontSize: 12)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
+          // 비디오 영역
           _buildVideoLayout(),
-          _buildTopBar(l),
-          _buildBottomControls(l),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildVideoLayout() {
-    if (!_localUserJoined) {
-      return const Center(child: CircularProgressIndicator(color: Colors.white));
-    }
-
-    final allViews = <Widget>[
-      _buildLocalVideo(),
-      ..._remoteUids.map((uid) => _buildRemoteVideo(uid)),
-    ];
-
-    if (allViews.length == 1) return allViews[0];
-    if (allViews.length == 2) {
-      return Column(children: [
-        Expanded(child: allViews[0]),
-        Expanded(child: allViews[1]),
-      ]);
-    }
-    
-    return GridView.count(
-      crossAxisCount: 2,
-      children: allViews.map((v) => Container(
-        decoration: BoxDecoration(border: Border.all(color: Colors.black54, width: 0.5)),
-        child: v,
-      )).toList(),
-    );
-  }
-
-  Widget _buildLocalVideo() {
-    return Stack(
-      children: [
-        if (_isVideoEnabled)
-          AgoraVideoView(
-            controller: VideoViewController(
-              rtcEngine: _engine,
-              canvas: const VideoCanvas(uid: 0),
-            ),
-          )
-        else
-          _buildPlaceholder(null),
-        _buildInfoOverlay("Me"),
-      ],
-    );
-  }
-
-  Widget _buildRemoteVideo(int uid) {
-    bool isVideoOn = _remoteVideoStates[uid] ?? true;
-    return Stack(
-      children: [
-        if (isVideoOn)
-          AgoraVideoView(
-            controller: VideoViewController.remote(
-              rtcEngine: _engine,
-              canvas: VideoCanvas(uid: uid),
-              connection: RtcConnection(channelId: widget.channelName),
-            ),
-          )
-        else
-          _buildPlaceholder(uid),
-        _buildInfoOverlay(_uidToName[uid] ?? "User"),
-      ],
-    );
-  }
-
-  Widget _buildPlaceholder(int? uid) {
-    return Container(
-      color: Colors.grey[900],
-      child: Center(
-        child: CircleAvatar(
-          radius: 40,
-          backgroundColor: Colors.grey[800],
-          child: const Icon(Icons.person, size: 40, color: Colors.white54),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoOverlay(String label) {
-    return Positioned(
-      bottom: 8,
-      left: 8,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
-        child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
-      ),
-    );
-  }
-
-  Widget _buildTopBar(AppLocalizations l) {
-    return Positioned(
-      top: MediaQuery.of(context).padding.top + 10,
-      left: 16,
-      right: 16,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 30),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          Expanded(
-            child: Text(
-              widget.roomName,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-              overflow: TextOverflow.ellipsis,
+          // 상단바
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 10, bottom: 10),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.black54, Colors.transparent],
+                ),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  Expanded(
+                    child: Text(
+                      widget.roomName,
+                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 48), // 대칭용
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: 48),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildBottomControls(AppLocalizations l) {
-    return Positioned(
-      bottom: MediaQuery.of(context).padding.bottom + 20,
-      left: 0,
-      right: 0,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _controlButton(
-            icon: _isMuted ? Icons.mic_off : Icons.mic,
-            color: _isMuted ? Colors.red : Colors.white24,
-            onPressed: _toggleMute,
-          ),
-          _controlButton(
-            icon: _isVideoEnabled ? Icons.videocam : Icons.videocam_off,
-            color: _isVideoEnabled ? Colors.white24 : Colors.red,
-            onPressed: () => _toggleVideo(),
-          ),
-          _controlButton(
-            icon: Icons.flip_camera_ios,
-            color: Colors.white24,
-            onPressed: _flipCamera,
-          ),
-          _controlButton(
-            icon: Icons.call_end,
-            color: Colors.red,
-            onPressed: () => Navigator.of(context).pop(),
+          // 하단 컨트롤 바 및 종료 버튼
+          Positioned(
+            bottom: 40,
+            left: 0,
+            right: 0,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // 마이크 토글
+                    _buildControlButton(
+                      onPressed: _toggleMute,
+                      icon: _isMuted ? Icons.mic_off : Icons.mic,
+                      color: _isMuted ? Colors.red : Colors.white24,
+                    ),
+                    // 종료 버튼 (빨간색)
+                    GestureDetector(
+                      onTap: _leaveChannel,
+                      child: Container(
+                        width: 70,
+                        height: 70,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
+                        ),
+                        child: const Icon(Icons.call_end, color: Colors.white, size: 36),
+                      ),
+                    ),
+                    // 카메라 토글
+                    _buildControlButton(
+                      onPressed: _toggleCamera,
+                      icon: _isCameraOff ? Icons.videocam_off : Icons.videocam,
+                      color: _isCameraOff ? Colors.red : Colors.white24,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                // 카메라 전환 버튼
+                _buildControlButton(
+                  onPressed: _switchCamera,
+                  icon: Icons.flip_camera_ios,
+                  color: Colors.white24,
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _controlButton({required IconData icon, required Color color, required VoidCallback onPressed}) {
-    return InkWell(
-      onTap: onPressed,
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-        child: Icon(icon, color: Colors.white, size: 28),
+  Widget _buildControlButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required Color color,
+  }) {
+    return CircleAvatar(
+      radius: 28,
+      backgroundColor: color,
+      child: IconButton(
+        icon: Icon(icon, color: Colors.white, size: 28),
+        onPressed: onPressed,
       ),
     );
   }

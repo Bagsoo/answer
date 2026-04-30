@@ -1,11 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:any_link_preview/any_link_preview.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:google_mlkit_language_id/google_mlkit_language_id.dart';
 import 'package:google_mlkit_translation/google_mlkit_translation.dart';
+import 'package:gal/gal.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:linkify/linkify.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
@@ -18,6 +23,7 @@ import '../../providers/user_provider.dart';
 import '../../screens/user_profile_detail_screen.dart';
 import 'location_message_bubble.dart';
 import 'settlement_bubble.dart';
+import 'dart:io';
 
 class MessageBubble extends StatefulWidget {
   final Map<String, dynamic> data;
@@ -1475,6 +1481,82 @@ class _MessageBubbleState extends State<MessageBubble>
   }
 }
 
+// ── 공통 미디어 저장 유틸리티 ──────────────────────────────────────────────
+Future<void> _saveMediaToGallery(BuildContext context, String url) async {
+  try {
+    // 권한 체크 (gal은 자체적으로 권한을 요청하지만 미리 체크)
+    final hasAccess = await Gal.hasAccess();
+    if (!hasAccess) {
+      final granted = await Gal.requestAccess();
+      if (!granted) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Storage permission denied')),
+          );
+        }
+        return;
+      }
+    }
+
+    // 로딩 표시
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Saving to gallery...'),
+            ],
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+
+    // 임시 파일로 다운로드
+    final tempDir = await getTemporaryDirectory();
+    final fileName = "answer_${DateTime.now().millisecondsSinceEpoch}";
+    final isVideo = url.contains('.mp4') || url.contains('video');
+    final extension = isVideo ? '.mp4' : '.jpg';
+    final filePath = "${tempDir.path}/$fileName$extension";
+
+    await Dio().download(url, filePath);
+
+    // Gal을 사용하여 갤러리에 저장
+    if (isVideo) {
+      await Gal.putVideo(filePath);
+    } else {
+      await Gal.putImage(filePath);
+    }
+
+    // 임시 파일 삭제
+    final file = File(filePath);
+    if (await file.exists()) {
+      await file.delete();
+    }
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Saved to gallery')),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+}
+
 // ── 이미지 풀스크린 뷰어 ──────────────────────────────────────────────────────
 class _ImageViewerScreen extends StatefulWidget {
   final List<String> urls;
@@ -1503,6 +1585,12 @@ class _ImageViewerScreenState extends State<_ImageViewerScreen> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         title: Text('${_current + 1} / ${widget.urls.length}'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.download_rounded),
+            onPressed: () => _saveMediaToGallery(context, widget.urls[_current]),
+          ),
+        ],
       ),
       body: PageView.builder(
         controller: PageController(initialPage: widget.initialIndex),
@@ -1562,6 +1650,12 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.download_rounded),
+            onPressed: () => _saveMediaToGallery(context, widget.videoUrl),
+          ),
+        ],
       ),
       body: Center(
         child: _initialized

@@ -2084,7 +2084,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  l.voiceCallOngoing,
+                                  callData['type'] == 'video'
+                                      ? l.videoCallOngoing
+                                      : l.voiceCallOngoing,
                                   style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     color: colorScheme.onPrimaryContainer,
