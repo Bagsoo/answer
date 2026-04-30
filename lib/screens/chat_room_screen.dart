@@ -23,6 +23,7 @@ import '../services/voice_call_service.dart';
 import '../utils/user_cache.dart';
 import '../utils/user_display.dart';
 import 'voice_room_screen.dart';
+import 'video_room_screen.dart';
 import 'chat_room_more/chat_room_participants_screen.dart';
 import 'chat_room_more/chat_room_invite_screen.dart';
 import 'chat_room_more/notices_screen.dart';
@@ -133,6 +134,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
     AppLocalizations l, {
     String? preferredCallId,
     bool startIfMissing = true,
+    String type = 'voice', // 'voice' or 'video'
   }) async {
     if (_voiceCallBusy) return;
     setState(() {
@@ -147,30 +149,31 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
     }
     try {
       var callId = preferredCallId;
+      String actualCallType = type;
+
       if (callId == null || callId.isEmpty) {
-        if (!startIfMissing) {
-          final activeCallId =
-              await voiceCallService.getActiveCallId(widget.roomId);
-          if (activeCallId == null || activeCallId.isEmpty) {
-            throw StateError(l.voiceCallNotFound);
-          }
-          callId = activeCallId;
-        } else {
+        final activeId = await voiceCallService.getActiveCallId(widget.roomId);
+        if (activeId != null && activeId.isNotEmpty) {
+          callId = activeId;
+          actualCallType = await voiceCallService.getActiveCallType(widget.roomId) ?? 'voice';
+        } else if (startIfMissing) {
           try {
-            callId = await voiceCallService.startVoiceCall(widget.roomId);
+            callId = await voiceCallService.startVoiceCall(widget.roomId, type: type);
+            actualCallType = type;
           } on FirebaseFunctionsException catch (error) {
             if (error.code == 'already-exists') {
-              final activeCallId =
-                  await voiceCallService.getActiveCallId(widget.roomId);
-              if (activeCallId == null || activeCallId.isEmpty) {
-                throw StateError(l.voiceCallNotFound);
-              }
-              callId = activeCallId;
+              callId = await voiceCallService.getActiveCallId(widget.roomId);
+              actualCallType = await voiceCallService.getActiveCallType(widget.roomId) ?? 'voice';
             } else {
               rethrow;
             }
           }
+        } else {
+          throw StateError(l.voiceCallNotFound);
         }
+      } else {
+        // preferredCallId가 있을 경우 실제 타입을 다시 확인
+        actualCallType = await voiceCallService.getActiveCallType(widget.roomId) ?? type;
       }
 
       if (callId == null || callId.isEmpty) {
@@ -181,28 +184,45 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
         roomId: widget.roomId,
         callId: callId,
         device: _deviceType,
+        isVideoEnabled: actualCallType == 'video',
       );
 
       if (!mounted) return;
 
       final appBarTitle = _getAppBarTitle(l);
 
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => VoiceRoomScreen(
-            roomId: widget.roomId,
-            roomName: appBarTitle,
-            callId: callId!,
-            token: joinResult.token,
-            appId: joinResult.appId,
-            channelName: joinResult.channelName,
-            agoraUid: joinResult.uid,
+      if (actualCallType == 'video') {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => VideoRoomScreen(
+              roomId: widget.roomId,
+              roomName: appBarTitle,
+              callId: callId!,
+              token: joinResult.token,
+              appId: joinResult.appId,
+              channelName: joinResult.channelName,
+              agoraUid: joinResult.uid,
+            ),
           ),
-        ),
-      );
+        );
+      } else {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => VoiceRoomScreen(
+              roomId: widget.roomId,
+              roomName: appBarTitle,
+              callId: callId!,
+              token: joinResult.token,
+              appId: joinResult.appId,
+              channelName: joinResult.channelName,
+              agoraUid: joinResult.uid,
+            ),
+          ),
+        );
+      }
     } on FirebaseFunctionsException catch (error) {
       if (!mounted) return;
-      final message = error.message ?? l.voiceCallStartFailed;
+      final message = error.message ?? (type == 'video' ? l.videoCallStartFailed : l.voiceCallStartFailed);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
@@ -2825,7 +2845,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
         icon: Icons.videocam,
         label: l.attachVideoCall,
         color: Colors.purple,
-        onTap: () {},
+        onTap: () => _joinVoiceCall(l, type: 'video'),
       ),
       AttachItem(
         icon: Icons.auto_awesome_outlined,

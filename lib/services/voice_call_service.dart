@@ -160,10 +160,16 @@ class VoiceCallService {
     return roomDoc.data()?['active_call_id'] as String?;
   }
 
-  Future<String> startVoiceCall(String roomId) async {
+  Future<String?> getActiveCallType(String roomId) async {
+    final roomDoc = await _db.collection('chat_rooms').doc(roomId).get();
+    return roomDoc.data()?['active_call_type'] as String?;
+  }
+
+  Future<String> startVoiceCall(String roomId, {String type = 'voice'}) async {
     final callable = _functions.httpsCallable('startVoiceCall');
     final result = await callable.call(<String, dynamic>{
       'roomId': roomId,
+      'type': type,
     });
     return (result.data as Map)['callId'] as String;
   }
@@ -172,12 +178,14 @@ class VoiceCallService {
     required String roomId,
     required String callId,
     required String device,
+    bool isVideoEnabled = false,
   }) async {
     final callable = _functions.httpsCallable('joinVoiceCall');
     final result = await callable.call(<String, dynamic>{
       'roomId': roomId,
       'callId': callId,
       'device': device,
+      'isVideoEnabled': isVideoEnabled,
     });
     final data = Map<String, dynamic>.from(result.data as Map);
     return VoiceCallJoinResult(
