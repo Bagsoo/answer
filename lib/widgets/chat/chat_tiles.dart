@@ -25,44 +25,6 @@ String _localizedLastMessage(BuildContext context, String lastMessage) {
   }
 }
 
-Widget _voiceLiveBadge(BuildContext context, {bool compact = false}) {
-  final cs = Theme.of(context).colorScheme;
-  final label = AppLocalizations.of(context).voiceCallOngoing;
-  return Container(
-    padding: EdgeInsets.symmetric(
-      horizontal: compact ? 6 : 8,
-      vertical: compact ? 3 : 4,
-    ),
-    decoration: BoxDecoration(
-      color: cs.errorContainer,
-      borderRadius: BorderRadius.circular(999),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 7,
-          height: 7,
-          decoration: BoxDecoration(
-            color: cs.error,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 5),
-        Text(
-          compact ? 'LIVE' : label,
-          style: TextStyle(
-            color: cs.onErrorContainer,
-            fontSize: compact ? 10 : 11,
-            fontWeight: FontWeight.w700,
-            height: 1,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 class ParticipantCountBadge extends StatelessWidget {
   final int count;
   final ColorScheme colorScheme;
@@ -168,8 +130,11 @@ class _DmTileState extends State<DmTile> {
       widget.room['last_message'] as String? ?? '',
     );
     final unreadCnt = widget.room['unread_cnt'] as int? ?? 0;
-    final hasActiveCall =
-        (widget.room['active_call_id'] as String? ?? '').isNotEmpty;
+    
+    // 통화 관련 정보
+    final hasActiveCall = (widget.room['active_call_id'] as String? ?? '').isNotEmpty;
+    final activeCallType = widget.room['active_call_type'] as String? ?? 'voice';
+    
     final hasPhoto = _otherPhoto.isNotEmpty && !_otherDeleted;
     final displayName = _otherDeleted
         ? l.deletedUser
@@ -214,7 +179,9 @@ class _DmTileState extends State<DmTile> {
         ],
       ),
       subtitle: Text(
-        hasActiveCall ? l.voiceCallOngoing : lastMessage,
+        hasActiveCall 
+            ? (activeCallType == 'video' ? l.videoCallOngoing : l.voiceCallOngoing)
+            : lastMessage,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
@@ -228,8 +195,6 @@ class _DmTileState extends State<DmTile> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (hasActiveCall) _voiceLiveBadge(context, compact: true),
-          if (hasActiveCall && unreadCnt > 0) const SizedBox(height: 6),
           if (unreadCnt > 0)
             CircleAvatar(
               radius: 12,
@@ -379,6 +344,7 @@ class ChatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final roomId = room['id'] as String;
     final name = room['name'] as String? ?? roomId;
     final lastMessage = _localizedLastMessage(
@@ -386,7 +352,11 @@ class ChatTile extends StatelessWidget {
       room['last_message'] as String? ?? '',
     );
     final unreadCnt = room['unread_cnt'] as int? ?? 0;
+    
+    // 통화 관련 정보
     final hasActiveCall = (room['active_call_id'] as String? ?? '').isNotEmpty;
+    final activeCallType = room['active_call_type'] as String? ?? 'voice';
+
     final type = room['type'] as String? ?? 'direct';
     final memberIds = List<String>.from(room['member_ids'] as List? ?? []);
     final groupProfileImage = room['group_profile_image'] as String? ?? '';
@@ -451,7 +421,9 @@ class ChatTile extends StatelessWidget {
         ],
       ),
       subtitle: Text(
-        hasActiveCall ? AppLocalizations.of(context).voiceCallOngoing : lastMessage,
+        hasActiveCall 
+            ? (activeCallType == 'video' ? l.videoCallOngoing : l.voiceCallOngoing)
+            : lastMessage,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
@@ -465,8 +437,6 @@ class ChatTile extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (hasActiveCall) _voiceLiveBadge(context, compact: true),
-          if (hasActiveCall && unreadCnt > 0) const SizedBox(height: 6),
           if (unreadCnt > 0)
             CircleAvatar(
               radius: 12,
