@@ -71,30 +71,34 @@ class NotificationService {
       return;
     }
 
-    final settings2 = await _fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-    debugPrint('FCM permission: ${settings2.authorizationStatus}');
+    try {
+      final settings2 = await _fcm.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      debugPrint('FCM permission: ${settings2.authorizationStatus}');
 
-    await _fcm.setForegroundNotificationPresentationOptions(
-      alert: false,
-      badge: true,
-      sound: false,
-    );
+      await _fcm.setForegroundNotificationPresentationOptions(
+        alert: false,
+        badge: true,
+        sound: false,
+      );
 
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-    FirebaseMessaging.onMessage.listen(_onForegroundMessage);
-    FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpenedApp);
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      FirebaseMessaging.onMessage.listen(_onForegroundMessage);
+      FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpenedApp);
 
-    final initialMessage = await _fcm.getInitialMessage();
-    if (initialMessage != null) {
-      _handleNavigationFromData(initialMessage.data);
+      final initialMessage = await _fcm.getInitialMessage();
+      if (initialMessage != null) {
+        _handleNavigationFromData(initialMessage.data);
+      }
+
+      await _saveFcmToken();
+      _fcm.onTokenRefresh.listen((token) => _saveToken(token));
+    } catch (e) {
+      debugPrint('NotificationService: FCM init failed: $e');
     }
-
-    await _saveFcmToken();
-    _fcm.onTokenRefresh.listen((token) => _saveToken(token));
   }
 
   // ── FCM 토큰 저장 ───────────────────────────────────────────────────────────
@@ -104,8 +108,13 @@ class NotificationService {
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    final token = await _fcm.getToken();
-    if (token != null) await _saveToken(token);
+    
+    try {
+      final token = await _fcm.getToken();
+      if (token != null) await _saveToken(token);
+    } catch (e) {
+      debugPrint('NotificationService: Failed to get FCM token: $e');
+    }
   }
 
   Future<void> _saveToken(String token) async {
@@ -138,16 +147,21 @@ class NotificationService {
   Future<void> deleteFcmToken() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    final token = await _fcm.getToken();
-    if (token == null) return;
-    // Firestore 문서 삭제 → onUserTokenChangedV2가 active_fcm_tokens에서도 제거
-    await _db
-        .collection('users')
-        .doc(uid)
-        .collection('fcm_tokens')
-        .doc(token.substring(0, 20))
-        .delete();
-    await _fcm.deleteToken();
+    
+    try {
+      final token = await _fcm.getToken();
+      if (token == null) return;
+      // Firestore 문서 삭제 → onUserTokenChangedV2가 active_fcm_tokens에서도 제거
+      await _db
+          .collection('users')
+          .doc(uid)
+          .collection('fcm_tokens')
+          .doc(token.substring(0, 20))
+          .delete();
+      await _fcm.deleteToken();
+    } catch (e) {
+      debugPrint('NotificationService: Failed to delete FCM token: $e');
+    }
   }
 
   // ── 포그라운드 FCM 수신 → 로컬 알림으로 표시 ──────────────────────────────
