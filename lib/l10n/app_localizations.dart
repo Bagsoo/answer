@@ -75,6 +75,8 @@ class AppLocalizations {
   String get deleteFailed => _s.deleteFailed;
   String get cancel => _s.cancel;
   String get confirm => _s.confirm;
+  String get notification => _s.notification;
+  String get aiMinutesUnderPreparation => _s.aiMinutesUnderPreparation;
   String get delete => _s.delete;
   String get save => _s.save;
   String get close => _s.close;
@@ -855,6 +857,8 @@ abstract class _AppStrings {
   String get deleteFailed;
   String get cancel;
   String get confirm;
+  String get notification;
+  String get aiMinutesUnderPreparation;
   String get delete;
   String get save;
   String get close;
@@ -1641,6 +1645,8 @@ class _EnStrings extends _AppStrings {
   @override String get deleteFailed => 'Failed to delete the group.';
   @override String get cancel => 'Cancel';
   @override String get confirm => 'Confirm';
+  @override String get notification => 'Notification';
+  @override String get aiMinutesUnderPreparation => 'AI minutes are currently being prepared.';
   @override String get delete => 'Delete';
   @override String get save => 'Save';
   @override String get close => 'Close';
@@ -2404,6 +2410,8 @@ class _KoStrings extends _AppStrings {
   @override String get deleteFailed => '그룹 삭제에 실패했습니다.';
   @override String get cancel => '취소';
   @override String get confirm => '확인';
+  @override String get notification => '알림';
+  @override String get aiMinutesUnderPreparation => 'AI 회의록은 현재 준비 중입니다.';
   @override String get delete => '삭제';
   @override String get save => '저장';
   @override String get close => '닫기';
@@ -3168,6 +3176,8 @@ class _JaStrings extends _AppStrings {
   @override String get deleteFailed => 'グループの削除に失敗しました。';
   @override String get cancel => 'キャンセル';
   @override String get confirm => '確認';
+  @override String get notification => 'お知らせ';
+  @override String get aiMinutesUnderPreparation => 'AI議事録は現在準備中です。';
   @override String get delete => '削除';
   @override String get save => '保存';
   @override String get close => '閉じる';

@@ -2853,7 +2853,21 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
         icon: Icons.auto_awesome_outlined,
         label: l.attachAiMinutes,
         color: Colors.teal,
-        onTap: () {},
+        onTap: () {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text(l.notification),
+              content: Text(l.aiMinutesUnderPreparation),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(l.confirm),
+                ),
+              ],
+            ),
+          );
+        },
       ),
       AttachItem(
         icon: Icons.share_location_outlined,
