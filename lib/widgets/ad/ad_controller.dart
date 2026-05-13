@@ -5,18 +5,25 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 enum AdState { loading, loaded, failed }
 
 class AdController extends ChangeNotifier {
-  static const _adUnitAndroid = 'ca-app-pub-3940256099942544/2247696110'; // 테스트
-  static const _adUnitIos     = 'ca-app-pub-3940256099942544/3986624511'; // 테스트
-  static const _kTimeout      = Duration(seconds: 3);
+  static const _testAdUnitAndroid = 'ca-app-pub-3940256099942544/2247696110'; // 테스트
+  static const _testAdUnitIos     = 'ca-app-pub-3940256099942544/3986624511'; // 테스트
+  static const _prodAdUnit        = 'ca-app-pub-3027819032479365/6866554616'; // 실제
+  static const _kTimeout          = Duration(seconds: 3);
 
   AdState _state = AdState.loading;
   NativeAd? nativeAd;
 
   AdState get state => _state;
 
-  String get _adUnitId => defaultTargetPlatform == TargetPlatform.iOS 
-      ? _adUnitIos
-      : _adUnitAndroid;
+  String get _adUnitId {
+    if (kReleaseMode) {
+      return _prodAdUnit;
+    } else {
+      return defaultTargetPlatform == TargetPlatform.iOS 
+          ? _testAdUnitIos
+          : _testAdUnitAndroid;
+    }
+  }
 
   Future<void> load({
     NativeTemplateStyle? templateStyle,

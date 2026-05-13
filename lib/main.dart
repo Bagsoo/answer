@@ -65,7 +65,7 @@ void main() async {
     if (isMobile) {
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       NotificationService().init();
-      await initializeAds();
+      Future.delayed(Duration(seconds: 2), () async => await initializeAds());
     }
   }
   
