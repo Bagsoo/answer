@@ -15,14 +15,13 @@ Future<void> initializeAds() async {
 
   final params = ConsentRequestParameters(
     consentDebugSettings: debugSettings,
-  );
-  await ConsentInformation.instance.reset();
+  );  
 
   ConsentInformation.instance.requestConsentInfoUpdate(
     params,
     () async {
       await Future.delayed(const Duration(milliseconds: 1000));
-      
+
       ConsentForm.loadAndShowConsentFormIfRequired(
         (FormError? formError) async {
           if (formError != null) {
