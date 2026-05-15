@@ -58,6 +58,17 @@ service cloud.firestore {
         )
       );
 
+      match /messages/{messageId} {
+        allow read: if isAdmin() || (isLoggedIn() && request.auth.uid in get(/databases/$(database)/documents/chat_rooms/$(roomId)).data.member_ids);
+        allow create: if isAdmin() || (isLoggedIn() && request.auth.uid in getAfter(/databases/$(database)/documents/chat_rooms/$(roomId)).data.member_ids);
+        allow update: if isAdmin() || (isLoggedIn() && request.auth.uid == resource.data.sender_id);
+      }
+
+      match /room_members/{memberId} {
+        allow read: if isAdmin() || (isLoggedIn() && (request.auth.uid == memberId || request.auth.uid in get(/databases/$(database)/documents/chat_rooms/$(roomId)).data.member_ids));
+        allow write: if isAdmin() || (isLoggedIn() && (request.auth.uid == memberId || request.auth.uid in getAfter(/databases/$(database)/documents/chat_rooms/$(roomId)).data.member_ids));
+      }
+
       match /calls/{callId} {
         allow read: if isAdmin() || (isLoggedIn() && request.auth.uid in get(/databases/$(database)/documents/chat_rooms/$(roomId)).data.member_ids);
         allow write: if false;
@@ -80,8 +91,8 @@ service cloud.firestore {
       match /{allSubcollections=**} {
         allow read: if isAdmin() || (isLoggedIn() && request.auth.uid in get(/databases/$(database)/documents/chat_rooms/$(roomId)).data.member_ids);
         allow write: if isAdmin() || (isLoggedIn() && (
-          request.auth.uid in get(/databases/$(database)/documents/chat_rooms/$(roomId)).data.member_ids ||
-          (get(/databases/$(database)/documents/chat_rooms/$(roomId)).data.ref_group_id != null && hasPermission(get(/databases/$(database)/documents/chat_rooms/$(roomId)).data.ref_group_id, 'can_manage_permissions'))
+          request.auth.uid in getAfter(/databases/$(database)/documents/chat_rooms/$(roomId)).data.member_ids ||
+          (getAfter(/databases/$(database)/documents/chat_rooms/$(roomId)).data.ref_group_id != null && hasPermission(getAfter(/databases/$(database)/documents/chat_rooms/$(roomId)).data.ref_group_id, 'can_manage_permissions'))
         ));
       }
     }

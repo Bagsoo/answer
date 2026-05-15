@@ -415,9 +415,15 @@ class ChatProvider extends ChangeNotifier {
 
       final roomDoc = results[0] as DocumentSnapshot<Map<String, dynamic>>;
       final memberDoc = results[1] as DocumentSnapshot<Map<String, dynamic>>;
-      final roomType = roomDoc.data()?['type'] as String?;
+      
+      if (!roomDoc.exists) {
+        debugPrint('ChatProvider: Room document does not exist for $roomId');
+      }
+
+      final roomData = roomDoc.data();
+      final roomType = roomData?['type'] as String?;
       final memberIds = List<String>.from(
-        roomDoc.data()?['member_ids'] as List? ?? [],
+        roomData?['member_ids'] as List? ?? [],
       );
 
       String otherUserUid = '';
@@ -435,18 +441,24 @@ class ChatProvider extends ChangeNotifier {
           otherUserName = profile['name'] as String? ?? '';
           otherUserPhoto = profile['photo'] as String? ?? '';
           otherUserDeleted = profile['is_deleted'] == true;
+          
+          if (otherUserName.isEmpty) {
+            debugPrint('ChatProvider: Other user name is empty for UID: $otherUserUid');
+          }
+        } else {
+          debugPrint('ChatProvider: DM room without other user UID. members: $memberIds');
         }
       }
 
       final meta = RoomMeta(
         roomId: roomId,
-        refGroupId: roomDoc.data()?['ref_group_id'] as String?,
+        refGroupId: roomData?['ref_group_id'] as String?,
         roomType: roomType,
         myRole: memberDoc.data()?['role'] as String? ?? 'member',
-        roomName: roomDoc.data()?['name'] as String? ?? '',
-        groupName: roomDoc.data()?['group_name'] as String? ?? '',
+        roomName: roomData?['name'] as String? ?? '',
+        groupName: roomData?['group_name'] as String? ?? '',
         pinnedMessage:
-            roomDoc.data()?['pinned_message'] as Map<String, dynamic>?,
+            roomData?['pinned_message'] as Map<String, dynamic>?,
         otherUserUid: otherUserUid,
         otherUserName: otherUserName,
         otherUserPhoto: otherUserPhoto,
@@ -457,7 +469,7 @@ class ChatProvider extends ChangeNotifier {
       notifyListeners();
       return meta;
     } catch (e) {
-      debugPrint('ChatProvider._fetchAndCacheMeta error: $e');
+      debugPrint('ChatProvider._fetchAndCacheMeta error (Room: $roomId): $e');
       return _metaCache.get(roomId) ?? RoomMeta(roomId: roomId);
     } finally {
       _loadingMeta.remove(roomId);

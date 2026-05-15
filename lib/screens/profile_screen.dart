@@ -8,6 +8,7 @@ import '../../screens/group_tabs/group_type_category_data.dart';
 import '../../widgets/common/location_picker_sheet.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/env_config.dart';
+import 'account_link_management_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -309,11 +310,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // ── 전화번호 (읽기 전용) ──────────────────────────────────
             TextField(
               readOnly: true,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const AccountLinkManagementScreen(),
+                  ),
+                );
+              },
               controller:
                   TextEditingController(text: userProvider.phoneNumber),
               decoration: InputDecoration(
                 labelText: l.phoneNumber,
                 prefixIcon: const Icon(Icons.phone_outlined),
+                suffixIcon: const Icon(Icons.chevron_right),
                 filled: true,
                 fillColor:
                     cs.surfaceContainerHighest.withOpacity(0.5),

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:linkify/linkify.dart';
 import 'chat_asset_service.dart';
 
@@ -380,16 +381,23 @@ class ChatService {
 
   // ── 공통: unread_counts 증가 맵 생성 ──────────────────────────────────────
   Future<Map<String, dynamic>> _buildUnreadUpdate(String roomId) async {
-    final roomDoc = await _db.collection('chat_rooms').doc(roomId).get();
-    final memberIds =
-        List<String>.from(roomDoc.data()?['member_ids'] ?? []);
+    try {
+      final roomDoc = await _db.collection('chat_rooms').doc(roomId).get();
+      final data = roomDoc.data();
+      if (data == null) return <String, dynamic>{};
 
-    final unreadUpdate = <String, dynamic>{};
-    for (final uid in memberIds) {
-      if (uid == currentUserId) continue;
-      unreadUpdate['unread_counts.$uid'] = FieldValue.increment(1);
+      final memberIds = List<String>.from(data['member_ids'] as List? ?? []);
+
+      final unreadUpdate = <String, dynamic>{};
+      for (final uid in memberIds) {
+        if (uid == currentUserId) continue;
+        unreadUpdate['unread_counts.$uid'] = FieldValue.increment(1);
+      }
+      return unreadUpdate;
+    } catch (e) {
+      debugPrint('Error building unread update: $e');
+      return <String, dynamic>{};
     }
-    return unreadUpdate;
   }
 
   // ── 텍스트 메시지 전송 ─────────────────────────────────────────────────────

@@ -243,13 +243,34 @@ class AuthService extends ChangeNotifier {
     final u = user ?? currentUser;
     if (u == null) return;
     final ids = _providerIds(u);
-    await _db.collection('users').doc(u.uid).set({
+    
+    final updates = <String, dynamic>{
       'linked_google': ids.contains(_providerGoogle),
       'linked_apple': ids.contains(_providerApple),
       'linked_phone': ids.contains(_providerPhone),
-      'last_sign_in_provider': lastSignInProvider,
       'updated_at': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    };
+
+    if (lastSignInProvider != null) {
+      updates['last_sign_in_provider'] = lastSignInProvider;
+      updates['preferred_login_provider'] = lastSignInProvider;
+    }
+
+    for (final profile in u.providerData) {
+      if (profile.providerId == _providerGoogle) {
+        if (profile.email != null) {
+          updates['google_email'] = profile.email;
+          updates['email'] = profile.email;
+        }
+      } else if (profile.providerId == _providerApple) {
+        if (profile.email != null) {
+          updates['apple_email'] = profile.email;
+          updates['email'] = profile.email;
+        }
+      }
+    }
+
+    await _db.collection('users').doc(u.uid).set(updates, SetOptions(merge: true));
   }
 
   Set<String> _providerIds(User user) => user.providerData.map((p) => p.providerId).toSet();

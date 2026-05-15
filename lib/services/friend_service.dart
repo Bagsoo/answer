@@ -157,12 +157,31 @@ class FriendService {
           data['uid'] = doc.id;
           return data;
         }).toList();
-        if (deferPrefs) {
-          Future.microtask(() => _saveFriendCount(list.length));
-        } else {
-          _saveFriendCount(list.length);
+        
+        final uids = list
+            .map((friend) => friend['uid'] as String? ?? '')
+            .where((uid) => uid.isNotEmpty)
+            .toSet();
+        if (uids.isNotEmpty) {
+          UserCache.prefetch(uids); // 백그라운드 prefetch
         }
-        return list;
+
+        final visible = list.where((friend) {
+          final uid = friend['uid'] as String? ?? '';
+          final cached = uid.isEmpty ? null : UserCache.getCached(uid);
+          if (cached != null) {
+            friend['display_name'] = cached['name'] ?? friend['display_name'];
+            friend['profile_image'] = cached['photo'] ?? friend['profile_image'];
+          }
+          return cached?['is_deleted'] != true;
+        }).toList();
+
+        if (deferPrefs) {
+          Future.microtask(() => _saveFriendCount(visible.length));
+        } else {
+          _saveFriendCount(visible.length);
+        }
+        return visible;
       });
     }
 
@@ -184,6 +203,10 @@ class FriendService {
       final visible = list.where((friend) {
         final uid = friend['uid'] as String? ?? '';
         final cached = uid.isEmpty ? null : UserCache.getCached(uid);
+        if (cached != null) {
+          friend['display_name'] = cached['name'] ?? friend['display_name'];
+          friend['profile_image'] = cached['photo'] ?? friend['profile_image'];
+        }
         return cached?['is_deleted'] != true;
       }).toList();
 

@@ -668,6 +668,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
   void _sendMessage() async {
     final text = _msgController.text.trim();
     if (text.isEmpty) return;
+
+    final originalText = _msgController.text;
     _msgController.clear();
     _clearMessageDraft();
     final replyId = _replyToId;
@@ -678,22 +680,35 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
         _replyToData = null;
       });
 
-    final userProvider = context.read<UserProvider>();
-    final chatService = context.read<ChatService>();
-    await chatService.sendMessage(
-      widget.roomId,
-      text,
-      senderName: _myName,
-      senderPhotoUrl: userProvider.photoUrl,
-      replyToId: replyId,
-      replyToText: replyData != null
-          ? (replyData['text'] as String? ?? '').length > 80
+    try {
+      final userProvider = context.read<UserProvider>();
+      final chatService = context.read<ChatService>();
+      await chatService.sendMessage(
+        widget.roomId,
+        text,
+        senderName: _myName,
+        senderPhotoUrl: userProvider.photoUrl,
+        replyToId: replyId,
+        replyToText: replyData != null
+            ? (replyData['text'] as String? ?? '').length > 80
                 ? '${(replyData['text'] as String).substring(0, 80)}…'
                 : replyData['text'] as String? ?? ''
-          : null,
-      replyToSender: replyData?['sender_name'] as String?,
-    );
-    chatService.updateLastReadTime(widget.roomId);
+            : null,
+        replyToSender: replyData?['sender_name'] as String?,
+      );
+      chatService.updateLastReadTime(widget.roomId);
+    } catch (e) {
+      debugPrint('SendMessage Error: $e');
+      if (mounted) {
+        _msgController.text = originalText;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('전송 실패: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _sendImages() async {

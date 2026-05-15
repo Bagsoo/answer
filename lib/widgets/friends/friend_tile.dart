@@ -14,10 +14,7 @@ ImageProvider? _friendAvatarImageProvider(String photoUrl) {
   if (useDiskCache) {
     return CachedNetworkImageProvider(photoUrl);
   }
-  // Windows: 네트워크 아바타 디코드를 건너뛰고 이니셜만 사용
-  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
-    return null;
-  }
+  // 모바일 이외의 플랫폼(Windows, Web 등)은 NetworkImage를 사용
   return ResizeImage(
     NetworkImage(photoUrl),
     width: 128,

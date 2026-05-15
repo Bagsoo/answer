@@ -413,6 +413,7 @@ class AppLocalizations {
   String get locationPermissionRequired => _s.locationPermissionRequired;
   String get locationPermissionOpenSettings => _s.locationPermissionOpenSettings;
   String get locationFetchFailed => _s.locationFetchFailed;
+  String get locationSearchFailed => _s.locationSearchFailed;
   String get loadingAddress => _s.loadingAddress;
 
   // ── 플랜: Free ──────────────────────────────────────────────────────────────
@@ -1195,6 +1196,7 @@ abstract class _AppStrings {
   String get locationPermissionRequired;
   String get locationPermissionOpenSettings;
   String get locationFetchFailed;
+  String get locationSearchFailed;
   String get loadingAddress;
 
   // Free
@@ -1979,6 +1981,7 @@ class _EnStrings extends _AppStrings {
   @override String get locationPermissionRequired => 'Location permission is required.';
   @override String get locationPermissionOpenSettings => 'Please allow location permission in Settings.';
   @override String get locationFetchFailed => 'Could not get your location.';
+  @override String get locationSearchFailed => 'An error occurred during the search. Please check your network connection.';
   @override String get loadingAddress => 'Loading address...';
 
   // Free
@@ -2746,6 +2749,7 @@ class _KoStrings extends _AppStrings {
   @override String get locationPermissionRequired => '위치 권한이 필요해요.';
   @override String get locationPermissionOpenSettings => '설정에서 위치 권한을 허용해주세요.';
   @override String get locationFetchFailed => '위치를 가져오지 못했어요.';
+  @override String get locationSearchFailed => '검색 중 오류가 발생했습니다. 네트워크 연결을 확인해주세요.';
   @override String get loadingAddress => '주소 불러오는 중...';
 
   // Free
@@ -3511,6 +3515,7 @@ class _JaStrings extends _AppStrings {
   @override String get locationPermissionRequired => '位置情報の権限が必要です。';
   @override String get locationPermissionOpenSettings => '設定で位置情報の権限を許可してください。';
   @override String get locationFetchFailed => '位置情報を取得できませんでした。';
+  @override String get locationSearchFailed => '検索中にエラーが発生しました。ネットワーク接続を確認してください。';
   @override String get loadingAddress => '住所を読み込み中...';
 
   // Free

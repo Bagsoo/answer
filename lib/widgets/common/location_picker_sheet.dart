@@ -89,7 +89,10 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       setState(() => _predictions = []);
       return;
     }
-    setState(() => _searching = true);
+    setState(() {
+      _searching = true;
+      _errorMsg = null;
+    });
 
     try {
       final uri = Uri.https(
@@ -106,6 +109,18 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       if (!mounted) return;
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
+      
+      if (data['status'] != 'OK' && data['status'] != 'ZERO_RESULTS') {
+        debugPrint('Google Places API Error: ${data['status']} - ${data['error_message']}');
+        if (mounted) {
+          setState(() {
+            _searching = false;
+            _errorMsg = 'API Error: ${data['status']}';
+          });
+        }
+        return;
+      }
+
       final predictions = (data['predictions'] as List? ?? [])
           .map((p) => _PlacePrediction(
                 placeId: p['place_id'] as String,
@@ -123,7 +138,12 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
         _searching = false;
       });
     } catch (e) {
-      if (mounted) setState(() => _searching = false);
+      if (mounted) {
+        setState(() {
+          _searching = false;
+          _errorMsg = AppLocalizations.of(context).locationSearchFailed;
+        });
+      }
     }
   }
 

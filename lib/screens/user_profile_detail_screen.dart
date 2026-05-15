@@ -30,7 +30,9 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
   bool _isBlocked = false;
   bool _isDeleted = false;
   bool _loading = true;
+  bool _dmLoading = false;
   String _phoneNumber = '';
+  String? _currentPhotoUrl;
 
   String get _myUid => FirebaseAuth.instance.currentUser?.uid ?? '';
   bool get _isMe => widget.uid == _myUid;
@@ -38,6 +40,7 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _currentPhotoUrl = widget.photoUrl;
     _loadStatus();
   }
 
@@ -62,6 +65,12 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
         _phoneNumber = _isDeleted
             ? ''
             : userDoc.data()?['phone_number'] as String? ?? '';
+        
+        final latestPhoto = userDoc.data()?['photo'] as String?;
+        if (latestPhoto != null && latestPhoto.isNotEmpty) {
+          _currentPhotoUrl = latestPhoto;
+        }
+        
         _loading = false;
       });
     }
@@ -75,16 +84,28 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
 
   // ── DM 보내기 ─────────────────────────────────────────────────────────────
   Future<void> _openDm() async {
-    if (_isDeleted) return;
-    final friendService = context.read<FriendService>();
-    final myName = context.read<UserProvider>().name;
-    final roomId = await friendService.getOrCreateDmRoom(
-      widget.uid, widget.displayName, myName: myName,
-    );
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(MaterialPageRoute(
-      builder: (_) => ChatRoomScreen(roomId: roomId),
-    ));
+    if (_isDeleted || _dmLoading) return;
+    setState(() => _dmLoading = true);
+    try {
+      final friendService = context.read<FriendService>();
+      final myName = context.read<UserProvider>().name;
+      final roomId = await friendService.getOrCreateDmRoom(
+        widget.uid,
+        widget.displayName,
+        myName: myName,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => ChatRoomScreen(roomId: roomId)),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _dmLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('DM방을 열 수 없습니다: $e')),
+        );
+      }
+    }
   }
 
   // ── 친구 추가 ─────────────────────────────────────────────────────────────
@@ -256,7 +277,7 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
       ColorScheme colorScheme, AppLocalizations l, String initial) {
     final displayName = _isDeleted ? l.deletedUser : widget.displayName;
     final hasPhoto =
-        !_isDeleted && widget.photoUrl != null && widget.photoUrl!.isNotEmpty;
+        !_isDeleted && _currentPhotoUrl != null && _currentPhotoUrl!.isNotEmpty;
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -268,7 +289,7 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
             backgroundColor: _isBlocked
                 ? colorScheme.errorContainer
                 : colorScheme.primaryContainer,
-            backgroundImage: hasPhoto ? NetworkImage(widget.photoUrl!) : null,
+            backgroundImage: hasPhoto ? NetworkImage(_currentPhotoUrl!) : null,
             child: !hasPhoto ? 
             Text(
               initial,
@@ -346,6 +367,7 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
               icon: Icons.chat_bubble_outline,
               label: l.sendDm,
               color: colorScheme.primary,
+              isLoading: _dmLoading,
               onTap: _openDm,
             ),
             const Divider(indent: 16, endIndent: 16, height: 1),
@@ -398,20 +420,28 @@ class _ActionButton extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
+  final bool isLoading;
 
   const _ActionButton({
     required this.icon,
     required this.label,
     required this.color,
     required this.onTap,
+    this.isLoading = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(icon, color: color),
+      leading: isLoading
+          ? SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2, color: color),
+            )
+          : Icon(icon, color: color),
       title: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w500)),
-      onTap: onTap,
+      onTap: isLoading ? null : onTap,
     );
   }
 }
