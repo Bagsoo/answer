@@ -56,6 +56,7 @@ class _GroupListScreenState extends State<GroupListScreen>
   List<Map<String, dynamic>> _recommendedGroups = [];
   bool _recommendLoading = false;
   bool _recommendLoaded = false;
+  String? _recommendErrorMsg;
 
   String get _currentUserId => context.read<UserProvider>().uid;
   String get _tabKey => LocalPreferencesService.groupListTabKey(_currentUserId);
@@ -139,6 +140,7 @@ class _GroupListScreenState extends State<GroupListScreen>
     setState(() {
       _recommendLoading = true;
       _recommendLoaded = true;
+      _recommendErrorMsg = null;
     });
     try {
       final results = await context
@@ -151,7 +153,13 @@ class _GroupListScreenState extends State<GroupListScreen>
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _recommendLoading = false);
+      debugPrint('Failed to load recommendations: $e');
+      if (mounted) {
+        setState(() {
+          _recommendLoading = false;
+          _recommendErrorMsg = 'Failed to load recommendations: $e';
+        });
+      }
     }
   }
 
@@ -396,17 +404,21 @@ class _GroupListScreenState extends State<GroupListScreen>
             Padding(
               padding: const EdgeInsets.only(top: 60),
               child: Center(
-                child: Column(
-                  children: [
-                    Icon(Icons.recommend_outlined,
-                        size: 64, color: cs.onSurface.withOpacity(0.2)),
-                    const SizedBox(height: 16),
-                    Text(l.noRecommendations,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.recommend_outlined,
+                          size: 48, color: cs.onSurface.withOpacity(0.3)),
+                      const SizedBox(height: 16),
+                      Text(
+                        _recommendErrorMsg ?? l.noRecommendations,
                         style: TextStyle(
-                            color: cs.onSurface.withOpacity(0.4))),
-                  ],
+                            color: _recommendErrorMsg != null ? cs.error : cs.onSurface.withOpacity(0.5)),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             )
           else
             ...interleaveAds(recommendWidgets, keyPrefix: 'recommend_ad'),
