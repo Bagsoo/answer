@@ -17,6 +17,7 @@ import 'services/block_service.dart';
 import 'services/memo_service.dart';
 import 'services/poll_service.dart';
 import 'services/report_service.dart';
+import 'services/recommendation_service.dart';
 import 'services/incoming_share_service.dart';
 import 'services/user_notification_service.dart';
 import 'services/analytics_service.dart';
@@ -90,6 +91,7 @@ void main() async {
         Provider<NotificationService>(create: (_) => NotificationService()),
         Provider<PollService>(create: (_) => PollService()),
         Provider<ReportService>(create: (_) => ReportService()),
+        Provider<RecommendationService>(create: (_) => RecommendationService()),
         Provider<AnalyticsService>(create: (_) => AnalyticsService()),
         Provider<MyScheduleService>(create: (_) => MyScheduleService()),
         ChangeNotifierProvider<IncomingShareService>(

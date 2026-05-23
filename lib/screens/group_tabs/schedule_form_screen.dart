@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
 import '../../config/env_config.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
@@ -495,6 +496,27 @@ class _LocationAutocompleteFieldState
 
   Future<void> _fetchPlaceDetail(Map<String, dynamic> suggestion) async {
     final placeId = suggestion['place_id'] as String;
+    final fullAddress = suggestion['description'] as String;
+
+    try {
+      // 1. Native Geocoding 시도
+      List<Location> locations = await locationFromAddress(fullAddress);
+      if (locations.isNotEmpty) {
+        final loc = locations.first;
+        widget.onLocationSelected({
+          'name': suggestion['main_text'],
+          'address': fullAddress,
+          'place_id': placeId,
+          'lat': loc.latitude,
+          'lng': loc.longitude,
+        });
+        return;
+      }
+    } catch (e) {
+      debugPrint('Native Geocoding failed in ScheduleForm: $e');
+    }
+
+    // 2. Fallback: HTTP Details
     try {
       final uri = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/details/json'

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart' as http;
 import '../../l10n/app_localizations.dart';
 import '../../services/local_preferences_service.dart';
@@ -23,9 +24,6 @@ class LocationResult {
 }
 
 /// 위치 선택 바텀시트
-/// [showCurrentLocation] false면 현재위치 버튼 숨김 (그룹용)
-/// [hintText] 검색창 힌트 텍스트 오버라이드
-/// [showGroupHint] true면 그룹 위치 안내 문구 표시
 class LocationPickerSheet extends StatefulWidget {
   final String googleApiKey;
   final String languageCode;
@@ -83,7 +81,11 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     await LocalPreferencesService.setString(_searchKey, query);
   }
 
-  // ── Google Places Autocomplete ────────────────────────────────────────────
+  // ── Google Places Autocomplete (HTTP - Web API) ──────────────────────────
+  // Note: Autocomplete via HTTP requires "IP" or "None" restriction in Console.
+  // To use "Android/iOS" restriction, one must use Native SDKs.
+  // We'll keep HTTP for autocomplete but use Geocoding (Native) for the final result
+  // to improve success rate and follow platform standards where possible.
   Future<void> _searchPlaces(String input) async {
     if (input.trim().isEmpty) {
       setState(() => _predictions = []);
@@ -130,6 +132,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                 secondaryText: p['structured_formatting']
                         ?['secondary_text'] as String? ??
                     '',
+                fullAddress: p['description'] as String,
               ))
           .toList();
 
@@ -147,9 +150,27 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     }
   }
 
-  // ── Place Details → 좌표 ──────────────────────────────────────────────────
+  // ── Geocoding (Native SDK) 를 사용하여 주소를 좌표로 변환 ─────────────────────
+  // Native SDK를 사용하므로 Android/iOS 제한이 걸린 키로도 작동합니다.
   Future<LocationResult?> _getPlaceDetails(
-      String placeId, String name) async {
+      String placeId, String name, String fullAddress) async {
+    try {
+      // 1. Native Geocoding 시도 (가장 안전)
+      List<Location> locations = await locationFromAddress(fullAddress);
+      if (locations.isNotEmpty) {
+        final loc = locations.first;
+        return LocationResult(
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          name: name,
+          address: fullAddress,
+        );
+      }
+    } catch (e) {
+      debugPrint('Native Geocoding failed, falling back to HTTP: $e');
+    }
+
+    // 2. Fallback: Place Details HTTP (Web API)
     try {
       final uri = Uri.https(
         'maps.googleapis.com',
@@ -177,7 +198,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     }
   }
 
-  // ── 현재 위치 ─────────────────────────────────────────────────────────────
+  // ── 현재 위치 (Geolocator + Geocoding Native SDK) ─────────────────────────
   Future<void> _useCurrentLocation() async {
     setState(() {
       _loadingCurrentLocation = true;
@@ -225,8 +246,9 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       );
       if (!mounted) return;
 
+      // Native SDK Geocoding 사용
       final address =
-          await _reverseGeocode(position.latitude, position.longitude);
+          await _reverseGeocodeNative(position.latitude, position.longitude);
       await _saveRecentSearch(address);
 
       if (mounted) {
@@ -250,26 +272,21 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     }
   }
 
-  // ── 역지오코딩 ───────────────────────────────────────────────────────────
-  Future<String> _reverseGeocode(double lat, double lng) async {
+  // ── 역지오코딩 (Native SDK 사용) ──────────────────────────────────────────
+  Future<String> _reverseGeocodeNative(double lat, double lng) async {
     try {
-      final uri = Uri.https(
-        'maps.googleapis.com',
-        '/maps/api/geocode/json',
-        {
-          'latlng': '$lat,$lng',
-          'key': widget.googleApiKey,
-          'language': widget.languageCode,
-          'result_type': 'sublocality|locality',
-        },
-      );
-      final response = await http.get(uri);
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final results = data['results'] as List?;
-      if (results != null && results.isNotEmpty) {
-        return results[0]['formatted_address'] as String? ?? '현재 위치';
+      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
+      if (placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        // 한글 주소 조합 (예: 서울특별시 강남구 역삼동)
+        final parts = [p.administrativeArea, p.locality, p.subLocality, p.thoroughfare]
+            .where((s) => s != null && s.isNotEmpty)
+            .toList();
+        return parts.join(' ');
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Native Reverse Geocoding failed: $e');
+    }
     return '현재 위치';
   }
 
@@ -465,7 +482,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                                 );
                                 final result =
                                     await _getPlaceDetails(
-                                        p.placeId, p.mainText);
+                                        p.placeId, p.mainText, p.fullAddress);
                                 if (result != null &&
                                     context.mounted) {
                                   Navigator.pop(context, result);
@@ -486,10 +503,12 @@ class _PlacePrediction {
   final String placeId;
   final String mainText;
   final String secondaryText;
+  final String fullAddress;
 
   _PlacePrediction({
     required this.placeId,
     required this.mainText,
     required this.secondaryText,
+    required this.fullAddress,
   });
 }
