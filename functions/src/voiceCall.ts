@@ -190,23 +190,41 @@ async function notifyCallStarted(roomId: string, callerUid: string, callId: stri
   const tokens = await getTokensForUids(receiverIds);
   if (tokens.length === 0) return;
 
-  const roomName = room.name ?? room.group_name ?? (type === "video" ? "Video Call" : "Voice Call");
-  const bodyText = type === "video" ? "영상통화가 시작되었습니다." : "음성통화가 시작되었습니다.";
-
+  const callerDoc = await getDb().collection("users").doc(callerUid).get();
+  const callerName = callerDoc.data()?.name ?? "알 수 없는 사용자";
+  const roomName = room.name ?? room.group_name ?? (type === "video" ? "영상통화" : "음성통화");
+  
+  // FlutterCallkitIncoming이 요구하는 데이터 구조
   const payload = {
-    notification: { title: roomName, body: bodyText },
     data: {
-      type: "voice_call", // 클라이언트 앱의 기존 리스너 구조 유지
+      type: "voice_call",
       callType: type,
-      roomId,
-      callId,
-      channelName,
-      notificationTitle: roomName,
-      notificationBody: bodyText,
-      avatarUrl: room.group_profile_image ?? ""
+      roomId: roomId,
+      callId: callId,
+      channelName: channelName,
+      callerName: callerName,
+      // CallKit 전용 데이터
+      action: "show_incoming_call", 
     },
-    android: { priority: "high" as const, collapseKey: `${type}_call_${roomId}`, notification: { channelId: "chat_channel" } },
-    apns: { payload: { aps: { sound: "default", badge: 1, contentAvailable: true } } },
+    // 안드로이드/iOS 모두 데이터 메시지로 처리하여 백그라운드에서도 수신 가능하게 함
+    android: {
+      priority: "high" as const,
+      notification: {
+        title: callerName,
+        body: type === "video" ? "영상통화가 왔습니다." : "음성통화가 왔습니다.",
+        channelId: "chat_channel",
+        clickAction: "FLUTTER_NOTIFICATION_CLICK",
+      },
+    },
+    apns: {
+      payload: {
+        aps: {
+          sound: "default",
+          badge: 1,
+          contentAvailable: true,
+        },
+      },
+    },
   };
 
   try {

@@ -87,15 +87,66 @@ class CallkitService {
     await FlutterCallkitIncoming.endCall(callkitIdFromCallId(callId));
   }
 
-  void bindEndCallback(Future<void> Function() onEnded) {
+  void bindCallListeners({
+    required Future<void> Function(Map<String, dynamic> data) onAccept,
+    required Future<void> Function(Map<String, dynamic> data) onDecline,
+    required Future<void> Function() onEnded,
+  }) {
     _subscription?.cancel();
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
+    if (kIsWeb) return; // Web에서는 CallKit 미지원
+    
     _subscription = FlutterCallkitIncoming.onEvent.listen((dynamic event) async {
-      final name = event?.event?.toString() ?? '';
-      if (name.contains('actionCallEnded') || name.contains('ACTION_CALL_ENDED')) {
+      final eventName = event?.event?.toString() ?? '';
+      final body = event?.body as Map<String, dynamic>? ?? {};
+
+      debugPrint('Callkit Event: $eventName, Body: $body');
+
+      if (eventName.contains('ACTION_CALL_ACCEPT')) {
+        await onAccept(body);
+      } else if (eventName.contains('ACTION_CALL_DECLINE')) {
+        await onDecline(body);
+      } else if (eventName.contains('ACTION_CALL_ENDED')) {
         await onEnded();
       }
     });
+  }
+
+  Future<void> showIncomingCall({
+    required String callId,
+    required String roomId,
+    required String callerName,
+    required String callType,
+  }) async {
+    if (kIsWeb) return;
+    
+    final callkitId = callkitIdFromCallId(callId);
+    final params = CallKitParams(
+      id: callkitId,
+      nameCaller: callerName,
+      appName: 'Answer',
+      handle: callerName,
+      type: callType == 'video' ? 1 : 0,
+      extra: <String, dynamic>{
+        'callId': callId,
+        'roomId': roomId,
+        'callerName': callerName,
+        'callType': callType,
+      },
+      android: const AndroidParams(
+        isCustomNotification: true,
+        isShowCallID: true,
+        isShowLogo: true,
+      ),
+      ios: const IOSParams(
+        iconName: 'AppIcon',
+        handleType: 'generic',
+        supportsVideo: true,
+        maximumCallGroups: 1,
+        maximumCallsPerCallGroup: 1,
+      ),
+    );
+
+    await FlutterCallkitIncoming.showCallkitIncoming(params);
   }
 
   Future<void> unbind() async {

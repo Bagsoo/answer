@@ -60,11 +60,19 @@ class _VoiceRoomScreenState extends State<VoiceRoomScreen>
     WidgetsBinding.instance.addObserver(this);
     context.read<VoiceCallService>().isInVoiceRoom.value = true;
     context.read<VoiceCallService>().endVoiceRoomTransition();
-    CallkitService.instance.bindEndCallback(() async {
-      if (!_leaving) {
-        await _leaveVoiceRoom();
-      }
-    });
+    CallkitService.instance.bindCallListeners(
+      onAccept: (data) async {
+        debugPrint('Callkit Accepted within Room: $data');
+      },
+      onDecline: (data) async {
+        debugPrint('Callkit Declined within Room: $data');
+      },
+      onEnded: () async {
+        if (!_leaving) {
+          await _leaveVoiceRoom();
+        }
+      },
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       setState(() {

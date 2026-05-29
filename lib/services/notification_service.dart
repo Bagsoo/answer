@@ -5,19 +5,35 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+import 'callkit_service.dart';
 import 'chat_service.dart';
+import 'voice_call_service.dart';
 import '../screens/chat_room_screen.dart';
 import '../screens/group_detail_screen.dart';
 import '../screens/group_tabs/join_requests_screen.dart';
+import '../screens/video_room_screen.dart';
+import '../screens/voice_room_screen.dart';
 
 // 백그라운드 메시지 핸들러 (top-level 함수여야 함)
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('Background FCM: ${message.messageId}');
+  
+  if (message.data['type'] == 'voice_call') {
+    await CallkitService.instance.showIncomingCall(
+      callId: message.data['callId'],
+      roomId: message.data['roomId'],
+      callerName: message.data['callerName'],
+      callType: message.data['callType'],
+    );
+    return;
+  }
+  
   await NotificationService().showNotificationFromRemoteMessage(message);
 }
 
@@ -89,6 +105,9 @@ class NotificationService {
       FirebaseMessaging.onMessage.listen(_onForegroundMessage);
       FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpenedApp);
 
+      // Callkit 리스너 바인딩
+      _initCallkitListeners();
+
       final initialMessage = await _fcm.getInitialMessage();
       if (initialMessage != null) {
         _handleNavigationFromData(initialMessage.data);
@@ -141,6 +160,52 @@ class NotificationService {
     });
     // 토큰 저장 후 Cloud Function(onUserTokenChangedV2)이 자동으로
     // 해당 유저가 속한 모든 chat_rooms / groups의 active_fcm_tokens를 갱신함
+  }
+
+  void _initCallkitListeners() {
+    CallkitService.instance.bindCallListeners(
+      onAccept: (data) async {
+        debugPrint('Callkit Accepted: $data');
+        final nav = navigatorKey.currentState;
+        if (nav == null) return;
+        
+        final roomId = data['roomId'] as String;
+        final callId = data['callId'] as String;
+        final callType = data['callType'] as String;
+        final callerName = data['callerName'] as String;
+
+        // 실제 참여 로직 (VoiceCallService 활용)
+        final voiceCallService = VoiceCallService();
+        final joinResult = await voiceCallService.joinVoiceCall(
+          roomId: roomId,
+          callId: callId,
+          device: kIsWeb ? 'web' : 'mobile',
+          isVideoEnabled: callType == 'video',
+        );
+
+        if (!nav.mounted) return;
+        
+        await nav.push(
+          MaterialPageRoute(
+            builder: (_) => VideoRoomScreen(
+              roomId: roomId,
+              roomName: callerName,
+              callId: callId,
+              token: joinResult.token,
+              appId: joinResult.appId,
+              channelName: joinResult.channelName,
+              agoraUid: joinResult.uid,
+            ),
+          ),
+        );
+      },
+      onDecline: (data) async {
+        debugPrint('Callkit Declined: $data');
+      },
+      onEnded: () async {
+        debugPrint('Callkit Ended');
+      },
+    );
   }
 
   // 로그아웃 시 토큰 삭제

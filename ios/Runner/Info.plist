@@ -73,8 +73,12 @@
     <string>We need your location to show nearby places.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
     <string>We need your location to show nearby places.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>We need camera access for video calls.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>We need microphone access so you can record voice messages.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>We need contacts access for call integration.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

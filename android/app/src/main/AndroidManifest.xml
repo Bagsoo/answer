@@ -80,6 +80,25 @@
         <receiver
             android:name=".VoiceCallActionReceiver"
             android:exported="false" />
+        <service
+            android:name="com.dexterous.flutterlocalnotifications.ForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+        <service
+            android:name="com.hiennv.flutter_callkit_incoming.CallkitService"
+            android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.telecom.ConnectionService" />
+            </intent-filter>
+        </service>
+        <receiver
+            android:name="com.hiennv.flutter_callkit_incoming.CallkitIncomingBroadcastReceiver"
+            android:exported="true" />
+        <receiver
+            android:name="com.hiennv.flutter_callkit_incoming.ActionBroadcastReceiver"
+            android:exported="true" />
+
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${googleApiKey}"/>
