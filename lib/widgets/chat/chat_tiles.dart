@@ -1,11 +1,23 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../l10n/app_localizations.dart';
 import '../../screens/chat_room_screen.dart';
 import '../../utils/user_cache.dart';
 
 // ── 유저 프로필 메모리 캐시 (Micro-batching / DataLoader) ────────────────────────
+
+String _formatLastTime(Timestamp? timestamp) {
+  if (timestamp == null) return '';
+  final date = timestamp.toDate();
+  final now = DateTime.now();
+  if (date.year == now.year && date.month == now.month && date.day == now.day) {
+    return DateFormat('HH:mm').format(date);
+  } else {
+    return DateFormat('MM/dd').format(date);
+  }
+}
 
 String _localizedLastMessage(BuildContext context, String lastMessage) {
   final l = AppLocalizations.of(context);
@@ -207,6 +219,14 @@ class _DmTileState extends State<DmTile> {
                     fontWeight: FontWeight.bold),
               ),
             ),
+          const SizedBox(height: 4),
+          Text(
+            _formatLastTime(widget.room['last_time'] as Timestamp?),
+            style: TextStyle(
+              fontSize: 11,
+              color: cs.onSurface.withOpacity(0.5),
+            ),
+          ),
         ],
       ),
       onTap: () {
@@ -449,6 +469,14 @@ class ChatTile extends StatelessWidget {
                     fontWeight: FontWeight.bold),
               ),
             ),
+          const SizedBox(height: 4),
+          Text(
+            _formatLastTime(room['last_time'] as Timestamp?),
+            style: TextStyle(
+              fontSize: 11,
+              color: colorScheme.onSurface.withOpacity(0.5),
+            ),
+          ),
         ],
       ),
       onTap: () {
