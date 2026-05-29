@@ -557,19 +557,63 @@ class GroupService {
   // ── 좋아요 토글 ────────────────────────────────────────────────────────────
   Future<void> toggleGroupLike(String groupId) async {
     if (currentUserId.isEmpty) return;
-    final ref = _db.collection('groups').doc(groupId);
-    final snap = await ref.get();
-    if (!snap.exists) return;
-
-    final likes = List<String>.from(snap.data()?['likes'] as List? ?? []);
-    if (likes.contains(currentUserId)) {
-      await ref.update({
-        'likes': FieldValue.arrayRemove([currentUserId])
-      });
+    
+    final groupsLikeRef = _db
+        .collection('groups')
+        .doc(groupId)
+        .collection('likes')
+        .doc(currentUserId);
+    final usersLikeRef = _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('liked_groups')
+        .doc(groupId);
+        
+    final snap = await groupsLikeRef.get();
+    final batch = _db.batch();
+    
+    if (snap.exists) {
+      batch.delete(groupsLikeRef);
+      batch.delete(usersLikeRef);
     } else {
-      await ref.update({
-        'likes': FieldValue.arrayUnion([currentUserId])
+      batch.set(groupsLikeRef, {
+        'createdAt': FieldValue.serverTimestamp(),
+        'uid': currentUserId,
+      });
+      batch.set(usersLikeRef, {
+        'createdAt': FieldValue.serverTimestamp(),
+        'groupId': groupId,
       });
     }
+    await batch.commit();
+  }
+
+  // ── 찜한 그룹 목록 ─────────────────────────────────────────────────────────
+  Stream<List<Map<String, dynamic>>> getMyLikedGroups() {
+    if (currentUserId.isEmpty) return Stream.value([]);
+    return _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('liked_groups')
+        .snapshots()
+        .switchMap((snapshot) {
+      final ids = snapshot.docs.map((doc) => doc.id).toList();
+      if (ids.isEmpty) return Stream.value([]);
+      
+      final limitedIds = ids.take(30).toList();
+      return _db
+          .collection('groups')
+          .where(FieldPath.documentId, whereIn: limitedIds)
+          .snapshots()
+          .map((groupsSnap) => groupsSnap.docs
+              .map((doc) {
+                final data = doc.data();
+                if ((data['status'] as String? ?? 'active') == 'deleted') return null;
+                data['id'] = doc.id;
+                return data;
+              })
+              .whereType<Map<String, dynamic>>()
+              .toList());
+    });
   }
 }

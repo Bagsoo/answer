@@ -8,6 +8,7 @@ import '../../screens/group_tabs/group_type_category_data.dart';
 import '../../widgets/common/location_picker_sheet.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/env_config.dart';
+import 'liked_groups_screen.dart';
 import 'account_link_management_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -313,7 +314,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const AccountLinkManagementScreen(),
+                    builder: (_) => AccountLinkManagementScreen(),
                   ),
                 );
               },
@@ -412,6 +413,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       );
                     }).toList(),
                   ),
+
+            const SizedBox(height: 32),
+            const Divider(),
+            const SizedBox(height: 16),
+
+            // ── 찜한 그룹 ─────────────────────────────────────────────
+            ListTile(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => LikedGroupsScreen()),
+                );
+              },
+              leading: Icon(Icons.favorite_outline, color: cs.primary),
+              title: Text(l.likedGroups,
+                  style: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w600)),
+              trailing: const Icon(Icons.chevron_right),
+              contentPadding: EdgeInsets.zero,
+            ),
 
             const SizedBox(height: 40),
           ],

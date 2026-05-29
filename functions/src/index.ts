@@ -477,3 +477,26 @@ export const getGooglePlaceDetails = onCall(
     return data;
   }
 );
+
+export const onGroupLikeCreatedV2 = onDocumentCreated("groups/{groupId}/likes/{uid}", async (event) => {
+  const groupId = event.params.groupId;
+  await db.collection("groups").doc(groupId).update({
+    likes_count: admin.firestore.FieldValue.increment(1)
+  });
+  return null;
+});
+
+export const onGroupLikeDeletedV2 = onDocumentDeleted("groups/{groupId}/likes/{uid}", async (event) => {
+  const groupId = event.params.groupId;
+  const groupRef = db.collection("groups").doc(groupId);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(groupRef);
+    if (!snap.exists) return;
+    const data = snap.data() || {};
+    const currentCount = data.likes_count || 0;
+    tx.update(groupRef, {
+      likes_count: Math.max(0, currentCount - 1)
+    });
+  });
+  return null;
+});

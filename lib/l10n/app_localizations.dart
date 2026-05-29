@@ -30,6 +30,8 @@ class AppLocalizations {
   String get noGroupsFound => _s.noGroupsFound;
   String get joinNow => _s.joinNow;
   String get requestJoin => _s.requestJoin;
+  // Group Join Status
+  String get waitingForApproval => _s.waitingForApproval;
   String get joinRequestSent => _s.joinRequestSent;
   String get joinedSuccess => _s.joinedSuccess;
   String get joinFailed => _s.joinFailed;
@@ -707,6 +709,8 @@ class AppLocalizations {
   String get tagSaveFailed => _s.tagSaveFailed;
   String get memberTags => _s.memberTags;
   String get editMemberTags => _s.editMemberTags;
+  String get likedGroups => _s.likedGroups;
+  String get likedGroupsTitle => _s.likedGroupsTitle;
   String get manageBoardsSection => _s.manageBoardsSection;
   String get catItDev => _s.catItDev;
   String get catMarketing => _s.catMarketing;
@@ -816,12 +820,13 @@ abstract class _AppStrings {
   String get searchGroupsHint;
   String get noGroupsFound;
   String get joinNow;
-  String get requestJoin;
+  String get requestJoin;  
   String get joinRequestSent;
   String get joinedSuccess;
   String get joinFailed;
   String get bannedUserNotice;
   String get alreadyJoined;
+  String get waitingForApproval;
   String get searchPlaceholder;
   String get searchMemoPlaceholder;
   String get searchChatPlaceholder;
@@ -1498,6 +1503,8 @@ abstract class _AppStrings {
   String get tagSaveFailed;
   String get memberTags;
   String get editMemberTags;
+  String get likedGroups;
+  String get likedGroupsTitle;
   String get manageBoardsSection;
 
   String get catItDev;
@@ -1608,11 +1615,14 @@ class _EnStrings extends _AppStrings {
   @override String get personalScheduleCreated => 'Personal schedule created!';
   @override String get personalScheduleUpdated => 'Personal schedule updated!';
   @override String get myGroups => 'My Groups';
+  @override String get likedGroups => 'Liked Groups';
+  @override String get likedGroupsTitle => 'My Liked Groups';
   @override String get findGroups => 'Find Groups';
   @override String get searchGroupsHint => 'Search groups by name...';
   @override String get noGroupsFound => 'No groups found.';
   @override String get joinNow => 'Join Now';
-  @override String get requestJoin => 'Request Join';
+  @override String get requestJoin => 'Join Request';
+  @override String get waitingForApproval => 'Waiting for approval';
   @override String get joinRequestSent => 'Join request sent!';
   @override String get joinedSuccess => 'Joined the group successfully!';
   @override String get joinFailed => 'Failed to join the group.';
@@ -2384,8 +2394,9 @@ class _KoStrings extends _AppStrings {
   @override String get searchGroupsHint => '그룹 이름으로 검색...';
   @override String get noGroupsFound => '검색 결과가 없습니다.';
   @override String get joinNow => '바로 가입';
-  @override String get requestJoin => '승인 요청';
-  @override String get joinRequestSent => '가입 요청을 보냈습니다!';
+  @override String get requestJoin => '가입 신청';
+  @override String get waitingForApproval => '승인 대기 중';
+  @override String get joinRequestSent => '가입 신청을 보냈습니다!';
   @override String get joinedSuccess => '그룹에 가입했습니다!';
   @override String get joinFailed => '그룹 가입에 실패했습니다.';
   @override String get alreadyJoined => '가입됨';
@@ -3067,6 +3078,8 @@ class _KoStrings extends _AppStrings {
   @override String get tagSaveFailed => '태그 저장에 실패했습니다.';
   @override String get memberTags => '태그';
   @override String get editMemberTags => '태그 편집';
+  @override String get likedGroups => '찜한 그룹';
+  @override String get likedGroupsTitle => '내가 찜한 그룹';
   @override String get manageBoardsSection => '게시판 관리';
 
   @override String get catItDev => 'IT/개발';
@@ -3159,11 +3172,14 @@ class _JaStrings extends _AppStrings {
   @override String get personalScheduleCreated => '個人の予定を登録しました！';
   @override String get personalScheduleUpdated => '個인의 예정を更新しました！';
   @override String get myGroups => 'マイグループ';
+  @override String get likedGroups => 'お気に入りグループ';
+  @override String get likedGroupsTitle => 'お気に入り済みのグループ';
   @override String get findGroups => 'グループを探す';
   @override String get searchGroupsHint => 'グループ名で検索...';
   @override String get noGroupsFound => 'グループが見つかりません。';
   @override String get joinNow => '今すぐ参加';
   @override String get requestJoin => '参加申請';
+  @override String get waitingForApproval => '承認待機中';
   @override String get joinRequestSent => '参加申請を送りました！';
   @override String get joinedSuccess => 'グループに参加しました！';
   @override String get joinFailed => 'グループへの参加に失敗しました。';

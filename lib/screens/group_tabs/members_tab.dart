@@ -298,7 +298,7 @@ class _MembersTabState extends State<MembersTab> with SingleTickerProviderStateM
                   final uid = filtered[index].id;
                   final role = data['role'] as String? ?? 'member';
                   final displayName = data['display_name'] as String? ?? l.unknown;
-                  final photoUrl = data['profile_image'] as String? ?? '';
+                  final photoUrl = (data['photo_url'] ?? data['profile_image']) as String? ?? '';
                   final isOwner = role == 'owner';
                   final isManager = role == 'manager';
                   final isMe = uid == gp.currentUserId;

@@ -90,7 +90,7 @@ class ExploreGroupTile extends StatelessWidget {
     final memberCount = (group['member_count'] as num?)?.toInt() ?? 1;
     final imageUrl = group['group_profile_image'] as String? ?? '';
     final distanceKm = group['distance_km'] as String?;
-    final likes = List<String>.from(group['likes'] as List? ?? []);
+    final likesCount = group['likes_count'] as int? ?? 0;
 
     final typeLabel = GroupTypeCategoryData.localizeType(type, l);
     final categoryLabel = GroupTypeCategoryData.localizeKey(category, l);
@@ -136,12 +136,12 @@ class ExploreGroupTile extends StatelessWidget {
               ],
             ],
           ),
-          if (likes.isNotEmpty)
+          if (likesCount > 0)
             Row(children: [
               Icon(Icons.favorite,
                   size: 12, color: Colors.red.withOpacity(0.7)),
               const SizedBox(width: 3),
-              Text('${likes.length}',
+              Text('$likesCount',
                   style: TextStyle(
                       fontSize: 11,
                       color: Colors.red.withOpacity(0.7))),

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/group_service.dart';
@@ -20,12 +22,53 @@ class GroupPreviewScreen extends StatefulWidget {
 
 class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
   bool _joining = false;
-  late List<String> _likes;
+  StreamSubscription? _likeSub;
+  bool _isLiked = false;
+  
+  StreamSubscription? _groupSub;
+  int _likesCount = 0;
+  int _memberCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _likes = List<String>.from(widget.group['likes'] as List? ?? []);
+    _likesCount = widget.group['likes_count'] as int? ?? 0;
+    _memberCount = (widget.group['member_count'] as num?)?.toInt() ?? 0;
+
+    final groupService = context.read<GroupService>();
+    final myUid = groupService.currentUserId;
+    if (myUid.isNotEmpty) {
+      _likeSub = FirebaseFirestore.instance
+          .collection('groups')
+          .doc(group['id'])
+          .collection('likes')
+          .doc(myUid)
+          .snapshots()
+          .listen((snap) {
+        if (mounted) {
+          setState(() {
+            _isLiked = snap.exists;
+          });
+        }
+      });
+    }
+
+    _groupSub = FirebaseFirestore.instance
+        .collection('groups')
+        .doc(group['id'])
+        .snapshots()
+        .listen((snap) {
+      if (snap.exists && mounted) {
+        final data = snap.data();
+        if (data != null) {
+          setState(() {
+            _likesCount = data['likes_count'] as int? ?? 0;
+            _memberCount = (data['member_count'] as num?)?.toInt() ?? _memberCount;
+          });
+        }
+      }
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<AnalyticsService>().logViewGroup(
@@ -35,6 +78,13 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
             );
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _likeSub?.cancel();
+    _groupSub?.cancel();
+    super.dispose();
   }
 
   Map<String, dynamic> get group => widget.group;
@@ -47,10 +97,11 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
     final groupId = group['id'] as String;
     
     setState(() {
-      if (_likes.contains(myUid)) {
-        _likes.remove(myUid);
+      _isLiked = !_isLiked;
+      if (_isLiked) {
+        _likesCount++;
       } else {
-        _likes.add(myUid);
+        _likesCount = _likesCount > 0 ? _likesCount - 1 : 0;
       }
     });
 
@@ -58,16 +109,6 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
       await groupService.toggleGroupLike(groupId);
     } catch (e) {
       debugPrint('Error toggling like: $e');
-      // 에러 시 롤백
-      if (mounted) {
-        setState(() {
-          if (_likes.contains(myUid)) {
-            _likes.remove(myUid);
-          } else {
-            _likes.add(myUid);
-          }
-        });
-      }
     }
   }
 
@@ -148,11 +189,9 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
     final name = group['name'] as String? ?? '';
     final type = group['type'] as String? ?? '';
     final category = group['category'] as String? ?? '';
-    final memberCount = (group['member_count'] as num?)?.toInt() ?? 0;
     final memberLimit = (group['member_limit'] as num?)?.toInt() ?? 50;
     final requireApproval = group['require_approval'] as bool? ?? false;
     final tags = List<String>.from(group['tags'] as List? ?? []);
-    final likes = List<String>.from(group['likes'] as List? ?? []);
     final profileImageUrl = group['group_profile_image'] as String? ?? '';
     final hasImage = profileImageUrl.isNotEmpty;
     final plan = group['plan'] as String? ?? 'free';
@@ -297,7 +336,7 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
               children: [
                 _StatChip(
                   icon: Icons.people_outline,
-                  label: '$memberCount / $memberLimit',
+                  label: '$_memberCount / $memberLimit',
                   color: colorScheme.primary,
                 ),
                 const SizedBox(width: 16),
@@ -305,10 +344,10 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
                   onTap: _toggleLike,
                   behavior: HitTestBehavior.opaque,
                   child: _StatChip(
-                    icon: _likes.contains(context.read<GroupService>().currentUserId)
+                    icon: _isLiked
                         ? Icons.favorite
                         : Icons.favorite_border,
-                    label: '${_likes.length}',
+                    label: '$_likesCount',
                     color: Colors.red,
                   ),
                 ),
@@ -374,27 +413,80 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
 
             const SizedBox(height: 32),
 
-            // ── 가입 버튼 ─────────────────────────────────────────────
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _joining ? null : _onJoin,
-                icon: _joining
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Icon(
-                        requireApproval
-                            ? Icons.how_to_reg_outlined
-                            : Icons.group_add_outlined,
+            // ── 가입 버튼 (상태 기반 동적 렌더링) ─────────────────────────────
+            StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('groups')
+                  .doc(groupId)
+                  .collection('members')
+                  .doc(context.read<GroupService>().currentUserId)
+                  .snapshots(),
+              builder: (context, memberSnap) {
+                final isMember = memberSnap.hasData && memberSnap.data!.exists;
+
+                if (isMember) {
+                  return SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (_) => GroupDetailScreen(
+                                groupId: groupId, groupName: name),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.check_circle_outline),
+                      label: Text(l.alreadyJoined),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colorScheme.surfaceContainerHighest,
+                        foregroundColor: colorScheme.onSurfaceVariant,
                       ),
-                label: Text(requireApproval ? l.requestJoin : l.joinNow),
-              ),
+                    ),
+                  );
+                }
+
+                return StreamBuilder<DocumentSnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('groups')
+                      .doc(groupId)
+                      .collection('join_requests')
+                      .doc(context.read<GroupService>().currentUserId)
+                      .snapshots(),
+                  builder: (context, requestSnap) {
+                    final isPending =
+                        requestSnap.hasData && requestSnap.data!.exists;
+
+                    return SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: (_joining || isPending) ? null : _onJoin,
+                        icon: _joining
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Icon(
+                                isPending
+                                    ? Icons.hourglass_empty
+                                    : (requireApproval
+                                        ? Icons.how_to_reg_outlined
+                                        : Icons.group_add_outlined),
+                              ),
+                        label: Text(
+                          isPending
+                              ? l.waitingForApproval
+                              : (requireApproval ? l.requestJoin : l.joinNow),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
           ],
         ),

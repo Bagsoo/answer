@@ -192,7 +192,6 @@ async function notifyCallStarted(roomId: string, callerUid: string, callId: stri
 
   const callerDoc = await getDb().collection("users").doc(callerUid).get();
   const callerName = callerDoc.data()?.name ?? "알 수 없는 사용자";
-  const roomName = room.name ?? room.group_name ?? (type === "video" ? "영상통화" : "음성통화");
   
   // FlutterCallkitIncoming이 요구하는 데이터 구조
   const payload = {

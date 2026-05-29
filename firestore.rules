@@ -17,8 +17,14 @@ service cloud.firestore {
 
     // 특정 권한이 있는지 확인하는 함수 (단일 문서 읽기)
     function hasPermission(groupId, perm) {
-      let member = get(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data;
-      return member.role == 'owner' || (member.role == 'manager' && member.permissions[perm] == true);
+      return exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)) &&
+        (
+          get(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data.role == 'owner' ||
+          (
+            get(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data.role == 'manager' &&
+            get(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data.permissions[perm] == true
+          )
+        );
     }
 
     // ── 관리자 ──────────────────────────────────────────────────────────────
@@ -109,8 +115,12 @@ service cloud.firestore {
       allow read: if isLoggedIn();
       allow create: if isLoggedIn();
       allow update: if isAdmin() || 
-                    hasPermission(groupId, 'can_manage_permissions') ||
-                    (isLoggedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']));
+                    hasPermission(groupId, 'can_manage_permissions');
+
+      match /likes/{uid} {
+        allow read: if isLoggedIn();
+        allow create, delete: if isLoggedIn() && request.auth.uid == uid;
+      }
 
       match /members/{memberId} {
         allow read: if isLoggedIn();
@@ -129,7 +139,7 @@ service cloud.firestore {
 
       match /{allSubcollections=**} {
         allow read: if isLoggedIn();
-        allow write: if hasPermission(groupId, 'can_manage_permissions') || exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+        allow write: if (allSubcollections != 'likes/*') && (hasPermission(groupId, 'can_manage_permissions') || exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)));
       }
     }
 

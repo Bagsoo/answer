@@ -34,7 +34,7 @@ class GroupProvider extends ChangeNotifier {
   bool qrEnabled = false;
   String inviteToken = '';
   List<String> tags = [];
-  List<String> likes = [];
+  int likesCount = 0;
   DateTime? createdAt;
 
   GeoPoint? location;
@@ -50,7 +50,8 @@ class GroupProvider extends ChangeNotifier {
       FirebaseAuth.instance.currentUser?.uid ?? '';
 
   bool get isOwner => myRole == 'owner';
-  bool get isLiked => likes.contains(currentUserId);
+  bool _isLiked = false;
+  bool get isLiked => _isLiked;
   bool get isPaidPlan => plan == 'plus' || plan == 'pro';
   bool get isDeleted => status == 'deleted';
 
@@ -113,6 +114,7 @@ class GroupProvider extends ChangeNotifier {
 
   StreamSubscription? _groupSub;
   StreamSubscription? _memberSub;
+  StreamSubscription? _likeSub;
 
   void _applySeed(Map<String, dynamic> d) {
     name = d['name'] as String? ?? name;
@@ -121,7 +123,7 @@ class GroupProvider extends ChangeNotifier {
     status = d['status'] as String? ?? status;
     memberCount = (d['member_count'] as num?)?.toInt() ?? memberCount;
     profileImageUrl = d['group_profile_image'] as String? ?? profileImageUrl;
-    likes = List<String>.from(d['likes'] as List? ?? likes);
+    likesCount = (d['likes_count'] as num?)?.toInt() ?? likesCount;
     _loaded = true;
   }
 
@@ -152,7 +154,7 @@ class GroupProvider extends ChangeNotifier {
       qrEnabled = d['qr_enabled'] as bool? ?? false;
       inviteToken = d['invite_token'] as String? ?? '';
       tags = List<String>.from(d['tags'] as List? ?? []);
-      likes = List<String>.from(d['likes'] as List? ?? []);
+      likesCount = (d['likes_count'] as num?)?.toInt() ?? 0;
       final ts = d['created_at'] as Timestamp?;
       location = d['location'] as GeoPoint?;
       locationName = d['location_name'] as String? ?? '';
@@ -160,6 +162,21 @@ class GroupProvider extends ChangeNotifier {
       _loaded = true;
       notifyListeners();
     });
+
+    // 3) 좋아요 상태 구독
+    _likeSub?.cancel();
+    if (currentUserId.isNotEmpty) {
+      _likeSub = db
+          .collection('groups')
+          .doc(groupId)
+          .collection('likes')
+          .doc(currentUserId)
+          .snapshots()
+          .listen((snap) {
+        _isLiked = snap.exists;
+        notifyListeners();
+      });
+    }
 
     // 2) 내 멤버 정보 구독
     _memberSub = db
@@ -180,24 +197,44 @@ class GroupProvider extends ChangeNotifier {
 
   // ── 좋아요 토글 ───────────────────────────────────────────────────────────
   Future<void> toggleLike() async {
-    final ref = FirebaseFirestore.instance
+    if (currentUserId.isEmpty) return;
+    
+    final db = FirebaseFirestore.instance;
+    final groupsLikeRef = db
         .collection('groups')
+        .doc(groupId)
+        .collection('likes')
+        .doc(currentUserId);
+    final usersLikeRef = db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('liked_groups')
         .doc(groupId);
-    if (isLiked) {
-      await ref.update({
-        'likes': FieldValue.arrayRemove([currentUserId])
-      });
+        
+    final snap = await groupsLikeRef.get();
+    final batch = db.batch();
+    
+    if (snap.exists) {
+      batch.delete(groupsLikeRef);
+      batch.delete(usersLikeRef);
     } else {
-      await ref.update({
-        'likes': FieldValue.arrayUnion([currentUserId])
+      batch.set(groupsLikeRef, {
+        'createdAt': FieldValue.serverTimestamp(),
+        'uid': currentUserId,
+      });
+      batch.set(usersLikeRef, {
+        'createdAt': FieldValue.serverTimestamp(),
+        'groupId': groupId,
       });
     }
+    await batch.commit();
   }
 
   @override
   void dispose() {
     _groupSub?.cancel();
     _memberSub?.cancel();
+    _likeSub?.cancel();
     super.dispose();
   }
 }

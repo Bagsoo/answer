@@ -260,7 +260,7 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
     }
 
     final memberCount = context.select<GroupProvider, int>((gp) => gp.memberCount);
-    final likes = context.select<GroupProvider, List<String>>((gp) => gp.likes);
+    final likesCount = context.select<GroupProvider, int>((gp) => gp.likesCount);
     final isLiked = context.select<GroupProvider, bool>((gp) => gp.isLiked);
     final name = context.select<GroupProvider, String>((gp) => gp.name);
     final profileImageUrl =
@@ -400,12 +400,12 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
                           ? Colors.red
                           : colorScheme.onSurface.withOpacity(0.45),
                     ),
-                    if (likes.isNotEmpty)
+                    if (likesCount > 0)
                       Positioned(
                         right: -5,
                         bottom: -7,
                         child: Text(
-                          '${likes.length}',
+                          '$likesCount',
                           style: TextStyle(
                             fontSize: 10,
                             color: isLiked
