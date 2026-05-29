@@ -1,13 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/friend_service.dart';
 import '../services/block_service.dart';
+import '../services/voice_call_service.dart';
 import '../providers/user_provider.dart';
 import '../l10n/app_localizations.dart';
 import 'chat_room_screen.dart';
+import 'video_room_screen.dart';
 
 class UserProfileDetailScreen extends StatefulWidget {
   final String uid;
@@ -106,6 +110,87 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
         );
       }
     }
+  }
+
+  // ── 영상통화 시작 ─────────────────────────────────────────────────────────
+  Future<void> _startVideoCall() async {
+    if (_isDeleted || _dmLoading) return;
+    
+    final l = AppLocalizations.of(context);
+    final voiceCallService = context.read<VoiceCallService>();
+    
+    if (!voiceCallService.tryBeginVoiceRoomTransition()) return;
+    
+    setState(() => _dmLoading = true);
+    
+    try {
+      final friendService = context.read<FriendService>();
+      final myName = context.read<UserProvider>().name;
+      
+      // 1. DM 방 확보 (없으면 생성)
+      final roomId = await friendService.getOrCreateDmRoom(
+        widget.uid,
+        widget.displayName,
+        myName: myName,
+      );
+      
+      // 2. 통화 세션 시작
+      final callId = await voiceCallService.startVoiceCall(roomId, type: 'video');
+      
+      // 3. 통화 세션 참여
+      final joinResult = await voiceCallService.joinVoiceCall(
+        roomId: roomId,
+        callId: callId,
+        device: _deviceType,
+        isVideoEnabled: true,
+      );
+      
+      if (!mounted) return;
+      
+      // 4. 영상통화 화면으로 이동
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VideoRoomScreen(
+            roomId: roomId,
+            roomName: widget.displayName,
+            callId: callId,
+            token: joinResult.token,
+            appId: joinResult.appId,
+            channelName: joinResult.channelName,
+            agoraUid: joinResult.uid,
+          ),
+        ),
+      );
+    } on FirebaseFunctionsException catch (e) {
+      if (mounted) {
+        String message = '${l.videoCallStartFailed}: $e';
+        if (e.code == 'resource-exhausted') {
+          // Cooldown active 에러 핸들링
+          message = '${l.videoCallStartFailed} (Cooldown: 300s)';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${l.videoCallStartFailed}: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _dmLoading = false);
+        voiceCallService.endVoiceRoomTransition();
+      }
+    }
+  }
+
+  String get _deviceType {
+    if (kIsWeb) return 'web';
+    if (Theme.of(context).platform == TargetPlatform.android) return 'android';
+    if (Theme.of(context).platform == TargetPlatform.iOS) return 'ios';
+    return 'unknown';
   }
 
   // ── 친구 추가 ─────────────────────────────────────────────────────────────
@@ -360,18 +445,37 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
 
           const SizedBox(height: 36),
 
-          // ── 액션 버튼들 ──────────────────────────────────────────────────
+          // ── 메인 액션 (DM, 영상통화) ──────────────────────────────────────
           if (!_isDeleted && !_isBlocked) ...[
-            // DM 보내기
-            _ActionButton(
-              icon: Icons.chat_bubble_outline,
-              label: l.sendDm,
-              color: colorScheme.primary,
-              isLoading: _dmLoading,
-              onTap: _openDm,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _MainActionButton(
+                      icon: Icons.chat_bubble_outline,
+                      label: l.sendDm,
+                      onTap: _openDm,
+                      isLoading: _dmLoading,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _MainActionButton(
+                      icon: Icons.videocam_outlined,
+                      label: l.attachVideoCall,
+                      onTap: _startVideoCall,
+                      isLoading: _dmLoading,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const Divider(indent: 16, endIndent: 16, height: 1),
+            const SizedBox(height: 24),
+          ],
 
+          // ── 추가 액션들 ──────────────────────────────────────────────────
+          if (!_isDeleted && !_isBlocked) ...[
             // 친구 추가 (친구 아닐 때만)
             if (!_isFriend) ...[
               _ActionButton(
@@ -409,6 +513,63 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
 
           const SizedBox(height: 32),
         ],
+      ),
+    );
+  }
+}
+
+// ── 메인 액션 버튼 (DM, 영상통화용) ───────────────────────────────────────────
+class _MainActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool isLoading;
+
+  const _MainActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.isLoading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: isLoading ? null : onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (isLoading)
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              Icon(icon, color: colorScheme.primary, size: 18),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

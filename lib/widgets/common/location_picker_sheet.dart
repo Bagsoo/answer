@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:http/http.dart' as http;
 import '../../l10n/app_localizations.dart';
 import '../../services/local_preferences_service.dart';
 import 'dart:io';
@@ -81,11 +81,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     await LocalPreferencesService.setString(_searchKey, query);
   }
 
-  // ── Google Places Autocomplete (HTTP - Web API) ──────────────────────────
-  // Note: Autocomplete via HTTP requires "IP" or "None" restriction in Console.
-  // To use "Android/iOS" restriction, one must use Native SDKs.
-  // We'll keep HTTP for autocomplete but use Geocoding (Native) for the final result
-  // to improve success rate and follow platform standards where possible.
+  // ── Google Places Autocomplete (Cloud Functions Proxy) ──────────────────
   Future<void> _searchPlaces(String input) async {
     if (input.trim().isEmpty) {
       setState(() => _predictions = []);
@@ -97,43 +93,46 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     });
 
     try {
-      final uri = Uri.https(
-        'maps.googleapis.com',
-        '/maps/api/place/autocomplete/json',
-        {
-          'input': input,
-          'key': widget.googleApiKey,
-          'language': widget.languageCode,
-        },
-      );
+      // 클라이언트에서 직접 호출 대신 Firebase Cloud Functions 호출
+      final callable = FirebaseFunctions.instanceFor(region: 'asia-northeast3')
+          .httpsCallable('getGooglePlacesAutocomplete');
+      
+      final response = await callable.call({
+        'input': input,
+        'language': widget.languageCode,
+      });
 
-      final response = await http.get(uri);
       if (!mounted) return;
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      // 타입을 명시적으로 변환 (Map<Object?, Object?> -> Map<String, dynamic>)
+      final Map<String, dynamic> data = Map<String, dynamic>.from(response.data as Map);
       
       if (data['status'] != 'OK' && data['status'] != 'ZERO_RESULTS') {
-        debugPrint('Google Places API Error: ${data['status']} - ${data['error_message']}');
+        final String? msg = data['error_message'] as String?;
+        debugPrint('Cloud Function Google Places Error: ${data['status']} - $msg');
         if (mounted) {
           setState(() {
             _searching = false;
-            _errorMsg = 'API Error: ${data['status']}';
+            _errorMsg = msg ?? 'API Error: ${data['status']}';
           });
         }
         return;
       }
 
       final predictions = (data['predictions'] as List? ?? [])
-          .map((p) => _PlacePrediction(
-                placeId: p['place_id'] as String,
-                mainText: (p['structured_formatting']
-                        ?['main_text'] as String?) ??
-                    (p['description'] as String),
-                secondaryText: p['structured_formatting']
-                        ?['secondary_text'] as String? ??
-                    '',
-                fullAddress: p['description'] as String,
-              ))
+          .map((p) {
+            final map = Map<String, dynamic>.from(p as Map);
+            final structured = map['structured_formatting'] != null 
+                ? Map<String, dynamic>.from(map['structured_formatting'] as Map)
+                : null;
+            
+            return _PlacePrediction(
+              placeId: map['place_id'] as String,
+              mainText: (structured?['main_text'] as String?) ?? (map['description'] as String),
+              secondaryText: (structured?['secondary_text'] as String?) ?? '',
+              fullAddress: map['description'] as String,
+            );
+          })
           .toList();
 
       setState(() {
@@ -141,6 +140,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
         _searching = false;
       });
     } catch (e) {
+      debugPrint('Call Cloud Function error: $e');
       if (mounted) {
         setState(() {
           _searching = false;
@@ -151,7 +151,6 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
   }
 
   // ── Geocoding (Native SDK) 를 사용하여 주소를 좌표로 변환 ─────────────────────
-  // Native SDK를 사용하므로 Android/iOS 제한이 걸린 키로도 작동합니다.
   Future<LocationResult?> _getPlaceDetails(
       String placeId, String name, String fullAddress) async {
     try {
@@ -167,33 +166,40 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
         );
       }
     } catch (e) {
-      debugPrint('Native Geocoding failed, falling back to HTTP: $e');
+      debugPrint('Native Geocoding failed, falling back to Cloud Functions: $e');
     }
 
-    // 2. Fallback: Place Details HTTP (Web API)
+    // 2. Fallback: Cloud Functions Proxy for Place Details
     try {
-      final uri = Uri.https(
-        'maps.googleapis.com',
-        '/maps/api/place/details/json',
-        {
-          'place_id': placeId,
-          'key': widget.googleApiKey,
-          'fields': 'geometry,name,formatted_address',
-          'language': widget.languageCode,
-        },
-      );
-      final response = await http.get(uri);
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final result = data['result'] as Map<String, dynamic>?;
-      final loc = result?['geometry']?['location'] as Map<String, dynamic>?;
-      if (loc == null) return null;
+      final callable = FirebaseFunctions.instanceFor(region: 'asia-northeast3')
+          .httpsCallable('getGooglePlaceDetails');
+      
+      final response = await callable.call({
+        'placeId': placeId,
+        'language': widget.languageCode,
+      });
+
+      final Map<String, dynamic> data = Map<String, dynamic>.from(response.data as Map);
+      final resultRaw = data['result'];
+      if (resultRaw == null) return null;
+      final result = Map<String, dynamic>.from(resultRaw as Map);
+      
+      final geometryRaw = result['geometry'];
+      if (geometryRaw == null) return null;
+      final geometry = Map<String, dynamic>.from(geometryRaw as Map);
+      
+      final locRaw = geometry['location'];
+      if (locRaw == null) return null;
+      final loc = Map<String, dynamic>.from(locRaw as Map);
+
       return LocationResult(
         latitude: (loc['lat'] as num).toDouble(),
         longitude: (loc['lng'] as num).toDouble(),
         name: name,
-        address: result?['formatted_address'] as String? ?? '',
+        address: result['formatted_address'] as String? ?? '',
       );
     } catch (e) {
+      debugPrint('Cloud Function Place Details error: $e');
       return null;
     }
   }

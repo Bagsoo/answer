@@ -1018,6 +1018,25 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
     }
   }
 
+  Future<void> _handleAiMinutesTap(AppLocalizations l) async {
+    setState(() => _showAttachPanel = false);
+    
+    // TODO: 권한 및 사용량 체크 로직 추가 예정
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l.notification),
+        content: Text(l.aiMinutesUnderPreparation),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l.confirm),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ──────────────────────────────────────────────────────────────────────────
   // 검색
   // ──────────────────────────────────────────────────────────────────────────
@@ -2858,32 +2877,20 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
         color: Colors.blue,
         onTap: () => _handleVoiceCallTap(l),
       ),
-      AttachItem(
-        icon: Icons.videocam,
-        label: l.attachVideoCall,
-        color: Colors.purple,
-        onTap: () => _joinVoiceCall(l, type: 'video'),
-      ),
-      AttachItem(
-        icon: Icons.auto_awesome_outlined,
-        label: l.attachAiMinutes,
-        color: Colors.teal,
-        onTap: () {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text(l.notification),
-              content: Text(l.aiMinutesUnderPreparation),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(l.confirm),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+      if (_roomMeta?.roomType == 'group_all' || _roomMeta?.roomType == 'group_sub')
+        AttachItem(
+          icon: Icons.videocam,
+          label: l.attachVideoCall,
+          color: Colors.purple,
+          onTap: () => _joinVoiceCall(l, type: 'video'),
+        ),
+      if (_roomMeta?.roomType == 'group_all' || _roomMeta?.roomType == 'group_sub')
+        AttachItem(
+          icon: Icons.auto_awesome_outlined,
+          label: l.attachAiMinutes,
+          color: Colors.teal,
+          onTap: () => _handleAiMinutesTap(l),
+        ),
       AttachItem(
         icon: Icons.share_location_outlined,
         label: l.attachLocation,

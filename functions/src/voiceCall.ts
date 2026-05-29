@@ -17,10 +17,10 @@ const VOICE_CALL_MAX_PARTICIPANTS = 8;
 const VIDEO_CALL_MAX_PARTICIPANTS = 4; // 초기에 4명으로 제한
 const VOICE_CALL_MAX_GROUP_MEMBERS = 20;
 const VIDEO_CALL_MAX_GROUP_MEMBERS = 20;
-const VOICE_CALL_COOLDOWN_MS = 60 * 1000;
+const VOICE_CALL_COOLDOWN_MS = 300 * 1000;
 const VOICE_CALL_MAX_DURATION_MS = 3 * 60 * 60 * 1000;
 const VOICE_CALL_DAILY_START_LIMIT = 20;
-const VOICE_CALL_HEARTBEAT_STALE_MS = 30 * 1000;
+const VOICE_CALL_HEARTBEAT_STALE_MS = 3 * 60 * 1000;
 const VOICE_CALL_TOKEN_TTL_SECONDS = 60 * 60;
 
 type RoomData = {
@@ -117,7 +117,7 @@ async function assertStartPermission(room: RoomData, uid: string, type: string) 
   const group = groupDoc.data() ?? {};
   const member = memberDoc.data() as GroupMemberData;
   const memberCount = (group.member_count as number | undefined) ?? 0;
-  
+
   const maxGroupLimit = type === "video" ? VIDEO_CALL_MAX_GROUP_MEMBERS : VOICE_CALL_MAX_GROUP_MEMBERS;
   if (memberCount > maxGroupLimit) {
     throw new HttpsError("failed-precondition", "Group too large for this call type.");
@@ -141,10 +141,11 @@ async function hasBlockedRelationship(uid: string, otherUid: string) {
 
 async function assertNoBlockedRelationship(uid: string, memberIds: string[]) {
   const others = memberIds.filter((id) => id !== uid);
-  for (const otherUid of others) {
-    if (await hasBlockedRelationship(uid, otherUid)) {
-      throw new HttpsError("permission-denied", "Blocked relationship exists.");
-    }
+  const results = await Promise.all(
+    others.map((otherUid) => hasBlockedRelationship(uid, otherUid))
+  );
+  if (results.some(Boolean)) {
+    throw new HttpsError("permission-denied", "Blocked relationship exists.");
   }
 }
 
@@ -191,18 +192,18 @@ async function notifyCallStarted(roomId: string, callerUid: string, callId: stri
 
   const roomName = room.name ?? room.group_name ?? (type === "video" ? "Video Call" : "Voice Call");
   const bodyText = type === "video" ? "영상통화가 시작되었습니다." : "음성통화가 시작되었습니다.";
-  
+
   const payload = {
     notification: { title: roomName, body: bodyText },
-    data: { 
+    data: {
       type: "voice_call", // 클라이언트 앱의 기존 리스너 구조 유지
       callType: type,
-      roomId, 
-      callId, 
-      channelName, 
-      notificationTitle: roomName, 
-      notificationBody: bodyText, 
-      avatarUrl: room.group_profile_image ?? "" 
+      roomId,
+      callId,
+      channelName,
+      notificationTitle: roomName,
+      notificationBody: bodyText,
+      avatarUrl: room.group_profile_image ?? ""
     },
     android: { priority: "high" as const, collapseKey: `${type}_call_${roomId}`, notification: { channelId: "chat_channel" } },
     apns: { payload: { aps: { sound: "default", badge: 1, contentAvailable: true } } },
@@ -226,9 +227,9 @@ async function endCallIfEmpty(roomId: string, callId: string) {
     const call = callSnap.data() ?? {};
     if (call.status !== "active") return;
 
-    const participantsSnap = await tx.get(callRef.collection("participants").where("left_at", "==", null));
-    const activeCount = participantsSnap.size;
-    const updates: any = { participant_count: activeCount, last_activity_at: admin.firestore.FieldValue.serverTimestamp() };
+    // ✅ 이미 있는 participant_count 필드 직접 사용
+    const activeCount = (call.participant_count as number) ?? 0;
+    const updates: any = { last_activity_at: admin.firestore.FieldValue.serverTimestamp() };
 
     if (activeCount <= 0) {
       updates.status = "ended";
@@ -260,19 +261,19 @@ export const startVoiceCall = onCall({ region: "asia-northeast3", secrets: ["AGO
     const channelName = `${roomId}_${Date.now()}`;
 
     await getDb().runTransaction(async (tx) => {
-      tx.set(callRef, { 
-        type: callType, 
-        status: "active", 
-        started_by: uid, 
-        started_at: admin.firestore.FieldValue.serverTimestamp(), 
-        channel_name: channelName, 
+      tx.set(callRef, {
+        type: callType,
+        status: "active",
+        started_by: uid,
+        started_at: admin.firestore.FieldValue.serverTimestamp(),
+        channel_name: channelName,
         participant_count: 0,
         max_participants: callType === "video" ? VIDEO_CALL_MAX_PARTICIPANTS : VOICE_CALL_MAX_PARTICIPANTS
       });
-      tx.update(roomDoc.ref, { 
-        active_call_id: callRef.id, 
-        active_call_type: callType, 
-        updated_at: admin.firestore.FieldValue.serverTimestamp() 
+      tx.update(roomDoc.ref, {
+        active_call_id: callRef.id,
+        active_call_type: callType,
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
       });
     });
 
@@ -301,7 +302,7 @@ export const joinVoiceCall = onCall({ region: "asia-northeast3", secrets: ["AGOR
     const result = await getDb().runTransaction(async (tx) => {
       const [callSnap, pSnap] = await Promise.all([tx.get(callRef), tx.get(participantRef)]);
       if (!callSnap.exists || callSnap.data()?.status !== "active") throw new HttpsError("failed-precondition", "Call not active.");
-      
+
       const callData = callSnap.data() ?? {};
       const participantCount = (callData.participant_count as number | undefined) ?? 0;
       const wasActive = pSnap.exists && pSnap.data()?.left_at == null;
@@ -312,29 +313,29 @@ export const joinVoiceCall = onCall({ region: "asia-northeast3", secrets: ["AGOR
         throw new HttpsError("resource-exhausted", "Call room is full.");
       }
 
-      tx.set(participantRef, { 
-        uid, 
-        joined_at: wasActive ? pSnap.data()?.joined_at : admin.firestore.FieldValue.serverTimestamp(), 
-        left_at: null, 
-        is_muted: false, 
+      tx.set(participantRef, {
+        uid,
+        joined_at: wasActive ? pSnap.data()?.joined_at : admin.firestore.FieldValue.serverTimestamp(),
+        left_at: null,
+        is_muted: false,
         is_video_enabled: isVideoEnabled ?? (callData.type === "video"),
-        device: device ?? "unknown", 
-        last_seen: admin.firestore.FieldValue.serverTimestamp() 
+        device: device ?? "unknown",
+        last_seen: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
-      
+
       if (!wasActive) tx.update(callRef, { participant_count: admin.firestore.FieldValue.increment(1) });
-      
+
       return { channelName: callData.channel_name as string };
     });
 
     const agoraUid = toAgoraUid(uid);
     const token = buildAgoraToken(result.channelName, agoraUid);
-    return { 
-      token, 
-      appId: process.env.AGORA_APP_ID, 
-      channelName: result.channelName, 
-      uid: agoraUid, 
-      expiresInSeconds: VOICE_CALL_TOKEN_TTL_SECONDS 
+    return {
+      token,
+      appId: process.env.AGORA_APP_ID,
+      channelName: result.channelName,
+      uid: agoraUid,
+      expiresInSeconds: VOICE_CALL_TOKEN_TTL_SECONDS
     };
   } catch (err: any) {
     console.error("joinCall Error:", err);
@@ -386,7 +387,7 @@ export const refreshVoiceToken = onCall({ region: "asia-northeast3", secrets: ["
   }
 });
 
-export const cleanupVoiceCalls = onSchedule({ schedule: "every 1 minutes", region: "asia-northeast3" }, async () => {
+export const cleanupVoiceCalls = onSchedule({ schedule: "every 5 minutes", region: "asia-northeast3" }, async () => {
   const db = getDb();
   const now = Date.now();
   const activeCallsSnap = await db.collectionGroup("calls").where("status", "==", "active").get();

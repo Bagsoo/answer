@@ -46,6 +46,7 @@ class AuthService extends ChangeNotifier {
   bool? get isRegisteredUser => _isRegisteredUser;
   String? _pendingDisplayName;
   String? get pendingDisplayName => _pendingDisplayName;
+  String? _pendingSignInProvider;
 
   static const _providerGoogle = 'google.com';
   static const _providerApple = 'apple.com';
@@ -166,6 +167,7 @@ class AuthService extends ChangeNotifier {
 
       if (userCredential.additionalUserInfo?.isNewUser == true) {
         _pendingDisplayName = displayName;
+        _pendingSignInProvider = _providerGoogle;
       } else {
         await _syncLinkedAuthState(user: userCredential.user, lastSignInProvider: _providerGoogle);
       }
@@ -207,16 +209,24 @@ class AuthService extends ChangeNotifier {
       final credential = PhoneAuthProvider.credential(verificationId: _verificationId!, smsCode: smsCode);
       final current = currentUser;
       User? user;
+      UserCredential? uc;
       if (current != null) {
         if (_providerIds(current).contains(_providerPhone)) return null;
-        final uc = await current.linkWithCredential(credential);
+        uc = await current.linkWithCredential(credential);
         user = uc.user;
       } else {
-        final uc = await _auth.signInWithCredential(credential);
+        uc = await _auth.signInWithCredential(credential);
         user = uc.user;
       }
       if (user == null) return '인증 실패';
-      await _syncLinkedAuthState(user: user, lastSignInProvider: _providerPhone);
+      
+      final isNewUser = current == null && uc?.additionalUserInfo?.isNewUser == true;
+      if (isNewUser) {
+        _pendingSignInProvider = _providerPhone;
+      } else {
+        await _syncLinkedAuthState(user: user, lastSignInProvider: _providerPhone);
+      }
+      
       _verificationId = null;
       return null;
     } catch (e) { return e.toString(); }
@@ -229,12 +239,15 @@ class AuthService extends ChangeNotifier {
       final userRef = _db.collection('users').doc(user.uid);
       await userRef.set({
         'name': name, 'locale': locale, 'timezone': timezone, 'account_status': 'active',
-        'profile_image': user.photoURL ?? '', 'updated_at': FieldValue.serverTimestamp(),
+        'profile_image': user.photoURL ?? '', 
+        'created_at': FieldValue.serverTimestamp(),
+        'updated_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
       _isRegisteredUser = true;
       _pendingDisplayName = null;
       notifyListeners();
-      await _syncLinkedAuthState(user: user);
+      await _syncLinkedAuthState(user: user, lastSignInProvider: _pendingSignInProvider);
+      _pendingSignInProvider = null;
       return true;
     } catch (e) { return false; }
   }

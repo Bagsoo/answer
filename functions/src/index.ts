@@ -24,9 +24,12 @@ export {
   refreshVoiceToken,
   cleanupVoiceCalls,
 } from "./voiceCall";
+import { defineSecret } from "firebase-functions/params";
 
 admin.initializeApp();
 const db = admin.firestore();
+
+const mapsApiKey = defineSecret("GOOGLE_MAPS_API_KEY");
 
 setGlobalOptions({
   region: "asia-northeast3",
@@ -440,3 +443,37 @@ export const onUserNotificationCreatedV2 = onDocumentWritten("users/{uid}/notifi
 });
 
 export { downgradeExpiredGroups, expireUserPayments } from "./downgradeExpiredGroups";
+
+export const getGooglePlacesAutocomplete = onCall(
+  { secrets: [mapsApiKey] },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) throw new HttpsError("unauthenticated", "Unauthenticated");
+
+    const { input, language } = request.data;
+    const apiKey = mapsApiKey.value(); // 이렇게 읽어야 해요
+
+    const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${apiKey}&language=${language || "ko"}`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+    return data;
+  }
+);
+
+export const getGooglePlaceDetails = onCall(
+  { secrets: [mapsApiKey] },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) throw new HttpsError("unauthenticated", "Unauthenticated");
+
+    const { placeId, language } = request.data;
+    const apiKey = mapsApiKey.value(); // 이렇게 읽어야 해요
+
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&key=${apiKey}&fields=geometry,name,formatted_address&language=${language || "ko"}`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+    return data;
+  }
+);

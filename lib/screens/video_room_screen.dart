@@ -154,12 +154,9 @@ class _VideoRoomScreenState extends State<VideoRoomScreen> {
   Future<void> _leaveChannel() async {
     _heartbeatTimer?.cancel();
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid != null) {
-      final callRef = FirebaseFirestore.instance
-          .collection('chat_rooms')
-          .doc(widget.roomId)
-          .collection('calls')
-          .doc(widget.callId);
+    try {
+      final roomRef = FirebaseFirestore.instance.collection('chat_rooms').doc(widget.roomId);
+      final callRef = roomRef.collection('calls').doc(widget.callId);
 
       await FirebaseFirestore.instance.runTransaction((transaction) async {
         final callSnap = await transaction.get(callRef);
@@ -173,13 +170,17 @@ class _VideoRoomScreenState extends State<VideoRoomScreen> {
           'participant_count': newCount,
           if (newCount == 0) 'status': 'ended',
         });
+
+        if (newCount == 0) {
+          transaction.update(roomRef, {'active_call_id': FieldValue.delete()});
+        }
       });
+    } catch (e) {
+      debugPrint("Transaction error: $e");
     }
 
     try {
       await _engine.stopPreview();
-      await _engine.leaveChannel();
-      await _engine.release();
     } catch (e) {
       debugPrint("Agora release error: $e");
     }

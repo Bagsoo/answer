@@ -1,12 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../config/env_config.dart';
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http;
 import 'dart:async';
-import 'dart:convert';
 import '../../services/notification_service.dart';
 import '../../providers/group_provider.dart';
 import '../../providers/user_provider.dart';
@@ -456,38 +455,43 @@ class _LocationAutocompleteFieldState
     setState(() => _loading = true);
 
     try {
-      final uri = Uri.parse(
-        'https://maps.googleapis.com/maps/api/place/autocomplete/json'
-        '?input=${Uri.encodeComponent(query)}'
-        '&key=${widget.apiKey}'
-        '&language=${widget.locale}',
-      );
-      final res = await http.get(uri);
+      final callable = FirebaseFunctions.instanceFor(region: 'asia-northeast3')
+          .httpsCallable('getGooglePlacesAutocomplete');
+      
+      final response = await callable.call({
+        'input': query,
+        'language': widget.locale,
+      });
+
       if (!mounted) return;
 
-      final json = jsonDecode(res.body);
-      if (json['status'] == 'OK') {
-        final predictions = json['predictions'] as List;
-        setState(() {
-          _suggestions = predictions
-              .map((p) => {
-                    'place_id': p['place_id'],
-                    'description': p['description'],
-                    'main_text':
-                        p['structured_formatting']?['main_text'] ??
-                            p['description'],
-                    'secondary_text':
-                        p['structured_formatting']?['secondary_text'] ?? '',
-                  })
-              .toList();
-        });
-        // 빌드 완료 후 오버레이 표시
-        WidgetsBinding.instance.addPostFrameCallback((_) => _showOverlay());
-      } else {
+      final Map<String, dynamic> json = Map<String, dynamic>.from(response.data as Map);
+      
+      if (json['status'] != 'OK' && json['status'] != 'ZERO_RESULTS') {
+        debugPrint('Cloud Function Google Places Error: ${json['status']} - ${json['error_message']}');
         setState(() => _suggestions = []);
         _removeOverlay();
+        return;
       }
-    } catch (_) {
+
+      // ✅ 이 부분이 빠져 있었음
+      final predictions = (json['predictions'] as List? ?? []).map((p) {
+        final Map<String, dynamic> pred = Map<String, dynamic>.from(p as Map);
+        final formatting = pred['structured_formatting'] != null
+            ? Map<String, dynamic>.from(pred['structured_formatting'] as Map)
+            : null;
+        return {
+          'place_id': pred['place_id'] as String,
+          'description': pred['description'] as String,
+          'main_text': formatting?['main_text'] as String? ?? pred['description'] as String,
+          'secondary_text': formatting?['secondary_text'] as String? ?? '',
+        };
+      }).toList();
+
+      setState(() => _suggestions = predictions);
+      _showOverlay();
+    } catch (e) {
+      debugPrint('_fetchSuggestions error: $e');
       if (mounted) setState(() => _suggestions = []);
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -516,21 +520,25 @@ class _LocationAutocompleteFieldState
       debugPrint('Native Geocoding failed in ScheduleForm: $e');
     }
 
-    // 2. Fallback: HTTP Details
+    // 2. Fallback: Cloud Function for Place Details
     try {
-      final uri = Uri.parse(
-        'https://maps.googleapis.com/maps/api/place/details/json'
-        '?place_id=${Uri.encodeComponent(placeId)}'
-        '&key=${widget.apiKey}'
-        '&fields=geometry,name,formatted_address'
-        '&language=${widget.locale}',
-      );
-      final res = await http.get(uri);
-      final json = jsonDecode(res.body);
+      final callable = FirebaseFunctions.instanceFor(region: 'asia-northeast3')
+          .httpsCallable('getGooglePlaceDetails');
+      
+      final response = await callable.call({
+        'placeId': placeId,
+        'language': widget.locale,
+      });
+
+      // Firebase Functions의 반환값은 Map<Object?, Object?> 형태일 수 있으므로 안전하게 변환
+      final Map<String, dynamic> json = Map<String, dynamic>.from(response.data as Map);
 
       double lat = 0.0, lng = 0.0;
       if (json['status'] == 'OK') {
-        final loc = json['result']['geometry']['location'];
+        final result = Map<String, dynamic>.from(json['result'] as Map);
+        final geometry = Map<String, dynamic>.from(result['geometry'] as Map);
+        final loc = Map<String, dynamic>.from(geometry['location'] as Map);
+        
         lat = (loc['lat'] as num).toDouble();
         lng = (loc['lng'] as num).toDouble();
       }
