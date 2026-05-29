@@ -553,4 +553,23 @@ class GroupService {
     for (final chatDoc in chatSnap.docs) batch.update(chatDoc.reference, {'group_profile_image': imageUrl});
     await batch.commit();
   }
+
+  // ── 좋아요 토글 ────────────────────────────────────────────────────────────
+  Future<void> toggleGroupLike(String groupId) async {
+    if (currentUserId.isEmpty) return;
+    final ref = _db.collection('groups').doc(groupId);
+    final snap = await ref.get();
+    if (!snap.exists) return;
+
+    final likes = List<String>.from(snap.data()?['likes'] as List? ?? []);
+    if (likes.contains(currentUserId)) {
+      await ref.update({
+        'likes': FieldValue.arrayRemove([currentUserId])
+      });
+    } else {
+      await ref.update({
+        'likes': FieldValue.arrayUnion([currentUserId])
+      });
+    }
+  }
 }

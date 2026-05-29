@@ -493,10 +493,16 @@ class AppLocalizations {
   String get permStartVoiceCall => _s.permStartVoiceCall;
   String get permEditGroupInfo => _s.permEditGroupInfo;
   String get permManagePermissions => _s.permManagePermissions;
+  String get permUseAiMinutes => _s.permUseAiMinutes;
   String get savePermissions => _s.savePermissions;
   String get permissionsSaved => _s.permissionsSaved;
   String get permissionsHint => _s.permissionsHint;
   String get voiceCallNoPermission => _s.voiceCallNoPermission;
+  String get aiMinutesNoPermission => _s.aiMinutesNoPermission;
+  String get aiMinutesQuotaExceeded => _s.aiMinutesQuotaExceeded;
+  String get aiMinutesLimitReached => _s.aiMinutesLimitReached;
+  String get aiMinutesRecording => _s.aiMinutesRecording;
+  String get aiMinutesStarting => _s.aiMinutesStarting;
   String get voiceCallBlockedUser => _s.voiceCallBlockedUser;
   String get voiceCallReady => _s.voiceCallReady;
   String get voiceCallStartFailed => _s.voiceCallStartFailed;
@@ -1272,10 +1278,16 @@ abstract class _AppStrings {
   String get permStartVoiceCall;
   String get permEditGroupInfo;
   String get permManagePermissions;
+  String get permUseAiMinutes;
   String get savePermissions;
   String get permissionsSaved;
   String get permissionsHint;
   String get voiceCallNoPermission;
+  String get aiMinutesNoPermission;
+  String get aiMinutesQuotaExceeded;
+  String get aiMinutesLimitReached;
+  String get aiMinutesRecording;
+  String get aiMinutesStarting;
   String get voiceCallBlockedUser;
   String get voiceCallReady;
   String get voiceCallStartFailed;
@@ -2061,10 +2073,16 @@ class _EnStrings extends _AppStrings {
   @override String get permStartVoiceCall => 'Start voice calls';
   @override String get permEditGroupInfo => 'Edit group info & settings';
   @override String get permManagePermissions => 'Manage member permissions';
+  @override String get permUseAiMinutes => 'Use AI minutes';
   @override String get savePermissions => 'Save Permissions';
   @override String get permissionsSaved => 'Permissions saved.';
   @override String get permissionsHint => 'You can only grant permissions you already have.';
   @override String get voiceCallNoPermission => 'You do not have permission to start a voice call in this chat.';
+  @override String get aiMinutesNoPermission => 'You do not have permission to use AI minutes in this group.';
+  @override String get aiMinutesQuotaExceeded => 'You have exceeded your monthly limit for AI minutes (10 sessions).';
+  @override String get aiMinutesLimitReached => 'Limit reached (30 min / 50MB). Stopping recording and starting analysis.';
+  @override String get aiMinutesRecording => 'Recording AI minutes...';
+  @override String get aiMinutesStarting => 'Starting AI minutes...';
   @override String get voiceCallBlockedUser => 'Voice calls are unavailable because this chat includes a blocked user.';
   @override String get voiceCallReady => 'Voice room is ready. Agora connection data has been issued.';
   @override String get voiceCallStartFailed => 'Could not start the voice call.';
@@ -2829,10 +2847,16 @@ class _KoStrings extends _AppStrings {
   @override String get permStartVoiceCall => '음성통화 시작';
   @override String get permEditGroupInfo => '그룹 정보 및 설정 수정';
   @override String get permManagePermissions => '멤버 권한 관리';
+  @override String get permUseAiMinutes => 'AI 회의록 사용 권한';
   @override String get savePermissions => '권한 저장';
   @override String get permissionsSaved => '권한이 저장되었습니다.';
   @override String get permissionsHint => '자신이 가진 권한만 다른 멤버에게 부여할 수 있습니다.';
   @override String get voiceCallNoPermission => '이 채팅방에서 음성통화를 시작할 권한이 없습니다.';
+  @override String get aiMinutesNoPermission => '이 그룹에서 AI 회의록을 사용할 권한이 없습니다.';
+  @override String get aiMinutesQuotaExceeded => '이번 달 사용 횟수(10회)를 모두 소진했습니다.';
+  @override String get aiMinutesLimitReached => '제한(30분/50MB)에 도달하여 녹음을 종료하고 분석을 시작합니다.';
+  @override String get aiMinutesRecording => 'AI 회의록 녹음 중...';
+  @override String get aiMinutesStarting => 'AI 회의록을 시작합니다...';
   @override String get voiceCallBlockedUser => '이 채팅방에 차단한 사용자가 포함되어 있어 음성통화를 시작할 수 없습니다.';
   @override String get voiceCallReady => '보이스룸이 준비되었습니다. Agora 연결 정보가 발급되었습니다.';
   @override String get voiceCallStartFailed => '음성통화를 시작하지 못했습니다.';
@@ -3114,6 +3138,12 @@ class _KoStrings extends _AppStrings {
 // ── Japanese ──────────────────────────────────────────────────────────────────
 class _JaStrings extends _AppStrings {
   const _JaStrings();
+
+  @override String get aiMinutesNoPermission => 'このグループでAI議事録を使用する権限がありません。';
+  @override String get aiMinutesQuotaExceeded => '今月の使用回数をすべて消化しました。';
+  @override String get aiMinutesLimitReached => '制限(30分/50MB)に達したため、録音を終了して分析を開始します。';
+  @override String get aiMinutesRecording => 'AI議事録の録音中...';
+  @override String get aiMinutesStarting => 'AI議事録を開始します...';
 
   @override String get adLabel => '広告';
   @override String get navFriends => '友達';
@@ -3595,6 +3625,7 @@ class _JaStrings extends _AppStrings {
   @override String get permStartVoiceCall => '音声通話の開始';
   @override String get permEditGroupInfo => 'グループ情報・設定の編集';
   @override String get permManagePermissions => 'メンバー権限管理';
+  @override String get permUseAiMinutes => 'AI議事録の使用権限';
   @override String get savePermissions => '権限を保存';
   @override String get permissionsSaved => '権限を保存しました。';
   @override String get permissionsHint => '自分が持っている権限のみ付与できます。';

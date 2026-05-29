@@ -32,6 +32,8 @@ import 'chat_room_more/poll_bubble.dart';
 import 'chat_room_more/chat_room_shared_assets_screen.dart';
 import 'chat_room_more/location_share_sheet.dart';
 import '../widgets/chat/contact_share_sheet.dart';
+import '../services/ai_minutes_service.dart';
+import '../widgets/chat/ai_minutes_recorder_sheet.dart';
 import 'user_profile_detail_screen.dart';
 import '../widgets/chat/date_divider.dart';
 import '../widgets/chat/system_message.dart';
@@ -1020,21 +1022,69 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
 
   Future<void> _handleAiMinutesTap(AppLocalizations l) async {
     setState(() => _showAttachPanel = false);
-    
-    // TODO: 권한 및 사용량 체크 로직 추가 예정
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l.notification),
-        content: Text(l.aiMinutesUnderPreparation),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l.confirm),
+
+    final groupId = _roomMeta?.refGroupId;
+    if (groupId == null || groupId.isEmpty) return;
+
+    // 1. 권한 체크
+    bool hasPermission = false;
+    try {
+      final memberDoc = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(groupId)
+          .collection('members')
+          .doc(_currentUserId)
+          .get();
+
+      if (memberDoc.exists) {
+        final data = memberDoc.data()!;
+        final role = data['role'] as String? ?? 'member';
+        final perms = data['permissions'] as Map<String, dynamic>? ?? {};
+        
+        // 소유자이거나 명시적 권한이 있는 경우
+        if (role == 'owner' || perms['can_use_ai_minutes'] == true) {
+          hasPermission = true;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking AI minutes permission: $e');
+    }
+
+    if (!hasPermission) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(l.notification),
+            content: Text(l.aiMinutesNoPermission),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(l.confirm),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        );
+      }
+      return;
+    }
+
+    // 2. 권한이 있는 경우 기존의 "준비 중" 알림 표시 (나중에 실제 기능 연결)
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(l.notification),
+          content: Text(l.aiMinutesUnderPreparation),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(l.confirm),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   // ──────────────────────────────────────────────────────────────────────────

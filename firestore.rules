@@ -108,7 +108,9 @@ service cloud.firestore {
     match /groups/{groupId} {
       allow read: if isLoggedIn();
       allow create: if isLoggedIn();
-      allow update: if isAdmin() || hasPermission(groupId, 'can_manage_permissions');
+      allow update: if isAdmin() || 
+                    hasPermission(groupId, 'can_manage_permissions') ||
+                    (isLoggedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']));
 
       match /members/{memberId} {
         allow read: if isLoggedIn();

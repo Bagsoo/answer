@@ -633,6 +633,7 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
   late bool _canStartVoiceCall;
   late bool _canEditGroupInfo;
   late bool _canManagePermissions;
+  late bool _canUseAiMinutes;
   late String _currentRole;
   bool _savingPerms = false;
 
@@ -647,6 +648,7 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
     _canEditGroupInfo = widget.perms['can_edit_group_info'] as bool? ?? false;
     _canManagePermissions =
         widget.perms['can_manage_permissions'] as bool? ?? false;
+    _canUseAiMinutes = widget.perms['can_use_ai_minutes'] as bool? ?? false;
     _loadData();
   }
 
@@ -680,6 +682,7 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
             'can_start_voice_call': _canStartVoiceCall,
             'can_edit_group_info': _canEditGroupInfo,
             'can_manage_permissions': _canManagePermissions,
+            'can_use_ai_minutes': _canUseAiMinutes,
             'can_write_post': true,
           },
         );
@@ -910,6 +913,11 @@ class _MemberProfileSheetState extends State<_MemberProfileSheet> {
                     label: l.permManagePermissions,
                     value: _canManagePermissions,
                     onChanged: (v) => setState(() => _canManagePermissions = v),
+                    colorScheme: cs),
+                _PermSwitch(
+                    label: l.permUseAiMinutes,
+                    value: _canUseAiMinutes,
+                    onChanged: (v) => setState(() => _canUseAiMinutes = v),
                     colorScheme: cs),
               ],
               

@@ -20,10 +20,12 @@ class GroupPreviewScreen extends StatefulWidget {
 
 class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
   bool _joining = false;
+  late List<String> _likes;
 
   @override
   void initState() {
     super.initState();
+    _likes = List<String>.from(widget.group['likes'] as List? ?? []);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<AnalyticsService>().logViewGroup(
@@ -36,6 +38,38 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
   }
 
   Map<String, dynamic> get group => widget.group;
+
+  Future<void> _toggleLike() async {
+    final groupService = context.read<GroupService>();
+    final myUid = groupService.currentUserId;
+    if (myUid.isEmpty) return;
+
+    final groupId = group['id'] as String;
+    
+    setState(() {
+      if (_likes.contains(myUid)) {
+        _likes.remove(myUid);
+      } else {
+        _likes.add(myUid);
+      }
+    });
+
+    try {
+      await groupService.toggleGroupLike(groupId);
+    } catch (e) {
+      debugPrint('Error toggling like: $e');
+      // 에러 시 롤백
+      if (mounted) {
+        setState(() {
+          if (_likes.contains(myUid)) {
+            _likes.remove(myUid);
+          } else {
+            _likes.add(myUid);
+          }
+        });
+      }
+    }
+  }
 
   Future<void> _onJoin() async {
     final l = AppLocalizations.of(context);
@@ -267,10 +301,16 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
                   color: colorScheme.primary,
                 ),
                 const SizedBox(width: 16),
-                _StatChip(
-                  icon: Icons.favorite,
-                  label: '${likes.length}',
-                  color: Colors.red,
+                GestureDetector(
+                  onTap: _toggleLike,
+                  behavior: HitTestBehavior.opaque,
+                  child: _StatChip(
+                    icon: _likes.contains(context.read<GroupService>().currentUserId)
+                        ? Icons.favorite
+                        : Icons.favorite_border,
+                    label: '${_likes.length}',
+                    color: Colors.red,
+                  ),
                 ),
               ],
             ),
