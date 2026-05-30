@@ -139,7 +139,7 @@ service cloud.firestore {
 
       match /{allSubcollections=**} {
         allow read: if isLoggedIn();
-        allow write: if (allSubcollections != 'likes/*') && (hasPermission(groupId, 'can_manage_permissions') || exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)));
+        allow write: if hasPermission(groupId, 'can_manage_permissions') || exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
       }
     }
 
