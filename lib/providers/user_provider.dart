@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/user_cache.dart';
 
 class UserProvider extends ChangeNotifier {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -185,6 +186,7 @@ class UserProvider extends ChangeNotifier {
 
       await _db.collection('users').doc(_uid).update({'profile_image': newUrl});
       _photoUrl = newUrl;
+      UserCache.invalidate(_uid);
       notifyListeners();
 
       final prefs = await SharedPreferences.getInstance();
@@ -228,7 +230,10 @@ class UserProvider extends ChangeNotifier {
       for (final doc in snap.docs) {
         batch.update(
           _db.collection('groups').doc(doc.id).collection('members').doc(_uid),
-          {'profile_image': newUrl},
+          {
+            'profile_image': newUrl,
+            'photo_url': FieldValue.delete(),
+          },
         );
         if (++count == 490) {
           await batch.commit(); batch = _db.batch(); count = 0;
@@ -242,6 +247,7 @@ class UserProvider extends ChangeNotifier {
   Future<void> updateName(String newName) async {
     await _db.collection('users').doc(_uid).update({'name': newName});
     _name = newName;
+    UserCache.invalidate(_uid);
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyName, newName);

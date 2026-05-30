@@ -16,6 +16,7 @@ import '../../widgets/groups/group_notice_sheet.dart';
 import '../chat_room_screen.dart';
 import '../user_profile_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../utils/user_display.dart';
 
 const _kAllTag = '__ALL__';
 
@@ -303,40 +304,105 @@ class _MembersTabState extends State<MembersTab> with SingleTickerProviderStateM
                   final isManager = role == 'manager';
                   final isMe = uid == gp.currentUserId;
 
-                  return ListTile(
-                    onTap: () => _showMemberProfile(context, uid, displayName, role, data['permissions'] ?? {}, List<String>.from(data['tags'] ?? []), isMe, canManagePerms, gp.myRole, gp.myPerms, groupId, l, colorScheme, photoUrl),
-                    leading: Stack(
-                      children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: isOwner ? colorScheme.primary : (isManager ? colorScheme.secondary : colorScheme.surfaceContainerHighest),
-                          backgroundImage: photoUrl.isNotEmpty ? CachedNetworkImageProvider(photoUrl) : null,
-                          child: photoUrl.isEmpty ? Text(displayName.isNotEmpty ? displayName[0].toUpperCase() : '?', style: TextStyle(color: isOwner ? colorScheme.onPrimary : (isManager ? colorScheme.onSecondary : colorScheme.onSurface), fontWeight: FontWeight.bold)) : null,
-                        ),
-                        if (isOwner || isManager)
-                          Positioned(
-                            right: -2,
-                            bottom: -2,
-                            child: Icon(
-                              Icons.star_rounded,
-                              size: 18,
-                              color: isOwner 
-                                ? Colors.amber[700] 
-                                : const Color(0xFFE0C1B3), // Rose Gold
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withOpacity(0.3),
-                                  offset: const Offset(1, 1),
-                                  blurRadius: 3,
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
+                  return FutureBuilder<UserDisplayData>(
+                    future: UserDisplay.resolve(
+                      uid,
+                      fallbackName: displayName,
+                      fallbackPhotoUrl: photoUrl,
                     ),
-                    title: Text(isMe ? '$displayName (${l.me})' : displayName, style: TextStyle(fontWeight: (isOwner || isManager) ? FontWeight.bold : FontWeight.normal)),
-                    subtitle: Text(isOwner ? l.roleOwner : (isManager ? l.roleManager : l.roleMember), style: TextStyle(color: isOwner ? colorScheme.primary : (isManager ? colorScheme.secondary : colorScheme.onSurface.withOpacity(0.5)), fontSize: 12)),
-                    trailing: (canManagePerms && !isMe && !isOwner) ? Icon(Icons.manage_accounts_outlined, color: colorScheme.onSurface.withOpacity(0.4)) : null,
+                    initialData: UserDisplay.fromStored(
+                      uid: uid,
+                      name: displayName,
+                      photoUrl: photoUrl,
+                    ),
+                    builder: (context, snapshot) {
+                      final user = snapshot.data ?? UserDisplay.fromStored(
+                        uid: uid,
+                        name: displayName,
+                        photoUrl: photoUrl,
+                      );
+
+                      final resolvedName = user.displayName(l, fallback: displayName);
+                      final resolvedPhoto = user.isDeleted ? '' : user.photoUrl;
+
+                      return ListTile(
+                        onTap: () => _showMemberProfile(
+                          context,
+                          uid,
+                          resolvedName,
+                          role,
+                          data['permissions'] ?? {},
+                          List<String>.from(data['tags'] ?? []),
+                          isMe,
+                          canManagePerms,
+                          gp.myRole,
+                          gp.myPerms,
+                          groupId,
+                          l,
+                          colorScheme,
+                          resolvedPhoto,
+                        ),
+                        leading: Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 24,
+                              backgroundColor: isOwner 
+                                  ? colorScheme.primary 
+                                  : (isManager ? colorScheme.secondary : colorScheme.surfaceContainerHighest),
+                              backgroundImage: resolvedPhoto.isNotEmpty 
+                                  ? CachedNetworkImageProvider(resolvedPhoto) 
+                                  : null,
+                              child: resolvedPhoto.isEmpty 
+                                  ? Text(
+                                      resolvedName.isNotEmpty ? resolvedName[0].toUpperCase() : '?', 
+                                      style: TextStyle(
+                                        color: isOwner 
+                                            ? colorScheme.onPrimary 
+                                            : (isManager ? colorScheme.onSecondary : colorScheme.onSurface), 
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ) 
+                                  : null,
+                            ),
+                            if (isOwner || isManager)
+                              Positioned(
+                                right: -2,
+                                bottom: -2,
+                                child: Icon(
+                                  Icons.star_rounded,
+                                  size: 18,
+                                  color: isOwner 
+                                      ? Colors.amber[700] 
+                                      : const Color(0xFFE0C1B3), // Rose Gold
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withOpacity(0.3),
+                                      offset: const Offset(1, 1),
+                                      blurRadius: 3,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                        title: Text(
+                          isMe ? '$resolvedName (${l.me})' : resolvedName, 
+                          style: TextStyle(fontWeight: (isOwner || isManager) ? FontWeight.bold : FontWeight.normal),
+                        ),
+                        subtitle: Text(
+                          isOwner ? l.roleOwner : (isManager ? l.roleManager : l.roleMember), 
+                          style: TextStyle(
+                            color: isOwner 
+                                ? colorScheme.primary 
+                                : (isManager ? colorScheme.secondary : colorScheme.onSurface.withOpacity(0.5)), 
+                            fontSize: 12,
+                          ),
+                        ),
+                        trailing: (canManagePerms && !isMe && !isOwner) 
+                            ? Icon(Icons.manage_accounts_outlined, color: colorScheme.onSurface.withOpacity(0.4)) 
+                            : null,
+                      );
+                    },
                   );
                 },
               ),
