@@ -61,7 +61,8 @@ service cloud.firestore {
     match /chat_rooms/{roomId} {
       allow read: if isAdmin() || (isLoggedIn() && (
         request.auth.uid in resource.data.member_ids || 
-        (resource.data.ref_group_id != null && exists(/databases/$(database)/documents/groups/$(resource.data.ref_group_id)/members/$(request.auth.uid)))
+        (resource.data.ref_group_id != null && exists(/databases/$(database)/documents/groups/$(resource.data.ref_group_id)/members/$(request.auth.uid))) ||
+        resource.data.type == 'group_all'
       ));
       allow create: if isLoggedIn();
       allow update: if isAdmin() || (
@@ -115,7 +116,15 @@ service cloud.firestore {
       allow read: if isLoggedIn();
       allow create: if isLoggedIn();
       allow update: if isAdmin() || 
-                    hasPermission(groupId, 'can_manage_permissions');
+                    hasPermission(groupId, 'can_manage_permissions') ||
+                    (
+                      isLoggedIn() &&
+                      request.resource.data.diff(resource.data).changedKeys().hasOnly(['member_count']) &&
+                      (
+                        request.resource.data.member_count == resource.data.member_count + 1 ||
+                        request.resource.data.member_count == resource.data.member_count - 1
+                      )
+                    );
 
       match /likes/{uid} {
         allow read: if isLoggedIn();
