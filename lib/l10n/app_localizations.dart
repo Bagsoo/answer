@@ -443,6 +443,10 @@ class AppLocalizations {
   String get planProFeature3 => _s.planProFeature3;
   String get planProFeature4 => _s.planProFeature4;
   String get planProFeature5 => _s.planProFeature5;
+  // ── ai 회의록 ────────────────────────────────────────────────────────────────     
+   String get aiMinutesReadyToRecord => _s.aiMinutesReadyToRecord;
+   String get aiMinutesPressMicToStart => _s.aiMinutesPressMicToStart;
+   String get aiMinutesStopToFinish => _s.aiMinutesStopToFinish;
 
   // ── 플랜 공통 ────────────────────────────────────────────────────────────────
   String get manageGroupPlan => _s.manageGroupPlan;
@@ -1233,6 +1237,12 @@ abstract class _AppStrings {
   String get planProFeature3;
   String get planProFeature4;
   String get planProFeature5;
+
+  // ai 회의록   
+   String get aiMinutesReadyToRecord;
+   String get aiMinutesPressMicToStart;
+   String get aiMinutesStopToFinish;
+
   // 플랜 공통
   String get manageGroupPlan;
   String get allowPlanUpgrade;
@@ -2032,6 +2042,11 @@ class _EnStrings extends _AppStrings {
   @override String get planProFeature4 => 'AI meeting minutes (group chats only)';
   @override String get planProFeature5 => 'All Plus features included';
 
+  // ai 회의록   
+   @override String get aiMinutesReadyToRecord => 'Ready to record';
+   @override String get aiMinutesPressMicToStart => 'Press mic to start';
+   @override String get aiMinutesStopToFinish => 'Stop to finish';
+
   // 플랜 공통
   @override String get manageGroupPlan => 'Manage Plan';
   @override String get allowPlanUpgrade => 'Allow Plan Upgrade Later';
@@ -2807,6 +2822,11 @@ class _KoStrings extends _AppStrings {
   @override String get planProFeature4 => 'AI 회의록 자동 생성 (그룹 채팅방 전용)';
   @override String get planProFeature5 => 'Plus 플랜 기능 전체 포함';
 
+  // ai 회의록  
+  @override String get aiMinutesReadyToRecord => '녹음 준비 완료';
+  @override String get aiMinutesPressMicToStart => '마이크를 눌러 녹음을 시작하세요';
+  @override String get aiMinutesStopToFinish => '녹음을 마치려면 정지를 누르세요';    
+
   // 플랜 공통
   @override String get manageGroupPlan => '플랜 관리';
   @override String get allowPlanUpgrade => '나중에 유료 플랜 전환 허용';
@@ -3154,8 +3174,7 @@ class _JaStrings extends _AppStrings {
 
   @override String get aiMinutesNoPermission => 'このグループでAI議事録を使用する権限がありません。';
   @override String get aiMinutesQuotaExceeded => '今月の使用回数をすべて消化しました。';
-  @override String get aiMinutesLimitReached => '制限(30分/50MB)に達したため、録音を終了して分析を開始します。';
-  @override String get aiMinutesRecording => 'AI議事録の録音中...';
+  @override String get aiMinutesLimitReached => '制限(30分/50MB)に達したため、録音を終了して分析を開始します。';  
   @override String get aiMinutesStarting => 'AI議事録を開始します...';
 
   @override String get adLabel => '広告';
@@ -3589,6 +3608,12 @@ class _JaStrings extends _AppStrings {
   @override String get planProFeature3 => 'スケジュール内の場所検索（Google Maps）';
   @override String get planProFeature4 => 'AI議事録自動生成（グループチャット専用）';
   @override String get planProFeature5 => 'Plusプランの全機能を含む';
+
+  // ai 회의록
+  @override String get aiMinutesRecording => '議事録を録音中...';
+  @override String get aiMinutesReadyToRecord => '録音準備完了';
+  @override String get aiMinutesPressMicToStart => 'マイクを押して録音を開始してください';
+  @override String get aiMinutesStopToFinish => '録音を終えるには停止を押してください';
 
   // 플랜 공통
   @override String get manageGroupPlan => 'プラン管理';

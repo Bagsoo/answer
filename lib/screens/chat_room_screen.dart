@@ -1041,7 +1041,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
         final role = data['role'] as String? ?? 'member';
         final perms = data['permissions'] as Map<String, dynamic>? ?? {};
         
-        // 소유자이거나 명시적 권한이 있는 경우
         if (role == 'owner' || perms['can_use_ai_minutes'] == true) {
           hasPermission = true;
         }
@@ -1069,22 +1068,64 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
       return;
     }
 
-    // 2. 권한이 있는 경우 기존의 "준비 중" 알림 표시 (나중에 실제 기능 연결)
-    if (mounted) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(l.notification),
-          content: Text(l.aiMinutesUnderPreparation),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(l.confirm),
-            ),
-          ],
-        ),
-      );
-    }
+    // 2. 권한이 있는 경우 녹음 시트 표시
+    if (!mounted) return;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (_) => AiMinutesRecorderSheet(
+        onCompleted: (file, durationSeconds) async {
+          // 3. 파일 업로드 및 AI 분석 메시지 생성
+          try {
+            final fileName = 'audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+            final storagePath = 'chat_rooms/${widget.roomId}/audio/$fileName';
+            
+            // Job 문서 참조 생성
+            final jobRef = FirebaseFirestore.instance.collection('ai_jobs').doc();
+            
+            // 4. Firestore에 Job 문서 선생성 (queued)
+            await jobRef.set({
+              'jobId': jobRef.id,
+              'roomId': widget.roomId,
+              'groupId': groupId,
+              'audioUrl': storagePath,
+              'durationSec': durationSeconds,
+              'status': 'queued',
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+            
+            // Storage에 업로드 (StorageService 필요)
+            final uploadResult = await context.read<StorageService>().uploadChatAudio(
+              roomId: widget.roomId,
+              messageId: DateTime.now().millisecondsSinceEpoch.toString(),
+              file: file,
+              fileName: fileName,
+              mimeType: 'audio/m4a',
+              jobId: jobRef.id,
+            );
+            
+            if (uploadResult != null) {
+              // 5. 채팅방에 "분석 중" 메시지 전송
+              await context.read<ChatService>().sendAiMinutesMessage(
+                widget.roomId,
+                jobId: jobRef.id,
+                senderName: _myName,
+                senderPhotoUrl: context.read<UserProvider>().photoUrl,
+              );
+            }
+          } catch (e) {
+            debugPrint('Error processing AI minutes: $e');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('회의록 분석 요청에 실패했습니다.')),
+              );
+            }
+          }
+        },
+      ),
+    );
   }
 
   // ──────────────────────────────────────────────────────────────────────────

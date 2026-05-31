@@ -23,6 +23,7 @@ import '../../providers/user_provider.dart';
 import '../../screens/user_profile_detail_screen.dart';
 import 'location_message_bubble.dart';
 import 'settlement_bubble.dart';
+import 'ai_minutes_bubble.dart';
 import 'dart:io';
 
 class MessageBubble extends StatefulWidget {
@@ -1166,17 +1167,17 @@ class _MessageBubbleState extends State<MessageBubble>
       );
     }
 
-    // ── 정산 ──────────────────────────────────────────────────────────────────
-    if (type == 'settlement') {
+    // ── AI 회의록 ─────────────────────────────────────────────────────────────
+    if (type == 'ai_minutes') {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           if (replyBox != null) replyBox,
-          SettlementBubble(
-            data: widget.data,
+          AiMinutesBubble(
+            jobId: widget.data['job_id'] as String? ?? '',
+            status: widget.data['ai_status'] as String? ?? 'processing',
             colorScheme: colorScheme,
-            isMe: widget.isMe,
           ),
         ],
       );

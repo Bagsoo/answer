@@ -111,6 +111,13 @@ service cloud.firestore {
       }
     }
 
+    // ── AI 회의록 관리 ──────────────────────────────────────────────────
+    match /ai_jobs/{jobId} {
+      allow read: if isLoggedIn() && request.auth.uid in get(/databases/$(database)/documents/chat_rooms/$(resource.data.roomId)).data.member_ids;
+      allow create: if isLoggedIn();
+      allow update: if false;
+    }
+
     // ── 그룹 ────────────────────────────────────────────────────────────────
     match /groups/{groupId} {
       allow read: if isLoggedIn();
@@ -125,6 +132,12 @@ service cloud.firestore {
                         request.resource.data.member_count == resource.data.member_count - 1
                       )
                     );
+
+      // AI 회의록 사용량 관리
+      match /usage/months/{monthId} {
+        allow read: if isLoggedIn() && exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+        allow write: if isAdmin() || hasPermission(groupId, 'can_manage_permissions');
+      }
 
       match /likes/{uid} {
         allow read: if isLoggedIn();

@@ -103,16 +103,21 @@ class StorageService {
     required File file,
     required String fileName,
     required String mimeType,
+    String? jobId,
   }) async {
     final ref = _storage.ref(
       'chat_rooms/$roomId/audio/${DateTime.now().millisecondsSinceEpoch}_$fileName',
     );
     try {
+      final Map<String, String> metadata = {'message_id': messageId};
+      if (jobId != null) {
+        metadata['job_id'] = jobId;
+      }
       final task = await ref.putFile(
         file,
         SettableMetadata(
           contentType: mimeType,
-          customMetadata: {'message_id': messageId},
+          customMetadata: metadata,
         ),
       );
       final url = await task.ref.getDownloadURL();

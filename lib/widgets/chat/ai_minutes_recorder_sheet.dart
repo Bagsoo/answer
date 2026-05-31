@@ -26,12 +26,6 @@ class _AiMinutesRecorderSheetState extends State<AiMinutesRecorderSheet> {
   static const int maxSizeInBytes = 50 * 1024 * 1024; // 50MB
 
   @override
-  void initState() {
-    super.initState();
-    _startRecording();
-  }
-
-  @override
   void dispose() {
     _timer?.cancel();
     _recorder.dispose();
@@ -57,13 +51,11 @@ class _AiMinutesRecorderSheetState extends State<AiMinutesRecorderSheet> {
             _seconds++;
           });
 
-          // 1. 시간 제한 체크 (30분)
           if (_seconds >= maxSeconds) {
             _stopAndComplete(reason: 'time');
             return;
           }
 
-          // 2. 용량 제한 체크 (50MB) - 5초마다 체크 (오버헤드 방지)
           if (_seconds % 5 == 0 && _filePath != null) {
             final file = File(_filePath!);
             if (await file.exists()) {
@@ -84,6 +76,8 @@ class _AiMinutesRecorderSheetState extends State<AiMinutesRecorderSheet> {
   Future<void> _stopAndComplete({String? reason}) async {
     _timer?.cancel();
     final path = await _recorder.stop();
+    // 파일이 완전히 닫히고 저장될 시간을 확보합니다.
+    await Future.delayed(const Duration(milliseconds: 300));
     if (path != null && mounted) {
       if (reason != null) {
         final l = AppLocalizations.of(context);
@@ -117,7 +111,7 @@ class _AiMinutesRecorderSheetState extends State<AiMinutesRecorderSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            l.aiMinutesRecording,
+            _isRecording ? l.aiMinutesRecording : l.aiMinutesReadyToRecord,
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
@@ -147,12 +141,12 @@ class _AiMinutesRecorderSheetState extends State<AiMinutesRecorderSheet> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton.filled(
-                onPressed: () => _stopAndComplete(),
+                onPressed: _isRecording ? () => _stopAndComplete() : () => _startRecording(),
                 iconSize: 40,
-                icon: const Icon(Icons.stop_rounded),
+                icon: Icon(_isRecording ? Icons.stop_rounded : Icons.mic_rounded),
                 style: IconButton.styleFrom(
-                  backgroundColor: cs.error,
-                  foregroundColor: cs.onError,
+                  backgroundColor: _isRecording ? cs.error : cs.primary,
+                  foregroundColor: _isRecording ? cs.onError : cs.onPrimary,
                   padding: const EdgeInsets.all(16),
                 ),
               ),
@@ -160,7 +154,7 @@ class _AiMinutesRecorderSheetState extends State<AiMinutesRecorderSheet> {
           ),
           const SizedBox(height: 16),
           Text(
-            l.confirm, // "완료하려면 정지 버튼을 누르세요" 같은 의미로 사용
+            _isRecording ? l.aiMinutesStopToFinish : l.aiMinutesPressMicToStart,
             style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.7)),
           ),
         ],

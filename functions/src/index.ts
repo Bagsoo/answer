@@ -24,6 +24,7 @@ export {
   refreshVoiceToken,
   cleanupVoiceCalls,
 } from "./voiceCall";
+export { onAiMinutesAudioUploaded } from "./aiMinutes";
 import { defineSecret } from "firebase-functions/params";
 
 admin.initializeApp();

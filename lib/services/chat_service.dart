@@ -26,9 +26,7 @@ class ChatService {
     humanize: false,
   );
 
-  // 현재 보고 있는 채팅방 ID
   String? currentRoomId;
-  
   String get currentUserId => _auth.currentUser?.uid ?? '';
 
   DocumentReference<Map<String, dynamic>> _roomRef(String roomId) =>
@@ -280,7 +278,6 @@ class ChatService {
     _chatAssetService.invalidateRoom(roomId);
   }
 
-  // ── 채팅방 목록 ────────────────────────────────────────────────────────────
   Stream<List<Map<String, dynamic>>> getChatRooms({
     String? refGroupId,
   }) {
@@ -314,7 +311,6 @@ class ChatService {
     });
   }
 
-  // ── 전체 읽지 않은 메시지 수 스트림 ──────────────────────────────────────
   Stream<int> totalUnreadStream() {
     if (currentUserId.isEmpty) return Stream.value(0);
     return _db
@@ -332,7 +328,6 @@ class ChatService {
     });
   }
 
-  // ── 메시지 스트림 (최신 30개) ──────────────────────────────────────────────
   Stream<QuerySnapshot> getMessages(String roomId) {
     return _db
         .collection('chat_rooms')
@@ -343,7 +338,6 @@ class ChatService {
         .snapshots();
   }
 
-  // ── 이전 메시지 페이지네이션 ───────────────────────────────────────────────
   Future<List<QueryDocumentSnapshot>> loadMoreMessages(
     String roomId,
     DocumentSnapshot lastDoc, {
@@ -360,7 +354,6 @@ class ChatService {
     return snap.docs;
   }
 
-  // ── 채팅방 멤버 스트림 ─────────────────────────────────────────────────────
   Stream<QuerySnapshot> getRoomMembers(String roomId) {
     return _db
         .collection('chat_rooms')
@@ -369,7 +362,6 @@ class ChatService {
         .snapshots();
   }
 
-  // ── 메시지 ID 미리 생성 ───────────────────────────────────────────────────
   String generateMessageId(String roomId) {
     return _db
         .collection('chat_rooms')
@@ -379,7 +371,6 @@ class ChatService {
         .id;
   }
 
-  // ── 공통: unread_counts 증가 맵 생성 ──────────────────────────────────────
   Future<Map<String, dynamic>> _buildUnreadUpdate(String roomId) async {
     try {
       final roomDoc = await _db.collection('chat_rooms').doc(roomId).get();
@@ -400,7 +391,6 @@ class ChatService {
     }
   }
 
-  // ── 텍스트 메시지 전송 ─────────────────────────────────────────────────────
   Future<void> sendMessage(
     String roomId,
     String text, {
@@ -439,7 +429,6 @@ class ChatService {
     );
   }
 
-  // ── 이미지 메시지 전송 ─────────────────────────────────────────────────────
   Future<void> sendImageMessage(
     String roomId, {
     required String messageId,
@@ -471,7 +460,6 @@ class ChatService {
     );
   }
 
-  // ── 동영상 메시지 전송 ─────────────────────────────────────────────────────
   Future<void> sendVideoMessage(
     String roomId, {
     required String messageId,
@@ -501,7 +489,6 @@ class ChatService {
     );
   }
 
-  // ── 파일 메시지 전송 ───────────────────────────────────────────────────────
   Future<void> sendFileMessage(
     String roomId, {
     required String messageId,
@@ -535,7 +522,39 @@ class ChatService {
     );
   }
 
-  // ── 연락처(프로필 카드) 메시지 전송 ───────────────────────────────────────
+  Future<void> sendAudioMessage(
+    String roomId, {
+    required String messageId,
+    required String audioUrl,
+    required int durationMs,
+    required String fileName,
+    required String mimeType,
+    required String senderName,
+    String? senderPhotoUrl,
+  }) async {
+    final msgRef = _messageCollection(roomId).doc(messageId);
+    final msgData = <String, dynamic>{
+      'sender_id': currentUserId,
+      'sender_name': senderName,
+      'sender_photo_url': senderPhotoUrl ?? '',
+      'text': '',
+      'type': 'audio',
+      'audio_url': audioUrl,
+      'audio_duration_ms': durationMs,
+      'file_name': fileName,
+      'mime_type': mimeType,
+      'is_system': false,
+      'created_at': FieldValue.serverTimestamp(),
+    };
+
+    await _commitMessage(
+      roomId,
+      msgRef: msgRef,
+      msgData: msgData,
+      lastMessage: 'audio',
+    );
+  }
+
   Future<void> sendContactMessage(
     String roomId, {
     required String sharedUserId,
@@ -575,38 +594,36 @@ class ChatService {
     await batch.commit();
   }
 
-  // ── 음성 메시지 전송 ───────────────────────────────────────────────────────
-  Future<void> sendAudioMessage(
+  Future<void> sendAiMinutesMessage(
     String roomId, {
-    required String messageId,
-    required String audioUrl,
-    required int durationMs,
-    required String fileName,
-    required String mimeType,
+    required String jobId,
     required String senderName,
     String? senderPhotoUrl,
   }) async {
-    final msgRef = _messageCollection(roomId).doc(messageId);
-    final msgData = <String, dynamic>{
+    final unreadUpdate = await _buildUnreadUpdate(roomId);
+    final batch = _db.batch();
+
+    final msgRef = _messageCollection(roomId).doc();
+
+    batch.set(msgRef, {
       'sender_id': currentUserId,
       'sender_name': senderName,
       'sender_photo_url': senderPhotoUrl ?? '',
       'text': '',
-      'type': 'audio',
-      'audio_url': audioUrl,
-      'audio_duration_ms': durationMs,
-      'file_name': fileName,
-      'mime_type': mimeType,
+      'type': 'ai_minutes',
+      'job_id': jobId,
+      'ai_status': 'processing',
       'is_system': false,
       'created_at': FieldValue.serverTimestamp(),
-    };
+    });
 
-    await _commitMessage(
-      roomId,
-      msgRef: msgRef,
-      msgData: msgData,
-      lastMessage: 'audio',
-    );
+    batch.update(_db.collection('chat_rooms').doc(roomId), {
+      'last_message': '🎤 회의록 생성 중...',
+      'last_time': FieldValue.serverTimestamp(),
+      ...unreadUpdate,
+    });
+
+    await batch.commit();
   }
 
   Future<void> sendSharedPostMessage(
@@ -814,7 +831,6 @@ class ChatService {
     await batch.commit();
   }
 
-  // ── 읽음 처리 ─────────────────────────────────────────────────────────────
   Future<void> updateLastReadTime(String roomId) async {
     final batch = _db.batch();
 
