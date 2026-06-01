@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:any_link_preview/any_link_preview.dart';
 import 'package:dio/dio.dart';
@@ -75,6 +76,7 @@ class _MessageBubbleState extends State<MessageBubble>
 
   // ML Kit 언어 감지 신뢰도 최소값
   static const double _minConfidence = 0.7;
+  static const Duration _translationTimeout = Duration(minutes: 2);
 
   @override
   void initState() {
@@ -224,6 +226,8 @@ class _MessageBubbleState extends State<MessageBubble>
       return;
     }
 
+    OnDeviceTranslator? translator;
+
     try {
       final languageIdentifier = LanguageIdentifier(
         confidenceThreshold: _minConfidence,
@@ -235,41 +239,49 @@ class _MessageBubbleState extends State<MessageBubble>
 
       final sourceLang = _toTranslateLanguage(sourceLangCode);
       if (sourceLang == null) {
-        if (mounted) setState(() => _translating = false);
         return;
       }
 
-      final translator = OnDeviceTranslator(
+      translator = OnDeviceTranslator(
         sourceLanguage: sourceLang,
         targetLanguage: targetLang,
       );
 
-      // 언어 모델 다운로드 확인 및 다운로드
       final modelManager = OnDeviceTranslatorModelManager();
       final String sourceCode = sourceLang.bcpCode;
       final String targetCode = targetLang.bcpCode;
 
-      if (!await modelManager.isModelDownloaded(sourceCode)) {
-        debugPrint('📥 Downloading source model: $sourceCode');
-        await modelManager.downloadModel(sourceCode);
-      }
+      final translated = await (() async {
+        if (!await modelManager.isModelDownloaded(sourceCode)) {
+          debugPrint('📥 Downloading source model: $sourceCode');
+          await modelManager.downloadModel(
+            sourceCode,
+            isWifiRequired: false,
+          );
+        }
 
-      if (!await modelManager.isModelDownloaded(targetCode)) {
-        debugPrint('📥 Downloading target model: $targetCode');
-        await modelManager.downloadModel(targetCode);
-      }
+        if (!await modelManager.isModelDownloaded(targetCode)) {
+          debugPrint('📥 Downloading target model: $targetCode');
+          await modelManager.downloadModel(
+            targetCode,
+            isWifiRequired: false,
+          );
+        }
 
-      final translated = await translator.translateText(textForTranslation);
-      translator.close();
+        return translator!.translateText(textForTranslation);
+      })().timeout(_translationTimeout);
 
       if (mounted) {
         setState(() {
           _translatedText = translated;
-          _translating = false;
         });
       }
+    } on TimeoutException {
+      debugPrint('번역 타임아웃: $_translationTimeout');
     } catch (e) {
       debugPrint('번역 실패: $e');
+    } finally {
+      translator?.close();
       if (mounted) setState(() => _translating = false);
     }
   }

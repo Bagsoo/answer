@@ -40,9 +40,10 @@ service cloud.firestore {
 
       match /joined_groups/{groupId} {
         allow read: if isOwner(uid) || isAdmin();
-        // 방장이나 매니저가 유저를 강퇴할 때 해당 문서를 삭제할 수 있도록 허용
-        allow delete: if isOwner(uid) || hasPermission(groupId, 'can_manage_permissions');
-        allow write: if isOwner(uid);
+        // 방장/권한 있는 사람이 가입 승인·강퇴 시 다른 유저의 가입 그룹 문서를 생성/수정/삭제할 수 있도록 허용
+        allow create, update, delete: if isOwner(uid) ||
+          hasPermission(groupId, 'can_manage_permissions') ||
+          isAdmin();
       }
 
       match /notifications/{notiId} {
@@ -155,8 +156,9 @@ service cloud.firestore {
       }
 
       match /join_requests/{requestId} {
-        allow read: if hasPermission(groupId, 'can_manage_permissions');
-        allow write: if isLoggedIn() || isAdmin();
+        allow read: if hasPermission(groupId, 'can_manage_permissions') || (isLoggedIn() && request.auth.uid == requestId);
+        allow create: if isLoggedIn() && request.auth.uid == requestId;
+        allow update, delete: if hasPermission(groupId, 'can_manage_permissions') || (isLoggedIn() && request.auth.uid == requestId);
       }
 
       match /{allSubcollections=**} {
