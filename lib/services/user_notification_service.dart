@@ -74,16 +74,7 @@ class UserNotificationService {
 
   // ── 읽지 않은 알림 존재 여부 스트림 (배지용) ───────────────────────────
   Stream<bool> hasUnreadNotifications() {
-    if (_uid.isEmpty) return Stream.value(false);
-    
-    return _db
-        .collection('users')
-        .doc(_uid)
-        .collection('notifications')
-        .where('is_read', isEqualTo: false)
-        .limit(1)
-        .snapshots()
-        .map((snap) => snap.docs.isNotEmpty);
+    return getNotifications().map((list) => list.any((n) => !n.isRead));
   }
 
   // ── 알림 읽음 처리 ───────────────────────────────────────────────────
