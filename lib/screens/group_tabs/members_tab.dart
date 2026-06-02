@@ -574,30 +574,62 @@ class _InviteFriendSheetState extends State<_InviteFriendSheet> {
                     final uid = f['uid'] as String;
                     final isSelected = _selectedUids.contains(uid);
                     final name = f['display_name'] as String? ?? l.unknown;
-                    final photo = f['photo_url'] as String? ?? '';
+                    final photo = (f['profile_image'] ?? f['photo_url']) as String? ?? '';
 
-                    return CheckboxListTile(
-                      value: isSelected,
-                      onChanged: (val) {
-                        setState(() {
-                          if (val == true) {
-                            _selectedUids.add(uid);
-                            _selectedPhotos[uid] = photo;
-                            _selectedNames[uid] = name;
-                          } else {
-                            _selectedUids.remove(uid);
-                            _selectedPhotos.remove(uid);
-                            _selectedNames.remove(uid);
-                          }
-                        });
-                      },
-                      secondary: CircleAvatar(
-                        backgroundColor: cs.primaryContainer,
-                        backgroundImage: photo.isNotEmpty ? CachedNetworkImageProvider(photo) : null,
-                        child: photo.isEmpty ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: TextStyle(color: cs.onPrimaryContainer, fontWeight: FontWeight.bold)) : null,
+                    return FutureBuilder<UserDisplayData>(
+                      future: UserDisplay.resolve(
+                        uid,
+                        fallbackName: name,
+                        fallbackPhotoUrl: photo,
                       ),
-                      title: Text(name),
-                      controlAffinity: ListTileControlAffinity.trailing,
+                      initialData: UserDisplay.fromStored(
+                        uid: uid,
+                        name: name,
+                        photoUrl: photo,
+                      ),
+                      builder: (context, snapshot) {
+                        final user = snapshot.data ?? UserDisplay.fromStored(
+                          uid: uid,
+                          name: name,
+                          photoUrl: photo,
+                        );
+                        final resolvedName = user.displayName(l, fallback: name);
+                        final resolvedPhoto = user.isDeleted ? '' : user.photoUrl;
+
+                        return CheckboxListTile(
+                          value: isSelected,
+                          onChanged: (val) {
+                            setState(() {
+                              if (val == true) {
+                                _selectedUids.add(uid);
+                                _selectedPhotos[uid] = resolvedPhoto;
+                                _selectedNames[uid] = resolvedName;
+                              } else {
+                                _selectedUids.remove(uid);
+                                _selectedPhotos.remove(uid);
+                                _selectedNames.remove(uid);
+                              }
+                            });
+                          },
+                          secondary: CircleAvatar(
+                            backgroundColor: cs.primaryContainer,
+                            backgroundImage: resolvedPhoto.isNotEmpty
+                                ? CachedNetworkImageProvider(resolvedPhoto)
+                                : null,
+                            child: resolvedPhoto.isEmpty
+                                ? Text(
+                                    resolvedName.isNotEmpty ? resolvedName[0].toUpperCase() : '?',
+                                    style: TextStyle(
+                                      color: cs.onPrimaryContainer,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          title: Text(resolvedName),
+                          controlAffinity: ListTileControlAffinity.trailing,
+                        );
+                      },
                     );
                   },
                 );

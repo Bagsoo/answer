@@ -153,59 +153,72 @@ class _ContactShareSheetState extends State<ContactShareSheet> {
                     itemBuilder: (context, index) {
                       final friend = friends[index];
                       final uid = friend['uid'] as String? ?? '';
-                      final user = UserDisplay.fromStored(
-                        uid: uid,
-                        name: friend['display_name'] as String? ?? l.unknown,
-                        photoUrl: friend['profile_image'] as String? ?? '',
-                      );
-                      final name = user.displayName(
-                        l,
-                        fallback:
-                            friend['display_name'] as String? ?? l.unknown,
-                      );
-                      final photoUrl = user.photoUrl;
-                      final hasPhoto = photoUrl.isNotEmpty;
+                      final fallbackName = friend['display_name'] as String? ?? l.unknown;
+                      final fallbackPhoto = friend['profile_image'] as String? ?? '';
 
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: CircleAvatar(
-                          radius: 22,
-                          backgroundColor: colorScheme.primaryContainer,
-                          backgroundImage: hasPhoto
-                              ? CachedNetworkImageProvider(photoUrl)
-                              : null,
-                          onBackgroundImageError: hasPhoto ? (_, __) {} : null,
-                          child: hasPhoto
-                              ? null
-                              : Text(
-                                  user.initial(l, fallback: '?'),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.onPrimaryContainer,
-                                  ),
-                                ),
+                      return FutureBuilder<UserDisplayData>(
+                        future: UserDisplay.resolve(
+                          uid,
+                          fallbackName: fallbackName,
+                          fallbackPhotoUrl: fallbackPhoto,
                         ),
-                        title: Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        initialData: UserDisplay.fromStored(
+                          uid: uid,
+                          name: fallbackName,
+                          photoUrl: fallbackPhoto,
                         ),
-                        trailing: FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: shareButtonColor,
-                            foregroundColor: shareButtonForegroundColor,
-                          ),
-                          onPressed: uid.isEmpty
-                              ? null
-                              : () => Navigator.of(context).pop(
-                                  ContactShareResult(
-                                    uid: uid,
-                                    displayName: name,
-                                    photoUrl: photoUrl,
-                                  ),
-                                ),
-                          child: Text(l.shareMessage),
-                        ),
+                        builder: (context, snapshot) {
+                          final user = snapshot.data ?? UserDisplay.fromStored(
+                            uid: uid,
+                            name: fallbackName,
+                            photoUrl: fallbackPhoto,
+                          );
+                          final name = user.displayName(l, fallback: fallbackName);
+                          final photoUrl = user.photoUrl;
+                          final hasPhoto = photoUrl.isNotEmpty;
+
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: CircleAvatar(
+                              radius: 22,
+                              backgroundColor: colorScheme.primaryContainer,
+                              backgroundImage: hasPhoto
+                                  ? CachedNetworkImageProvider(photoUrl)
+                                  : null,
+                              onBackgroundImageError: hasPhoto ? (_, __) {} : null,
+                              child: hasPhoto
+                                  ? null
+                                  : Text(
+                                      user.initial(l, fallback: '?'),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                            ),
+                            title: Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: shareButtonColor,
+                                foregroundColor: shareButtonForegroundColor,
+                              ),
+                              onPressed: uid.isEmpty
+                                  ? null
+                                  : () => Navigator.of(context).pop(
+                                      ContactShareResult(
+                                        uid: uid,
+                                        displayName: name,
+                                        photoUrl: photoUrl,
+                                      ),
+                                    ),
+                              child: Text(l.shareMessage),
+                            ),
+                          );
+                        },
                       );
                     },
                   );
