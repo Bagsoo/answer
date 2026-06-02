@@ -261,6 +261,20 @@ class AppLocalizations {
 
   String get adLabel => _s.adLabel;
 
+  // ── 공지 ──────────────────────────────────────────────────────────────
+  String get noticeAppUpdateTitle => _s.noticeAppUpdateTitle;
+  String get noticeNewAnnouncementTitle => _s.noticeNewAnnouncementTitle;
+  String get noticeUpdateAction => _s.noticeUpdateAction;
+  String get noticeLaterAction => _s.noticeLaterAction;
+  String get noticeMinVersion => _s.noticeMinVersion;
+  String get noticePriority => _s.noticePriority;
+  String get noticeExpiry => _s.noticeExpiry;
+  String get noticeNoExtraInfo => _s.noticeNoExtraInfo;
+  String get noticeTypeUpdate => _s.noticeTypeUpdate;
+  String get noticeTypeEvent => _s.noticeTypeEvent;
+  String get noticeTypeMaintenance => _s.noticeTypeMaintenance;
+  String get noticeTypeAnnouncement => _s.noticeTypeAnnouncement;
+
   // ── 번역 ──────────────────────────────────────────────────────────────
   String get translate => _s.translate;
   String get translating => _s.translating;
@@ -1041,6 +1055,20 @@ abstract class _AppStrings {
   String get plusPlanDesc;
   String get proPlanDesc;
   String get viewOnMap;
+
+  // 공지
+  String get noticeAppUpdateTitle;
+  String get noticeNewAnnouncementTitle;
+  String get noticeUpdateAction;
+  String get noticeLaterAction;
+  String get noticeMinVersion;
+  String get noticePriority;
+  String get noticeExpiry;
+  String get noticeNoExtraInfo;
+  String get noticeTypeUpdate;
+  String get noticeTypeEvent;
+  String get noticeTypeMaintenance;
+  String get noticeTypeAnnouncement;
 
   // ── 번역 ──────────────────────────────────────────────────────────────
   String get translate;
@@ -1849,6 +1877,20 @@ class _EnStrings extends _AppStrings {
   @override String settlementTotalCostValue(String cost) => 'Total $cost won';
   @override String settlementAmountValue(String amount) => '$amount won';
 
+  // 공지
+  @override String get noticeAppUpdateTitle => 'App Update Notice';
+  @override String get noticeNewAnnouncementTitle => 'New Announcement';
+  @override String get noticeUpdateAction => 'Update';
+  @override String get noticeLaterAction => 'Later';
+  @override String get noticeMinVersion => 'Nin Build';
+  @override String get noticePriority => 'Priority';
+  @override String get noticeExpiry => 'Expiry';
+  @override String get noticeNoExtraInfo => 'No extra info';
+  @override String get noticeTypeUpdate => 'Update';
+  @override String get noticeTypeEvent => 'Event';
+  @override String get noticeTypeMaintenance => 'Maintenance';
+  @override String get noticeTypeAnnouncement => 'Notice';
+
   // ── 번역 ──
   @override String get translate => 'Translate';
   @override String get translating => 'Translating...';
@@ -2644,6 +2686,20 @@ class _KoStrings extends _AppStrings {
   @override String get messageEdited => '(수정됨)';
   @override String get editMessageTitle => '메시지 수정';
 
+  // 공지
+  @override String get noticeAppUpdateTitle => '새 업데이트 안내';
+  @override String get noticeNewAnnouncementTitle => '새 공지 확인';
+  @override String get noticeUpdateAction => '업데이트';
+  @override String get noticeLaterAction => '나중에';
+  @override String get noticeMinVersion => '최소 빌드';
+  @override String get noticePriority => '우선순위';
+  @override String get noticeExpiry => '만료';
+  @override String get noticeNoExtraInfo => '추가 정보 없음';
+  @override String get noticeTypeUpdate => '업데이트';
+  @override String get noticeTypeEvent => '이벤트';
+  @override String get noticeTypeMaintenance => '점검';
+  @override String get noticeTypeAnnouncement => '공지';
+
   // ── 번역 ──
   @override String get translate => '번역';
   @override String get translating => '번역 중...';
@@ -3414,6 +3470,20 @@ class _JaStrings extends _AppStrings {
   @override String get settlementNotFound => '精算が見つかりません。';
   @override String settlementTotalCostValue(String cost) => '合計 $cost円';
   @override String settlementAmountValue(String amount) => '$amount円';
+
+  // 公지
+  @override String get noticeAppUpdateTitle => 'アプリのアップデート案内';
+  @override String get noticeNewAnnouncementTitle => '新しいお知らせを確認';
+  @override String get noticeUpdateAction => 'アップデート';
+  @override String get noticeLaterAction => '後で';
+  @override String get noticeMinVersion => '最小ビルド';
+  @override String get noticePriority => '優先順位';
+  @override String get noticeExpiry => '満了';
+  @override String get noticeNoExtraInfo => '追加情報なし';
+  @override String get noticeTypeUpdate => 'アップデート';
+  @override String get noticeTypeEvent => 'イベント';
+  @override String get noticeTypeMaintenance => 'メンテナンス';
+  @override String get noticeTypeAnnouncement => 'お知らせ';
 
   // ── 번역 ──
   @override String get translate => '翻訳';

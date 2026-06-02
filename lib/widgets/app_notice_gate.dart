@@ -1,8 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/app_notice.dart';
 import '../services/app_notice_service.dart';
 
@@ -25,9 +24,7 @@ class _AppNoticeGateState extends State<AppNoticeGate> {
   @override
   void initState() {
     super.initState();
-    print('DEBUG: AppNoticeGate initState called');
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      print('DEBUG: AppNoticeGate postFrameCallback triggered');
       _checkAndShowNotice();
     });
   }
@@ -36,42 +33,19 @@ class _AppNoticeGateState extends State<AppNoticeGate> {
     if (_didCheck || !mounted) return;
     _didCheck = true;
 
-    print('DEBUG: AppNoticeGate _checkAndShowNotice started');
-
     try {
-      print('DEBUG: AppNoticeGate calling PackageInfo.fromPlatform()...');
-      final packageInfo = await PackageInfo.fromPlatform();
-      final buildNumberStr = packageInfo.buildNumber;
-      final buildNumber = int.tryParse(buildNumberStr) ?? 0;
-      
-      print('DEBUG: AppNoticeGate: Platform Build Number: "$buildNumberStr" -> $buildNumber');
+      final notice = await _noticeService.fetchStartupNotice();
+      if (!mounted || notice == null) return;
 
-      final notice = await _noticeService.fetchStartupNotice(
-        currentBuildNumber: buildNumber,
-      );
-
-      if (!mounted) {
-        debugPrint('AppNoticeGate: Widget unmounted after fetch.');
-        return;
-      }
-
-      if (notice == null) {
-        debugPrint('AppNoticeGate: No notice to display.');
-        return;
-      }
-
-      debugPrint('AppNoticeGate: Showing dialog for notice: "${notice.title}"');
       await _showNoticeDialog(notice);
-    } catch (e, stack) {
-      debugPrint('AppNoticeGate Error: $e');
-      debugPrint('Stack Trace: $stack');
-    }
+    } catch (_) {}
   }
 
   Future<void> _showNoticeDialog(AppNotice notice) async {
     if (!mounted) return;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l = AppLocalizations.of(context);
 
     await showDialog<void>(
       context: context,
@@ -150,8 +124,8 @@ class _AppNoticeGateState extends State<AppNoticeGate> {
                               const SizedBox(height: 6),
                               Text(
                                 notice.noticeType == AppNoticeType.update
-                                    ? '앱 업데이트 안내'
-                                    : '새 공지 확인',
+                                    ? l.noticeAppUpdateTitle
+                                    : l.noticeNewAnnouncementTitle,
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: colorScheme.onSurfaceVariant,
@@ -182,8 +156,9 @@ class _AppNoticeGateState extends State<AppNoticeGate> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        _NoticeMetaRow(notice: notice),
+                        // const SizedBox(height: 16),
+                        // // 관리용 정보(우선순위, 최소빌드, 만료일)는 사용자에게 보여주지 않음
+                        // _NoticeMetaRow(notice: notice),
                         const SizedBox(height: 20),
                         Row(
                           children: [
@@ -197,8 +172,8 @@ class _AppNoticeGateState extends State<AppNoticeGate> {
                                 },
                                 child: Text(
                                   notice.noticeType == AppNoticeType.update
-                                      ? '나중에'
-                                      : '닫기',
+                                      ? l.noticeLaterAction
+                                      : l.close,
                                 ),
                               ),
                             ),
@@ -213,8 +188,8 @@ class _AppNoticeGateState extends State<AppNoticeGate> {
                                 },
                                 child: Text(
                                   notice.noticeType == AppNoticeType.update
-                                      ? '업데이트'
-                                      : '확인',
+                                      ? l.noticeUpdateAction
+                                      : l.confirm,
                                 ),
                               ),
                             ),
@@ -254,8 +229,9 @@ class _AppNoticeGateState extends State<AppNoticeGate> {
   }
 
   String? _resolveNoticeUrl(AppNotice notice) {
-    final isAndroid = !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
-    final isIOS = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+    final platform = Theme.of(context).platform;
+    final isAndroid = platform == TargetPlatform.android;
+    final isIOS = platform == TargetPlatform.iOS;
 
     return notice.resolveUrl(
       isAndroid: isAndroid,
@@ -279,24 +255,25 @@ class _NoticeTypeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l = AppLocalizations.of(context);
     final map = <AppNoticeType, ({String label, Color bg, Color fg})>{
       AppNoticeType.update: (
-        label: '업데이트',
+        label: l.noticeTypeUpdate,
         bg: colorScheme.errorContainer,
         fg: colorScheme.onErrorContainer,
       ),
       AppNoticeType.event: (
-        label: '이벤트',
+        label: l.noticeTypeEvent,
         bg: colorScheme.secondaryContainer,
         fg: colorScheme.onSecondaryContainer,
       ),
       AppNoticeType.maintenance: (
-        label: '점검',
+        label: l.noticeTypeMaintenance,
         bg: colorScheme.primaryContainer,
         fg: colorScheme.onPrimaryContainer,
       ),
       AppNoticeType.announcement: (
-        label: '공지',
+        label: l.noticeTypeAnnouncement,
         bg: colorScheme.surfaceContainerHighest,
         fg: colorScheme.onSurfaceVariant,
       ),
@@ -330,20 +307,21 @@ class _NoticeMetaRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final chips = <Widget>[
       _MetaChip(
         icon: Icons.sort_rounded,
-        label: '우선순위 ${notice.priority}',
+        label: '${l.noticePriority} ${notice.priority}',
       ),
       if (notice.minAppVersion != null)
         _MetaChip(
           icon: Icons.update_rounded,
-          label: '최소 빌드 ${notice.minAppVersion}',
+          label: '${l.noticeMinVersion} ${notice.minAppVersion}',
         ),
       if (notice.expiredAt != null)
         _MetaChip(
           icon: Icons.schedule_rounded,
-          label: '만료 ${_formatDate(notice.expiredAt)}',
+          label: '${l.noticeExpiry} ${_formatDate(notice.expiredAt)}',
         ),
     ];
 
@@ -354,7 +332,7 @@ class _NoticeMetaRow extends StatelessWidget {
           ? [
               _MetaChip(
                 icon: Icons.info_outline_rounded,
-                label: '추가 정보 없음',
+                label: l.noticeNoExtraInfo,
               ),
             ]
           : chips,

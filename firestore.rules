@@ -90,8 +90,7 @@ service cloud.firestore {
     }
 
     function isVisibleAppNotice() {
-      return resource.data.is_active == true &&
-        (resource.data.expired_at == null || resource.data.expired_at > request.time);
+      return resource.data.is_active == true;
     }
 
     // ── 관리자 ──────────────────────────────────────────────────────────────
