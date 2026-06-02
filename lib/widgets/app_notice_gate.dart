@@ -25,7 +25,9 @@ class _AppNoticeGateState extends State<AppNoticeGate> {
   @override
   void initState() {
     super.initState();
+    print('DEBUG: AppNoticeGate initState called');
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      print('DEBUG: AppNoticeGate postFrameCallback triggered');
       _checkAndShowNotice();
     });
   }
@@ -34,18 +36,35 @@ class _AppNoticeGateState extends State<AppNoticeGate> {
     if (_didCheck || !mounted) return;
     _didCheck = true;
 
+    print('DEBUG: AppNoticeGate _checkAndShowNotice started');
+
     try {
+      print('DEBUG: AppNoticeGate calling PackageInfo.fromPlatform()...');
       final packageInfo = await PackageInfo.fromPlatform();
-      final buildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
+      final buildNumberStr = packageInfo.buildNumber;
+      final buildNumber = int.tryParse(buildNumberStr) ?? 0;
+      
+      print('DEBUG: AppNoticeGate: Platform Build Number: "$buildNumberStr" -> $buildNumber');
+
       final notice = await _noticeService.fetchStartupNotice(
         currentBuildNumber: buildNumber,
       );
 
-      if (!mounted || notice == null) return;
+      if (!mounted) {
+        debugPrint('AppNoticeGate: Widget unmounted after fetch.');
+        return;
+      }
 
+      if (notice == null) {
+        debugPrint('AppNoticeGate: No notice to display.');
+        return;
+      }
+
+      debugPrint('AppNoticeGate: Showing dialog for notice: "${notice.title}"');
       await _showNoticeDialog(notice);
-    } catch (e) {
-      debugPrint('AppNoticeGate error: $e');
+    } catch (e, stack) {
+      debugPrint('AppNoticeGate Error: $e');
+      debugPrint('Stack Trace: $stack');
     }
   }
 
