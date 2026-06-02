@@ -18,6 +18,9 @@ class LocalPreferencesService {
   static String groupNoticeLastReadKey(String uid, String groupId) =>
       'pref.group_notice_last_read.$uid.$groupId';
 
+  static String appNoticeReadKey(String noticeId, DateTime? updatedAt) =>
+      'pref.app_notice_read.$noticeId.${updatedAt?.millisecondsSinceEpoch ?? 0}';
+
   static String privateChatUnreadKey(String uid) =>
       'pref.chat_unread.private.$uid';
 

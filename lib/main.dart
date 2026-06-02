@@ -30,6 +30,7 @@ import 'providers/user_provider.dart';
 import 'providers/chat_provider.dart';
 import 'l10n/app_localizations.dart';
 import 'theme/app_theme.dart';
+import 'widgets/app_notice_gate.dart';
 import 'screens/auth_wrapper.dart';
 import 'firebase_options.dart';
 
@@ -45,8 +46,13 @@ void main() async {
 
   if (isFirebaseSupported) {
     if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)
-          .catchError((e) => debugPrint('Firebase init error: $e'));
+      try {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      } catch (e) {
+        debugPrint('Firebase init error: $e');
+      }
     }
 
     final isWindows = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
@@ -134,7 +140,9 @@ class MessengerApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: const AuthWrapper(),
+      home: const AppNoticeGate(
+        child: AuthWrapper(),
+      ),
       debugShowCheckedModeBanner: false,
     );
   }

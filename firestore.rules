@@ -27,10 +27,85 @@ service cloud.firestore {
         );
     }
 
+    function isValidNoticeType(value) {
+      return value in ['update', 'event', 'maintenance', 'announcement'];
+    }
+
+    function isStringOrNull(value) {
+      return value == null || value is string;
+    }
+
+    function isNumberOrNull(value) {
+      return value == null || value is int || value is float;
+    }
+
+    function isTimestampOrNull(value) {
+      return value == null || value is timestamp;
+    }
+
+    function isValidAppNoticeBase(noticeId, data) {
+      return data.keys().hasOnly([
+          'id',
+          'title',
+          'content',
+          'notice_type',
+          'min_app_version',
+          'android_url',
+          'ios_url',
+          'default_url',
+          'is_active',
+          'priority',
+          'expired_at',
+          'updated_at',
+          'created_at',
+        ]) &&
+        data.id is string &&
+        data.id == noticeId &&
+        data.title is string &&
+        data.title.size() > 0 &&
+        data.title.size() <= 120 &&
+        data.content is string &&
+        data.content.size() > 0 &&
+        isValidNoticeType(data.notice_type) &&
+        isNumberOrNull(data.min_app_version) &&
+        isStringOrNull(data.android_url) &&
+        isStringOrNull(data.ios_url) &&
+        isStringOrNull(data.default_url) &&
+        data.is_active is bool &&
+        (data.priority is int || data.priority is float) &&
+        data.priority >= 0 &&
+        isTimestampOrNull(data.expired_at);
+    }
+
+    function isValidAppNoticeCreate(noticeId, data) {
+      return isValidAppNoticeBase(noticeId, data) &&
+        data.updated_at == request.time &&
+        data.created_at == request.time;
+    }
+
+    function isValidAppNoticeUpdate(noticeId, data) {
+      return isValidAppNoticeBase(noticeId, data) &&
+        data.updated_at == request.time &&
+        data.created_at == resource.data.created_at;
+    }
+
+    function isVisibleAppNotice() {
+      return resource.data.is_active == true &&
+        (resource.data.expired_at == null || resource.data.expired_at > request.time);
+    }
+
     // ── 관리자 ──────────────────────────────────────────────────────────────
     match /admins/{uid} {
       allow read: if isOwner(uid);
       allow write: if false;
+    }
+
+    // ── 앱 공지 ────────────────────────────────────────────────────────────
+    match /app_notices/{noticeId} {
+      allow read: if isAdmin() || isVisibleAppNotice();
+      allow create: if isAdmin() && isValidAppNoticeCreate(noticeId, request.resource.data);
+      allow update: if isAdmin() && isValidAppNoticeUpdate(noticeId, request.resource.data);
+      allow delete: if isAdmin();
     }
 
     // ── 유저 ────────────────────────────────────────────────────────────────
