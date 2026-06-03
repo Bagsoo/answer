@@ -3,11 +3,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
-import 'package:intl_phone_field/phone_number.dart' as intl_phone;
 import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../services/auth_service.dart';
+import '../widgets/auth/recent_login_badge.dart';
 
 class AccountLinkManagementScreen extends StatefulWidget {
   const AccountLinkManagementScreen({super.key});
@@ -223,7 +223,19 @@ class _AccountLinkManagementScreenState extends State<AccountLinkManagementScree
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('마지막 로그인: ${lastSignIn.isEmpty ? '-' : _label(lastSignIn)}'),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '마지막 로그인: ${lastSignIn.isEmpty ? '-' : _label(lastSignIn)}',
+                            ),
+                          ),
+                          if (lastSignIn.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            const RecentLoginBadge(text: '최근 사용'),
+                          ],
+                        ],
+                      ),
                       const SizedBox(height: 8),
                       Text(
                         '기본 로그인: ${preferred.isEmpty ? '-' : _label(preferred)}',
@@ -240,6 +252,7 @@ class _AccountLinkManagementScreenState extends State<AccountLinkManagementScree
               _providerTile(
                 title: 'Google',
                 linked: providerIds.contains(_google),
+                recent: lastSignIn == _google,
                 busy: _busy,
                 canUnlink: canUnlinkAny,
                 onLink: _linkGoogle,
@@ -248,6 +261,7 @@ class _AccountLinkManagementScreenState extends State<AccountLinkManagementScree
               _providerTile(
                 title: 'Apple',
                 linked: providerIds.contains(_apple),
+                recent: lastSignIn == _apple,
                 busy: _busy,
                 canUnlink: canUnlinkAny,
                 onLink: null,
@@ -257,6 +271,7 @@ class _AccountLinkManagementScreenState extends State<AccountLinkManagementScree
               _providerTile(
                 title: 'Phone',
                 linked: providerIds.contains(_phone),
+                recent: lastSignIn == _phone,
                 busy: _busy,
                 canUnlink: canUnlinkAny,
                 onLink: null,
@@ -346,7 +361,7 @@ class _AccountLinkManagementScreenState extends State<AccountLinkManagementScree
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
-                        value: linkedProviders.contains(preferred)
+                        initialValue: linkedProviders.contains(preferred)
                             ? preferred
                             : (linkedProviders.isNotEmpty ? linkedProviders.first : null),
                         items: linkedProviders
@@ -381,6 +396,7 @@ class _AccountLinkManagementScreenState extends State<AccountLinkManagementScree
   Widget _providerTile({
     required String title,
     required bool linked,
+    required bool recent,
     required bool busy,
     required bool canUnlink,
     required VoidCallback? onLink,
@@ -390,8 +406,17 @@ class _AccountLinkManagementScreenState extends State<AccountLinkManagementScree
     return Card(
       child: ListTile(
         title: Text(title),
-        subtitle: Text(
-          subtitle ?? (linked ? '연결됨' : '미연결'),
+        isThreeLine: recent,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(subtitle ?? (linked ? '연결됨' : '미연결')),
+            if (recent) ...[
+              const SizedBox(height: 6),
+              const RecentLoginBadge(text: '최근 사용'),
+            ],
+          ],
         ),
         trailing: linked
             ? TextButton(

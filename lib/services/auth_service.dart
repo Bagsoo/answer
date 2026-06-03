@@ -1,15 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:crypto/crypto.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../config/env_config.dart';
 import 'analytics_service.dart';
 
@@ -26,6 +26,17 @@ class AuthService extends ChangeNotifier {
 
   static const _keyIsRegistered = 'auth_is_registered';
   static const _keyRegisteredUid = 'auth_registered_uid';
+  static const _keyLastUsedProvider = 'last_used_provider';
+
+  Future<void> setLastUsedProvider(String provider) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyLastUsedProvider, provider);
+  }
+
+  Future<String?> getLastUsedProvider() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyLastUsedProvider);
+  }
 
   User? get currentUser {
     if (!_isFirebaseSupported) return null;
@@ -89,9 +100,8 @@ class AuthService extends ChangeNotifier {
       _isRegisteredUser = registered;
       notifyListeners();
 
-      // ── Analytics 로그 (유저 속성 설정) ──
       final locale = data['locale'] as String?;
-      final analytics = AnalyticsService(); // 혹은 Provider를 통해 접근 가능하지만 여기선 신규 인스턴스/싱글톤화 고려
+      final analytics = AnalyticsService();
       await analytics.setUserProperties(uid: uid, locale: locale);
 
       final prefs = await SharedPreferences.getInstance();
@@ -123,7 +133,6 @@ class AuthService extends ChangeNotifier {
     }, SetOptions(merge: true));
   }
 
-  // Windows PKCE Login
   Future<Map<String, String?>?> _performWindowsPkceLogin() async {
     final googleClientId = ClientId(EnvConfig.googleClientId, '');
     final scopes = ['email', 'profile', 'openid'];
@@ -164,6 +173,7 @@ class AuthService extends ChangeNotifier {
       if (idToken == null) return 'error';
       final credential = GoogleAuthProvider.credential(accessToken: accessToken, idToken: idToken);
       final userCredential = await _auth.signInWithCredential(credential);
+      await setLastUsedProvider(_providerGoogle);
 
       if (userCredential.additionalUserInfo?.isNewUser == true) {
         _pendingDisplayName = displayName;
@@ -174,6 +184,65 @@ class AuthService extends ChangeNotifier {
       return 'ok';
     } catch (e) {
       debugPrint('Google sign in error: $e');
+      return 'error';
+    }
+  }
+
+  String _sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    return sha256.convert(bytes).toString();
+  }
+
+  Future<String> signInWithApple() async {
+    try {
+      final rawNonce = generateNonce(length: 32);
+      final nonce = _sha256ofString(rawNonce);
+      final isWeb = kIsWeb;
+      final supportsWebFlow =
+          EnvConfig.appleServiceId.isNotEmpty && EnvConfig.appleRedirectUri.isNotEmpty;
+
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: nonce,
+        webAuthenticationOptions: (isWeb || defaultTargetPlatform == TargetPlatform.android)
+            ? (supportsWebFlow
+                ? WebAuthenticationOptions(
+                    clientId: EnvConfig.appleServiceId,
+                    redirectUri: Uri.parse(EnvConfig.appleRedirectUri),
+                  )
+                : null)
+            : null,
+      );
+
+      final idToken = credential.identityToken;
+      if (idToken == null) return 'error';
+
+      final oauthCredential = AppleAuthProvider.credentialWithIDToken(
+        idToken,
+        rawNonce,
+        AppleFullPersonName(
+          givenName: credential.givenName,
+          familyName: credential.familyName,
+        ),
+      );
+
+      final userCredential = await _auth.signInWithCredential(oauthCredential);
+      await setLastUsedProvider(_providerApple);
+      
+      if (userCredential.additionalUserInfo?.isNewUser == true) {
+        _pendingDisplayName = credential.givenName != null 
+            ? '${credential.givenName} ${credential.familyName ?? ''}'.trim()
+            : null;
+        _pendingSignInProvider = _providerApple;
+      } else {
+        await _syncLinkedAuthState(user: userCredential.user, lastSignInProvider: _providerApple);
+      }
+      return 'ok';
+    } catch (e) {
+      debugPrint('Apple sign in error: $e');
       return 'error';
     }
   }
@@ -220,7 +289,7 @@ class AuthService extends ChangeNotifier {
       }
       if (user == null) return '인증 실패';
       
-      final isNewUser = current == null && uc?.additionalUserInfo?.isNewUser == true;
+      final isNewUser = current == null && (uc.additionalUserInfo?.isNewUser ?? false);
       if (isNewUser) {
         _pendingSignInProvider = _providerPhone;
       } else {
@@ -243,6 +312,12 @@ class AuthService extends ChangeNotifier {
         'created_at': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      if (_pendingSignInProvider != null) {
+        await userRef.set({
+          'last_sign_in_provider': _pendingSignInProvider,
+          'preferred_login_provider': _pendingSignInProvider,
+        }, SetOptions(merge: true));
+      }
       _isRegisteredUser = true;
       _pendingDisplayName = null;
       notifyListeners();
@@ -266,7 +341,6 @@ class AuthService extends ChangeNotifier {
 
     if (lastSignInProvider != null) {
       updates['last_sign_in_provider'] = lastSignInProvider;
-      updates['preferred_login_provider'] = lastSignInProvider;
     }
 
     for (final profile in u.providerData) {
@@ -322,7 +396,9 @@ class AuthService extends ChangeNotifier {
     final user = currentUser;
     if (user == null) return 'No user';
     try {
-      await _db.collection('users').doc(user.uid).update({'preferred_login_provider': providerId});
+      await _db.collection('users').doc(user.uid).set({
+        'preferred_login_provider': providerId,
+      }, SetOptions(merge: true));
       return null;
     } catch (e) { return e.toString(); }
   }

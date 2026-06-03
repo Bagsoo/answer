@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
+import '../config/env_config.dart';
 import '../services/auth_service.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/app_localizations.dart';
@@ -58,6 +59,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool get _isWindowsNative =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+
+  bool get _canUseAppleSignIn {
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.android) {
+      return EnvConfig.appleServiceId.isNotEmpty &&
+          EnvConfig.appleRedirectUri.isNotEmpty;
+    }
+
+    return defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS;
+  }
 
   void _applyDesktopPhoneState() {
     final countryIso = _desktopCountryIso ?? 'KR';
@@ -174,7 +185,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _verifyOtp() async {
-    final l = AppLocalizations.of(context);
     setState(() {
       _isLoading = true;
       _errorMessage = '';
@@ -205,6 +215,25 @@ class _LoginScreenState extends State<LoginScreen> {
     if (result == 'error') {
       setState(() {
         _errorMessage = l.loginGoogleFailed;
+        _isLoading = false;
+      });
+    } else if (result == 'cancel') {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    final result = await context.read<AuthService>().signInWithApple();
+
+    if (!mounted) return;
+    if (result == 'error') {
+      setState(() {
+        _errorMessage = 'Apple 로그인에 실패했습니다.';
         _isLoading = false;
       });
     } else if (result == 'cancel') {
@@ -254,7 +283,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Image.asset(
                 'assets/images/answer_logo.png',
                 height: 160,
-                errorBuilder: (_, __, ___) => Icon(
+                errorBuilder: (context, error, stackTrace) => Icon(
                     Icons.chat_bubble_rounded,
                     size: 80,
                     color: Theme.of(context).colorScheme.primary),
@@ -275,7 +304,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   'assets/images/google_logo.png',
                   width: 20,
                   height: 20,
-                  errorBuilder: (_, __, ___) =>
+                  errorBuilder: (context, error, stackTrace) =>
                       const Icon(Icons.g_mobiledata, size: 24),
                 ),
                 label: l.loginWithGoogle,
@@ -286,17 +315,33 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 12),
 
-              // ── Apple 로그인 버튼 (비활성) ───────────────────────────
+              // ── Apple 로그인 버튼 ────────────────────────────────────
               _SocialLoginButton(
-                onPressed: null,
+                onPressed: (_isLoading || !_canUseAppleSignIn)
+                    ? null
+                    : _signInWithApple,
                 icon: const Icon(Icons.apple,
                     size: 22, color: Colors.white),
                 label: l.loginWithApple,
                 backgroundColor: Theme.of(context).colorScheme.inverseSurface,
                 textColor: Colors.white,
                 borderColor: Theme.of(context).colorScheme.inverseSurface,
-                disabled: true,
+                disabled: !_canUseAppleSignIn,
               ),
+
+              if (!_canUseAppleSignIn) ...[
+                const SizedBox(height: 8),
+                Text(
+                  kIsWeb || defaultTargetPlatform == TargetPlatform.android
+                      ? 'Apple 로그인을 사용하려면 APPLE_SERVICE_ID와 APPLE_REDIRECT_URI 설정이 필요합니다.'
+                      : '이 플랫폼에서는 Apple 로그인을 사용할 수 없습니다.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
 
               const SizedBox(height: 24),
 
