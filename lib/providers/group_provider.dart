@@ -52,6 +52,7 @@ class GroupProvider extends ChangeNotifier {
   bool get isOwner => myRole == 'owner';
   bool _isLiked = false;
   bool get isLiked => _isLiked;
+  DateTime? _lastToggleTime;
   bool get isPaidPlan => plan == 'plus' || plan == 'pro';
   bool get isDeleted => status == 'deleted';
 
@@ -154,7 +155,10 @@ class GroupProvider extends ChangeNotifier {
       qrEnabled = d['qr_enabled'] as bool? ?? false;
       inviteToken = d['invite_token'] as String? ?? '';
       tags = List<String>.from(d['tags'] as List? ?? []);
-      likesCount = (d['likes_count'] as num?)?.toInt() ?? 0;
+      final serverLikesCount = (d['likes_count'] as num?)?.toInt() ?? 0;
+      if (_lastToggleTime == null || DateTime.now().difference(_lastToggleTime!) > const Duration(seconds: 3)) {
+        likesCount = serverLikesCount;
+      }
       final ts = d['created_at'] as Timestamp?;
       location = d['location'] as GeoPoint?;
       locationName = d['location_name'] as String? ?? '';
@@ -211,23 +215,46 @@ class GroupProvider extends ChangeNotifier {
         .collection('liked_groups')
         .doc(groupId);
         
-    final snap = await groupsLikeRef.get();
-    final batch = db.batch();
-    
-    if (snap.exists) {
-      batch.delete(groupsLikeRef);
-      batch.delete(usersLikeRef);
+    // 낙관적 UI 업데이트
+    final bool wasLiked = _isLiked;
+    _isLiked = !wasLiked;
+    if (_isLiked) {
+      likesCount++;
     } else {
-      batch.set(groupsLikeRef, {
-        'createdAt': FieldValue.serverTimestamp(),
-        'uid': currentUserId,
-      });
-      batch.set(usersLikeRef, {
-        'createdAt': FieldValue.serverTimestamp(),
-        'groupId': groupId,
-      });
+      likesCount = (likesCount > 0) ? likesCount - 1 : 0;
     }
-    await batch.commit();
+    _lastToggleTime = DateTime.now();
+    notifyListeners();
+
+    try {
+      final snap = await groupsLikeRef.get();
+      final batch = db.batch();
+      
+      if (snap.exists) {
+        batch.delete(groupsLikeRef);
+        batch.delete(usersLikeRef);
+      } else {
+        batch.set(groupsLikeRef, {
+          'createdAt': FieldValue.serverTimestamp(),
+          'uid': currentUserId,
+        });
+        batch.set(usersLikeRef, {
+          'createdAt': FieldValue.serverTimestamp(),
+          'groupId': groupId,
+        });
+      }
+      await batch.commit();
+    } catch (e) {
+      // 에러 발생 시 롤백
+      _isLiked = wasLiked;
+      if (_isLiked) {
+        likesCount++;
+      } else {
+        likesCount = (likesCount > 0) ? likesCount - 1 : 0;
+      }
+      _lastToggleTime = null;
+      notifyListeners();
+    }
   }
 
   @override

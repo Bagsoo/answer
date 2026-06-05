@@ -28,6 +28,7 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
   StreamSubscription? _groupSub;
   int _likesCount = 0;
   int _memberCount = 0;
+  DateTime? _lastToggleTime;
 
   @override
   void initState() {
@@ -61,8 +62,11 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
       if (snap.exists && mounted) {
         final data = snap.data();
         if (data != null) {
+          final serverLikesCount = data['likes_count'] as int? ?? 0;
           setState(() {
-            _likesCount = data['likes_count'] as int? ?? 0;
+            if (_lastToggleTime == null || DateTime.now().difference(_lastToggleTime!) > const Duration(seconds: 3)) {
+              _likesCount = serverLikesCount;
+            }
             _memberCount = (data['member_count'] as num?)?.toInt() ?? _memberCount;
           });
         }
@@ -96,6 +100,7 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
 
     final groupId = group['id'] as String;
     
+    final bool wasLiked = _isLiked;
     setState(() {
       _isLiked = !_isLiked;
       if (_isLiked) {
@@ -103,12 +108,24 @@ class _GroupPreviewScreenState extends State<GroupPreviewScreen> {
       } else {
         _likesCount = _likesCount > 0 ? _likesCount - 1 : 0;
       }
+      _lastToggleTime = DateTime.now();
     });
 
     try {
       await groupService.toggleGroupLike(groupId);
     } catch (e) {
       debugPrint('Error toggling like: $e');
+      if (mounted) {
+        setState(() {
+          _isLiked = wasLiked;
+          if (_isLiked) {
+            _likesCount = _likesCount + 1;
+          } else {
+            _likesCount = _likesCount > 0 ? _likesCount - 1 : 0;
+          }
+          _lastToggleTime = null;
+        });
+      }
     }
   }
 

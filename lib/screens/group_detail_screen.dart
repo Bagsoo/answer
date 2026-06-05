@@ -259,13 +259,6 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
       );
     }
 
-    final memberCount = context.select<GroupProvider, int>((gp) => gp.memberCount);
-    final likesCount = context.select<GroupProvider, int>((gp) => gp.likesCount);
-    final isLiked = context.select<GroupProvider, bool>((gp) => gp.isLiked);
-    final name = context.select<GroupProvider, String>((gp) => gp.name);
-    final profileImageUrl =
-        context.select<GroupProvider, String>((gp) => gp.profileImageUrl);
-
     final tabViews = [
       MembersTab(
         isDesktopMode: isDesktopMode,
@@ -297,128 +290,158 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
 
     return Scaffold(
       appBar: AppBar(
-        leading: GestureDetector(
-          onTap: () {
-            final gp = context.read<GroupProvider>();
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => ChangeNotifierProvider.value(
-                  value: gp,
-                  child: GroupProfileScreen(groupId: gp.groupId),
+        leading: Selector<GroupProvider, (String, String)>(
+          selector: (_, gp) => (gp.profileImageUrl, gp.name),
+          builder: (context, data, _) {
+            final profileImageUrl = data.$1;
+            final name = data.$2;
+            return GestureDetector(
+              onTap: () {
+                final gp = context.read<GroupProvider>();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ChangeNotifierProvider.value(
+                      value: gp,
+                      child: GroupProfileScreen(groupId: gp.groupId),
+                    ),
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: colorScheme.primaryContainer,
+                  backgroundImage: profileImageUrl.isNotEmpty
+                      ? NetworkImage(profileImageUrl)
+                      : null,
+                  child: profileImageUrl.isEmpty
+                      ? Text(
+                          name.isNotEmpty ? name[0].toUpperCase() : '?',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onPrimaryContainer,
+                          ),
+                        )
+                      : null,
                 ),
               ),
             );
           },
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: colorScheme.primaryContainer,
-              backgroundImage:
-                  profileImageUrl.isNotEmpty ? NetworkImage(profileImageUrl) : null,
-              child: profileImageUrl.isEmpty
-                  ? Text(
-                      name.isNotEmpty ? name[0].toUpperCase() : '?',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onPrimaryContainer,
-                      ),
-                    )
-                  : null,
-            ),
-          ),
         ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Flexible(
-              child: Text(
-                name.isNotEmpty ? name : widget.groupName,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (memberCount > 0) ...[
-              const SizedBox(width: 6),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 1),
-                child: GestureDetector(
-                  onTap: () {
-                    if (isDesktopMode) {
-                      _tabController.animateTo(0);
-                      return;
-                    }
-                    _showMembersModal(context);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.people_outline,
-                          size: 13,
-                          color: colorScheme.onSurface.withOpacity(0.6),
+        title: Selector<GroupProvider, (String, int)>(
+          selector: (_, gp) => (gp.name, gp.memberCount),
+          builder: (context, data, _) {
+            final name = data.$1;
+            final memberCount = data.$2;
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Flexible(
+                  child: Text(
+                    name.isNotEmpty ? name : widget.groupName,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (memberCount > 0) ...[
+                  const SizedBox(width: 6),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 1),
+                    child: GestureDetector(
+                      onTap: () {
+                        if (isDesktopMode) {
+                          _tabController.animateTo(0);
+                          return;
+                        }
+                        _showMembersModal(context);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        const SizedBox(width: 3),
-                        Text(
-                          '$memberCount',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.onSurface.withOpacity(0.7),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.people_outline,
+                              size: 13,
+                              color: colorScheme.onSurface.withOpacity(0.6),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              '$memberCount',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurface.withOpacity(0.7),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+        actions: [
+          Selector<GroupProvider, (bool, int)>(
+            selector: (_, gp) => (gp.isLiked, gp.likesCount),
+            builder: (context, data, _) {
+              final isLiked = data.$1;
+              final likesCount = data.$2;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () => context.read<GroupProvider>().toggleLike(),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          transitionBuilder: (child, animation) =>
+                              ScaleTransition(scale: animation, child: child),
+                          child: Icon(
+                            isLiked ? Icons.favorite : Icons.favorite_border,
+                            key: ValueKey(isLiked),
+                            size: 24,
+                            color: isLiked
+                                ? Colors.red
+                                : colorScheme.onSurface.withOpacity(0.45),
                           ),
                         ),
+                        if (likesCount > 0)
+                          Positioned(
+                            right: -5,
+                            bottom: -7,
+                            child: Text(
+                              '$likesCount',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isLiked
+                                    ? Colors.red
+                                    : colorScheme.onSurface.withOpacity(0.5),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
                 ),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () => context.read<GroupProvider>().toggleLike(),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Icon(
-                      isLiked ? Icons.favorite : Icons.favorite_border,
-                      size: 24,
-                      color: isLiked
-                          ? Colors.red
-                          : colorScheme.onSurface.withOpacity(0.45),
-                    ),
-                    if (likesCount > 0)
-                      Positioned(
-                        right: -5,
-                        bottom: -7,
-                        child: Text(
-                          '$likesCount',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isLiked
-                                ? Colors.red
-                                : colorScheme.onSurface.withOpacity(0.5),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
+              );
+            },
           ),
         ],
         bottom: TabBar(
