@@ -6,6 +6,8 @@ import 'package:rxdart/rxdart.dart';
 import '../utils/search_dictionary.dart';
 import '../l10n/app_localizations.dart';
 import '../screens/group_tabs/group_type_category_data.dart';
+import '../models/group_cache.dart';
+import 'group_cache_service.dart';
 
 class GroupService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -140,6 +142,10 @@ class GroupService {
 
     try {
       await batch.commit();
+      
+      // Hive 캐시 즉시 업데이트
+      await GroupCacheService.saveGroupName(groupDoc.id, name);
+      
       return groupDoc.id;
     } catch (e) {
       debugPrint('Error creating group: $e');
@@ -246,6 +252,9 @@ class GroupService {
           });
         }
         await batch.commit();
+        
+        // Hive 캐시 업데이트
+        await GroupCacheService.saveGroupName(groupId, groupName);
       }
       return 'ok';
     } catch (e) {
@@ -349,6 +358,13 @@ class GroupService {
         });
       }
       await batch.commit();
+      
+      // 승인된 유저를 위해 Hive 캐시 업데이트 (이건 applicantUid의 로컬 환경이 아니라서 사실 의미 없음)
+      // 하지만 현재 유저가 승인된 유저라면 업데이트가 필요할 수 있음 (거의 없겠지만)
+      if (currentUserId == applicantUid) {
+        await GroupCacheService.saveGroupName(groupId, groupName);
+      }
+
       return 'ok';
     } catch (e) {
       debugPrint('approveJoinRequest error: $e');

@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/user_cache.dart';
+import '../services/group_cache_service.dart';
 
 class UserProvider extends ChangeNotifier {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -271,6 +272,10 @@ class UserProvider extends ChangeNotifier {
     _interests = [];
     _loaded = false;
     notifyListeners();
+
+    // Hive 캐시 초기화
+    await GroupCacheService.clearAll();
+
     final prefs = await SharedPreferences.getInstance();
     for (final key in [
       _keyUid, _keyName, _keyPhone, _keyPhoto, _keyLocale, _keyTimezone,

@@ -6,13 +6,13 @@ import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/schedule.dart';
 import 'notification_service.dart';
+import 'group_cache_service.dart';
 
 class MyScheduleService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   
   static const String _cacheKey = 'my_schedules_cache';
-  static const String _groupNamesKey = 'group_names_cache';
 
   String get currentUserId => _auth.currentUser?.uid ?? '';
 
@@ -51,15 +51,9 @@ class MyScheduleService {
 
   // ── 그룹 이름 캐시 (N+1 방지용) ───────────────────────────────────────────
   Future<Map<String, String>> _getGroupNames() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cacheStr = prefs.getString(_groupNamesKey);
-    Map<String, String> cache = {};
-    if (cacheStr != null) {
-      cache = Map<String, String>.from(jsonDecode(cacheStr));
-    }
+    Map<String, String> cache = await GroupCacheService.getAllGroupNames();
 
     // 현재 사용자가 가입된 그룹 목록에서 최신 이름들 가져오기
-    // 이 부분은 효율을 위해 사용자가 가입한 그룹 정보(joined_groups)를 활용
     final joinedGroupsSnap = await _db
         .collection('users')
         .doc(currentUserId)
@@ -67,16 +61,18 @@ class MyScheduleService {
         .get();
 
     bool changed = false;
+    Map<String, String> newNames = {};
     for (var doc in joinedGroupsSnap.docs) {
       final name = doc.data()['name'] as String?;
       if (name != null && cache[doc.id] != name) {
+        newNames[doc.id] = name;
         cache[doc.id] = name;
         changed = true;
       }
     }
 
     if (changed) {
-      await prefs.setString(_groupNamesKey, jsonEncode(cache));
+      await GroupCacheService.saveGroupNames(newNames);
     }
     return cache;
   }

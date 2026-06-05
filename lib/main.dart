@@ -24,6 +24,7 @@ import 'services/analytics_service.dart';
 import 'services/my_schedule_service.dart';
 import 'services/voice_call_service.dart';
 import 'services/storage_service.dart';
+import 'services/hive_service.dart';
 import 'providers/locale_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/user_provider.dart';
@@ -36,6 +37,9 @@ import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Hive 초기화
+  await HiveService.init();
 
   // Firebase 초기화 가능 플랫폼 (Android, iOS, Windows, Web)
   final isFirebaseSupported = !kIsWeb 

@@ -18,6 +18,8 @@ import 'group_qr_join_preview_screen.dart';
 import 'group_tabs/group_qr_scanner_screen.dart';
 import 'dart:convert';
 import '../utils/ad_interleaver.dart';
+import '../services/group_cache_service.dart';
+import '../models/group_cache.dart';
 
 import '../services/analytics_service.dart';
 
@@ -41,7 +43,6 @@ class _GroupListScreenState extends State<GroupListScreen>
     with SingleTickerProviderStateMixin {
   final ScrollController _myGroupsScrollController = ScrollController();
   bool _fabVisible = true;
-  static const _keyJoinedGroups = 'joined_groups_cache';
 
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
@@ -103,36 +104,19 @@ class _GroupListScreenState extends State<GroupListScreen>
   }
 
   Future<void> _loadCachedGroups() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_keyJoinedGroups);
-    if (raw != null && mounted) {
-      try {
-        final List<dynamic> decoded = jsonDecode(raw);
-        final cached = decoded
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
-        if (cached.isNotEmpty) {
-          setState(() {
-            _joinedGroups = cached;
-            _joinedLoading = false;
-          });
-        }
-      } catch (_) {}
+    final cached = await GroupCacheService.getJoinedGroups();
+    if (cached.isNotEmpty && mounted) {
+      setState(() {
+        _joinedGroups = cached.map((e) => e.toJson()).toList();
+        _joinedLoading = false;
+      });
     }
   }
 
   Future<void> _saveGroupsCache(List<Map<String, dynamic>> groups) async {
     try {
-      final slim = groups.map((g) => {
-        'id': g['id'],
-        'name': g['name'],
-        'type': g['type'],
-        'category': g['category'],
-        'member_count': g['member_count'],
-        'group_profile_image': g['group_profile_image'],
-      }).toList();
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_keyJoinedGroups, jsonEncode(slim));
+      final caches = groups.map((g) => GroupCache.fromJson(g)).toList();
+      await GroupCacheService.saveJoinedGroups(caches);
     } catch (_) {}
   }
 
