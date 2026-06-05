@@ -17,11 +17,11 @@ class BoardsTab extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
 
-    // GroupProvider에서 groupId, myRole 읽기
-    final gp = context.watch<GroupProvider>();
-    final groupId = gp.groupId;
-    final groupName = gp.name;
-    final isOwner = gp.isOwner;
+    // GroupProvider에서 필요한 데이터만 select로 감시하여 불필요한 리빌드(좋아요 클릭 시 깜빡임 등) 방지
+    final groupId = context.select<GroupProvider, String>((gp) => gp.groupId);
+    final groupName = context.select<GroupProvider, String>((gp) => gp.name);
+    final isOwner = context.select<GroupProvider, bool>((gp) => gp.isOwner);
+    final myRole = context.select<GroupProvider, String>((gp) => gp.myRole);
     final groupService = context.read<GroupService>();
 
     // myTags는 members 문서에만 있으므로 별도 구독 필요
@@ -124,7 +124,7 @@ class BoardsTab extends StatelessWidget {
                       writePermission:
                           board['write_permission'] as String? ??
                               'all',
-                      myRole: gp.myRole,
+                      myRole: myRole,
                     ),
                   )),
                 );
