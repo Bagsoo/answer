@@ -22,6 +22,7 @@ import '../../utils/user_display.dart';
 import '../post/block_viewer.dart';
 import '../../providers/user_provider.dart';
 import '../../screens/user_profile_detail_screen.dart';
+import '../../utils/translation_service.dart';
 import 'location_message_bubble.dart';
 import 'settlement_bubble.dart';
 import 'ai_minutes_bubble.dart';
@@ -218,7 +219,6 @@ class _MessageBubbleState extends State<MessageBubble>
     setState(() => _translating = true);
 
     final myLocale = context.read<UserProvider>().locale;
-    final targetLang = _myTranslateLanguage(myLocale);
     final textForTranslation = _extractTranslatableText(text);
 
     if (textForTranslation.length < 4) {
@@ -226,62 +226,26 @@ class _MessageBubbleState extends State<MessageBubble>
       return;
     }
 
-    OnDeviceTranslator? translator;
-
     try {
-      final languageIdentifier = LanguageIdentifier(
-        confidenceThreshold: _minConfidence,
-      );
-      final sourceLangCode = await languageIdentifier.identifyLanguage(
-        textForTranslation,
-      );
-      languageIdentifier.close();
-
-      final sourceLang = _toTranslateLanguage(sourceLangCode);
-      if (sourceLang == null) {
-        return;
+      final sourceLangCode = await TranslationService.identifyLanguage(textForTranslation);
+      if (sourceLangCode == null) {
+        throw Exception('언어 식별 실패');
       }
 
-      translator = OnDeviceTranslator(
-        sourceLanguage: sourceLang,
-        targetLanguage: targetLang,
+      final translated = await TranslationService.translateText(
+        text: textForTranslation,
+        sourceLangCode: sourceLangCode,
+        targetLangCode: myLocale.split('-').first.toLowerCase(),
       );
-
-      final modelManager = OnDeviceTranslatorModelManager();
-      final String sourceCode = sourceLang.bcpCode;
-      final String targetCode = targetLang.bcpCode;
-
-      final translated = await (() async {
-        if (!await modelManager.isModelDownloaded(sourceCode)) {
-          debugPrint('📥 Downloading source model: $sourceCode');
-          await modelManager.downloadModel(
-            sourceCode,
-            isWifiRequired: false,
-          );
-        }
-
-        if (!await modelManager.isModelDownloaded(targetCode)) {
-          debugPrint('📥 Downloading target model: $targetCode');
-          await modelManager.downloadModel(
-            targetCode,
-            isWifiRequired: false,
-          );
-        }
-
-        return translator!.translateText(textForTranslation);
-      })().timeout(_translationTimeout);
 
       if (mounted) {
         setState(() {
           _translatedText = translated;
         });
       }
-    } on TimeoutException {
-      debugPrint('번역 타임아웃: $_translationTimeout');
     } catch (e) {
       debugPrint('번역 실패: $e');
     } finally {
-      translator?.close();
       if (mounted) setState(() => _translating = false);
     }
   }
