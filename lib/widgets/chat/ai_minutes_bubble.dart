@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:messenger/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+
 
 class AiMinutesBubble extends StatelessWidget {
   final String jobId;
@@ -15,22 +17,23 @@ class AiMinutesBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('DEBUG: AiMinutesBubble listening to jobId: $jobId');
+    final l = AppLocalizations.of(context);
+    // debugPrint('DEBUG: AiMinutesBubble listening to jobId: $jobId');
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance.collection('ai_jobs').doc(jobId).snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingState('데이터를 불러오는 중...');
+          return _buildLoadingState(l.aiMinutesLoading, l);
         }
 
         if (snapshot.hasError) {
           debugPrint('DEBUG: AiMinutesBubble error: ${snapshot.error}');
-          return _buildErrorState('오류가 발생했습니다.');
+          return _buildErrorState(l.aiMinutesError, l);
         }
 
         if (!snapshot.hasData || !snapshot.data!.exists) {
           debugPrint('DEBUG: AiMinutesBubble: Document does not exist or no data');
-          return _buildLoadingState('요청을 확인 중입니다...');
+          return _buildLoadingState(l.aiMinutesChecking, l);
         }
 
         final data = snapshot.data!.data();
@@ -38,20 +41,20 @@ class AiMinutesBubble extends StatelessWidget {
         debugPrint('DEBUG: AiMinutesBubble currentStatus: $currentStatus');
 
         if (currentStatus == 'processing') {
-          return _buildLoadingState('AI가 회의록을 분석 중입니다... (약 1~2분 소요)');
+          return _buildLoadingState(l.aiMinutesAnalyzing, l);
         } else if (currentStatus == 'failed') {
-          return _buildErrorState(data?['errorMessage'] ?? '회의록 생성에 실패했습니다.');
+          return _buildErrorState(data?['errorMessage'] ?? l.aiMinutesFailed, l);
         } else if (currentStatus == 'completed') {
           final result = data?['result'] as Map<String, dynamic>?;
-          return _buildCompletedState(result?['summary'] ?? '요약 내용이 없습니다.');
+          return _buildCompletedState(result?['summary'] ?? l.aiMinutesNoSummary, l);
         }
 
-        return _buildLoadingState('대기 중...');
+        return _buildLoadingState(l.aiMinutesWaiting, l);
       },
     );
   }
 
-  Widget _buildLoadingState(String message) {
+  Widget _buildLoadingState(String message, AppLocalizations l) {
     return Container(
       constraints: const BoxConstraints(maxWidth: 240),
       padding: const EdgeInsets.all(12),
@@ -73,7 +76,7 @@ class AiMinutesBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildErrorState(String message) {
+  Widget _buildErrorState(String message, AppLocalizations l) {
     return Container(
       constraints: const BoxConstraints(maxWidth: 240),
       padding: const EdgeInsets.all(12),
@@ -85,7 +88,7 @@ class AiMinutesBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildCompletedState(String summary) {
+  Widget _buildCompletedState(String summary, AppLocalizations l) {
     return Container(
       constraints: const BoxConstraints(maxWidth: 240),
       padding: const EdgeInsets.all(12),
@@ -96,7 +99,7 @@ class AiMinutesBubble extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('🎤 회의록 요약', style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.onPrimaryContainer)),
+          Text(l.meetingMinutesSummary, style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.onPrimaryContainer)),
           const SizedBox(height: 8),
           Text(summary, style: TextStyle(fontSize: 13, color: colorScheme.onPrimaryContainer)),
         ],

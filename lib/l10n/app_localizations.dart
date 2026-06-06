@@ -461,6 +461,14 @@ class AppLocalizations {
    String get aiMinutesReadyToRecord => _s.aiMinutesReadyToRecord;
    String get aiMinutesPressMicToStart => _s.aiMinutesPressMicToStart;
    String get aiMinutesStopToFinish => _s.aiMinutesStopToFinish;
+   String get meetingMinutesSummary => _s.meetingMinutesSummary;
+   String get aiMinutesLoading => _s.aiMinutesLoading;
+   String get aiMinutesChecking => _s.aiMinutesChecking;
+   String get aiMinutesAnalyzing => _s.aiMinutesAnalyzing;
+   String get aiMinutesWaiting => _s.aiMinutesWaiting;
+   String get aiMinutesError => _s.aiMinutesError;
+   String get aiMinutesFailed => _s.aiMinutesFailed;
+   String get aiMinutesNoSummary => _s.aiMinutesNoSummary;
 
   // ── 플랜 공통 ────────────────────────────────────────────────────────────────
   String get manageGroupPlan => _s.manageGroupPlan;
@@ -1270,6 +1278,14 @@ abstract class _AppStrings {
    String get aiMinutesReadyToRecord;
    String get aiMinutesPressMicToStart;
    String get aiMinutesStopToFinish;
+   String get meetingMinutesSummary;
+   String get aiMinutesLoading;
+   String get aiMinutesChecking;
+   String get aiMinutesAnalyzing;
+   String get aiMinutesWaiting;
+   String get aiMinutesError;
+   String get aiMinutesFailed;
+   String get aiMinutesNoSummary;
 
   // 플랜 공통
   String get manageGroupPlan;
@@ -2088,6 +2104,14 @@ class _EnStrings extends _AppStrings {
    @override String get aiMinutesReadyToRecord => 'Ready to record';
    @override String get aiMinutesPressMicToStart => 'Press mic to start';
    @override String get aiMinutesStopToFinish => 'Stop to finish';
+   @override String get meetingMinutesSummary => 'Meeting Minutes Summary';
+   @override String get aiMinutesLoading => 'Loading...';
+   @override String get aiMinutesChecking => 'Checking...';
+   @override String get aiMinutesAnalyzing => 'Analyzing...';
+   @override String get aiMinutesWaiting => 'Waiting...';
+   @override String get aiMinutesError => 'Error';
+   @override String get aiMinutesFailed => 'Failed';
+   @override String get aiMinutesNoSummary => 'No Summary';
 
   // 플랜 공통
   @override String get manageGroupPlan => 'Manage Plan';
@@ -2881,7 +2905,15 @@ class _KoStrings extends _AppStrings {
   // ai 회의록  
   @override String get aiMinutesReadyToRecord => '녹음 준비 완료';
   @override String get aiMinutesPressMicToStart => '마이크를 눌러 녹음을 시작하세요';
-  @override String get aiMinutesStopToFinish => '녹음을 마치려면 정지를 누르세요';    
+  @override String get aiMinutesStopToFinish => '녹음을 마치려면 정지를 누르세요';  
+  @override String get meetingMinutesSummary => '회의록 요약';
+  @override String get aiMinutesLoading => '불러오는 중...';
+  @override String get aiMinutesChecking => '확인 중...';
+  @override String get aiMinutesAnalyzing => '분석 중...';
+  @override String get aiMinutesWaiting => '대기 중...';
+  @override String get aiMinutesError => '오류';
+  @override String get aiMinutesFailed => '실패';
+  @override String get aiMinutesNoSummary => '요약 없음';
 
   // 플랜 공통
   @override String get manageGroupPlan => '플랜 관리';
@@ -3684,6 +3716,14 @@ class _JaStrings extends _AppStrings {
   @override String get aiMinutesReadyToRecord => '録音準備完了';
   @override String get aiMinutesPressMicToStart => 'マイクを押して録音を開始してください';
   @override String get aiMinutesStopToFinish => '録音を終えるには停止を押してください';
+  @override String get meetingMinutesSummary => '会議録の要約';
+  @override String get aiMinutesLoading => '読み込み中...';
+  @override String get aiMinutesChecking => '確認中...';
+  @override String get aiMinutesAnalyzing => '分析中...';
+  @override String get aiMinutesWaiting => '待機中...';
+  @override String get aiMinutesError => 'エラー';
+  @override String get aiMinutesFailed => '失敗';
+  @override String get aiMinutesNoSummary => '要約なし';
 
   // 플랜 공통
   @override String get manageGroupPlan => 'プラン管理';
