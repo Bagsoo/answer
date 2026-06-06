@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../l10n/app_localizations.dart';
 import '../models/app_notice.dart';
 import '../services/app_notice_service.dart';
+import '../utils/translation_service.dart';
 
 class AppNoticeGate extends StatefulWidget {
   final Widget child;
@@ -21,12 +22,35 @@ class _AppNoticeGateState extends State<AppNoticeGate> {
   final AppNoticeService _noticeService = AppNoticeService();
   bool _didCheck = false;
 
+  // 번역 관련 상태
+  String? _translatedContent;
+  bool _isTranslating = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowNotice();
     });
+  }
+
+  Future<void> _translateNotice(String text, String sourceLang) async {
+    if (!mounted) return;
+    setState(() => _isTranslating = true);
+
+    final locale = Localizations.localeOf(context).languageCode;
+    final translated = await TranslationService.translateText(
+      text: text,
+      sourceLangCode: sourceLang,
+      targetLangCode: locale,
+    );
+
+    if (mounted) {
+      setState(() {
+        _translatedContent = translated;
+        _isTranslating = false;
+      });
+    }
   }
 
   Future<void> _checkAndShowNotice() async {
@@ -37,12 +61,23 @@ class _AppNoticeGateState extends State<AppNoticeGate> {
       final notice = await _noticeService.fetchStartupNotice();
       if (!mounted || notice == null) return;
 
-      await _showNoticeDialog(notice);
+      // 번역 필요 여부 체크
+      final sourceLang = await TranslationService.identifyLanguage(notice.content);
+      final myLang = Localizations.localeOf(context).languageCode;
+      
+      final shouldShowTranslate = sourceLang != null && sourceLang != myLang;
+
+      await _showNoticeDialog(notice, shouldShowTranslate ? sourceLang : null);
     } catch (_) {}
   }
 
-  Future<void> _showNoticeDialog(AppNotice notice) async {
+  Future<void> _showNoticeDialog(AppNotice notice, String? sourceLang) async {
     if (!mounted) return;
+    
+    // 초기화
+    _translatedContent = null;
+    _isTranslating = false;
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final l = AppLocalizations.of(context);
@@ -51,161 +86,185 @@ class _AppNoticeGateState extends State<AppNoticeGate> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        return PopScope(
-          canPop: false,
-          child: Dialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
-            ),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 520),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
-                gradient: LinearGradient(
-                  colors: [
-                    colorScheme.surface,
-                    colorScheme.primaryContainer.withValues(alpha: 0.15),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return PopScope(
+              canPop: false,
+              child: Dialog(
+                insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(28),
                 ),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withValues(alpha: 0.08),
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(28),
-                      ),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Icon(
-                            notice.noticeType == AppNoticeType.update
-                                ? Icons.system_update_alt_rounded
-                                : Icons.campaign_rounded,
-                            color: colorScheme.onPrimary,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      notice.title,
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w800,
-                                        color: colorScheme.onSurface,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  _NoticeTypeChip(notice: notice),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                notice.noticeType == AppNoticeType.update
-                                    ? l.noticeAppUpdateTitle
-                                    : l.noticeNewAnnouncementTitle,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: colorScheme.onSurfaceVariant,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    gradient: LinearGradient(
+                      colors: [
+                        colorScheme.surface,
+                        colorScheme.primaryContainer.withValues(alpha: 0.15),
                       ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 220),
-                          child: SingleChildScrollView(
-                            child: Text(
-                              notice.content,
-                              style: TextStyle(
-                                fontSize: 15,
-                                height: 1.6,
-                                color: colorScheme.onSurface,
-                              ),
-                            ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary.withValues(alpha: 0.08),
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(28),
                           ),
                         ),
-                        // const SizedBox(height: 16),
-                        // // 관리용 정보(우선순위, 최소빌드, 만료일)는 사용자에게 보여주지 않음
-                        // _NoticeMetaRow(notice: notice),
-                        const SizedBox(height: 20),
-                        Row(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () async {
-                                  await _noticeService.markAsRead(notice);
-                                  if (dialogContext.mounted) {
-                                    Navigator.of(dialogContext).pop();
-                                  }
-                                },
-                                child: Text(
-                                  notice.noticeType == AppNoticeType.update
-                                      ? l.noticeLaterAction
-                                      : l.close,
-                                ),
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Icon(
+                                notice.noticeType == AppNoticeType.update
+                                    ? Icons.system_update_alt_rounded
+                                    : Icons.campaign_rounded,
+                                color: colorScheme.onPrimary,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 14),
                             Expanded(
-                              child: FilledButton(
-                                onPressed: () async {
-                                  await _handlePrimaryAction(
-                                    dialogContext,
-                                    notice,
-                                  );
-                                },
-                                child: Text(
-                                  notice.noticeType == AppNoticeType.update
-                                      ? l.noticeUpdateAction
-                                      : l.confirm,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          notice.title,
+                                          style: TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.w800,
+                                            color: colorScheme.onSurface,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      _NoticeTypeChip(notice: notice),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    notice.noticeType == AppNoticeType.update
+                                        ? l.noticeAppUpdateTitle
+                                        : l.noticeNewAnnouncementTitle,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: colorScheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxHeight: 220),
+                              child: SingleChildScrollView(
+                                child: Text(
+                                  _translatedContent ?? notice.content,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    height: 1.6,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            
+                            // 번역 버튼
+                            if (sourceLang != null) ...[
+                              const SizedBox(height: 10),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: _isTranslating
+                                      ? null
+                                      : () async {
+                                          setDialogState(() => _isTranslating = true);
+                                          await _translateNotice(notice.content, sourceLang);
+                                          setDialogState(() => _isTranslating = false);
+                                        },
+                                  icon: _isTranslating
+                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                      : const Icon(Icons.translate_rounded, size: 16),
+                                  label: Text(l.translate),
+                                ),
+                              ),
+                            ],
+                            
+                            const SizedBox(height: 20),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () async {
+                                      await _noticeService.markAsRead(notice);
+                                      if (dialogContext.mounted) {
+                                        Navigator.of(dialogContext).pop();
+                                      }
+                                    },
+                                    child: Text(
+                                      notice.noticeType == AppNoticeType.update
+                                          ? l.noticeLaterAction
+                                          : l.close,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: FilledButton(
+                                    onPressed: () async {
+                                      await _handlePrimaryAction(
+                                        dialogContext,
+                                        notice,
+                                      );
+                                    },
+                                    child: Text(
+                                      notice.noticeType == AppNoticeType.update
+                                          ? l.noticeUpdateAction
+                                          : l.confirm,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          }
         );
       },
     );
   }
+
 
   Future<void> _handlePrimaryAction(
     BuildContext dialogContext,
