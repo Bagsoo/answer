@@ -37,12 +37,7 @@ import 'screens/auth_wrapper.dart';
 import 'firebase_options.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-  PlatformDispatcher.instance.onError = (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    return true;
-  };
+  WidgetsFlutterBinding.ensureInitialized();  
 
   // Hive 초기화
   await HiveService.init();
@@ -64,6 +59,12 @@ void main() async {
         debugPrint('Firebase init error: $e');
       }
     }
+
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
 
     final isWindows = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
     if (isWindows) {
