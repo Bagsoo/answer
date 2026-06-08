@@ -54,7 +54,7 @@ local.properties
 .generated/
 Pods/
 ServiceDefinitions.json
-Runner.xcworkspace/
+# Runner.xcworkspace/
 xcuserdata/
 DerivedData/
 *.moved-aside
