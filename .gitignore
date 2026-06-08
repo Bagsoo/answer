@@ -61,7 +61,7 @@ DerivedData/
 
 # Firebase 사용 시 (필요에 따라)
 google-services.json
-GoogleService-Info.plist
+# GoogleService-Info.plist
 
 # 보안 및 환경 변수
 .env
@@ -75,4 +75,4 @@ functions/.env
 # OS 관련
 Thumbs.db
 
-lib/firebase_options.dart
+# lib/firebase_options.dart
