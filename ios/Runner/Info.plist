@@ -58,6 +58,8 @@
 	<string>ca-app-pub-3027819032479365~5537088662</string>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>More relevant ads are shown based on this.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need access to your photo library to save and send photos.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
