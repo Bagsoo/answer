@@ -1,3 +1,6 @@
+ENV['FLUTTER_XCODE_SCHEME'] = 'Runner'
+ENV['FLUTTER_XCODE_PROJECT'] = 'Runner.xcodeproj'
+ENV['FLUTTER_XCODE_WORKSPACE'] = 'Runner.xcworkspace'
 # Uncomment this line to define a global platform for your project
 platform :ios, '15.0'
 
