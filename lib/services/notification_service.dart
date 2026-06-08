@@ -18,6 +18,8 @@ import '../screens/group_detail_screen.dart';
 import '../screens/group_tabs/join_requests_screen.dart';
 import '../screens/video_room_screen.dart';
 import '../screens/voice_room_screen.dart';
+import '../models/notification_settings_cache.dart';
+import 'hive_service.dart';
 
 // 백그라운드 메시지 핸들러 (top-level 함수여야 함)
 @pragma('vm:entry-point')
@@ -437,17 +439,66 @@ class NotificationService {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return _defaultSettings();
 
-    final doc = await _db.collection('users').doc(uid).get();
-    final raw =
-        doc.data()?['notification_settings'] as Map<String, dynamic>?;
-    if (raw == null) return _defaultSettings();
+    final box = await HiveService.openBox<NotificationSettingsCache>('notification_settings');
+    final cache = box.get(uid);
 
-    return {
-      'chat_message': raw['chat_message'] as bool? ?? true,
-      'join_request': raw['join_request'] as bool? ?? true,
-      'new_schedule': raw['new_schedule'] as bool? ?? true,
-      'marketing': raw['marketing'] as bool? ?? false,
-    };
+    final now = DateTime.now();
+    if (cache != null && now.difference(cache.updatedAt).inDays <= 7) {
+      return {
+        'chat_message': cache.chatMessage,
+        'join_request': cache.joinRequest,
+        'new_schedule': cache.newSchedule,
+        'marketing': cache.marketing,
+      };
+    }
+
+    try {
+      final doc = await _db.collection('users').doc(uid).get();
+      final raw = doc.data()?['notification_settings'] as Map<String, dynamic>?;
+      if (raw == null) {
+        final defaults = _defaultSettings();
+        final newCache = NotificationSettingsCache(
+          chatMessage: defaults['chat_message']!,
+          joinRequest: defaults['join_request']!,
+          newSchedule: defaults['new_schedule']!,
+          marketing: defaults['marketing']!,
+          updatedAt: now,
+        );
+        await box.put(uid, newCache);
+        return defaults;
+      }
+
+      final chatMessage = raw['chat_message'] as bool? ?? true;
+      final joinRequest = raw['join_request'] as bool? ?? true;
+      final newSchedule = raw['new_schedule'] as bool? ?? true;
+      final marketing = raw['marketing'] as bool? ?? false;
+
+      final newCache = NotificationSettingsCache(
+        chatMessage: chatMessage,
+        joinRequest: joinRequest,
+        newSchedule: newSchedule,
+        marketing: marketing,
+        updatedAt: now,
+      );
+      await box.put(uid, newCache);
+
+      return {
+        'chat_message': chatMessage,
+        'join_request': joinRequest,
+        'new_schedule': newSchedule,
+        'marketing': marketing,
+      };
+    } catch (_) {
+      if (cache != null) {
+        return {
+          'chat_message': cache.chatMessage,
+          'join_request': cache.joinRequest,
+          'new_schedule': cache.newSchedule,
+          'marketing': cache.marketing,
+        };
+      }
+      return _defaultSettings();
+    }
   }
 
   Future<void> saveNotificationSettings(Map<String, bool> settings) async {
@@ -457,6 +508,16 @@ class NotificationService {
         .collection('users')
         .doc(uid)
         .update({'notification_settings': settings});
+
+    final box = await HiveService.openBox<NotificationSettingsCache>('notification_settings');
+    final newCache = NotificationSettingsCache(
+      chatMessage: settings['chat_message'] ?? true,
+      joinRequest: settings['join_request'] ?? true,
+      newSchedule: settings['new_schedule'] ?? true,
+      marketing: settings['marketing'] ?? false,
+      updatedAt: DateTime.now(),
+    );
+    await box.put(uid, newCache);
   }
 
   Map<String, bool> _defaultSettings() => {

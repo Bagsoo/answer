@@ -6,9 +6,14 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/user_cache.dart';
 import '../services/group_cache_service.dart';
+import '../services/hive_service.dart';
+import '../models/user_profile_cache.dart';
+import '../models/notification_settings_cache.dart';
+import '../repositories/user_repository.dart';
 
 class UserProvider extends ChangeNotifier {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final UserRepository _userRepo = UserRepository();
 
   static const _keyUid          = 'user_uid';
   static const _keyName         = 'user_name';
@@ -65,72 +70,57 @@ class UserProvider extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
 
-    // 1) 캐시 즉시 적용
-    final cachedName = prefs.getString(_keyName) ?? '';
-    if (cachedName.isNotEmpty) {
-      _name         = cachedName;
-      _photoUrl     = prefs.getString(_keyPhoto);
-      _phoneNumber  = prefs.getString(_keyPhone) ?? '';
+    // 1) 캐시 즉시 적용 (UserProfileCache에서 로드)
+    final cachedProfile = await _userRepo.getCachedProfile(_uid);
+    if (cachedProfile != null) {
+      _name         = cachedProfile.name ?? '';
+      _photoUrl     = cachedProfile.photoUrl;
+      _phoneNumber  = cachedProfile.phone ?? '';
+      _locationName = cachedProfile.locationName ?? '';
+      _locationLat  = cachedProfile.locationLat;
+      _locationLng  = cachedProfile.locationLng;
+      _interests    = cachedProfile.interests ?? [];
+      
+      // 로케일 및 시간대는 기존대로 SharedPreferences 유지
       _locale       = prefs.getString(_keyLocale) ?? 'ko';
       _timezone     = prefs.getString(_keyTimezone) ?? 'Asia/Seoul';
-      _locationName = prefs.getString(_keyLocationName) ?? '';
-      _locationLat  = prefs.getDouble(_keyLocationLat);
-      _locationLng  = prefs.getDouble(_keyLocationLng);
-      _interests    = prefs.getStringList(_keyInterests) ?? [];
-      // _loaded = true;
+      notifyListeners();
+    } else {
+      _locale       = prefs.getString(_keyLocale) ?? 'ko';
+      _timezone     = prefs.getString(_keyTimezone) ?? 'Asia/Seoul';
       notifyListeners();
     }
 
-    // 2) Firebase 최신 데이터
+    // 2) Firebase 최신 데이터 및 캐시 갱신
+    final freshProfile = await _userRepo.fetchAndCacheProfile(_uid);
+    if (freshProfile != null) {
+      _name         = freshProfile.name ?? '';
+      _photoUrl     = freshProfile.photoUrl;
+      _phoneNumber  = freshProfile.phone ?? '';
+      _locationName = freshProfile.locationName ?? '';
+      _locationLat  = freshProfile.locationLat;
+      _locationLng  = freshProfile.locationLng;
+      _interests    = freshProfile.interests ?? [];
+      _loaded = true;
+      notifyListeners();
+    }
+
+    // Firebase 최신 locale / timezone 불러와 SharedPreferences 갱신
     final doc  = await _db.collection('users').doc(_uid).get();
     final data = doc.data();
-    if (data == null) return;
-    if ((data['account_status'] as String? ?? 'active') == 'deleted') {
-      await clear();
-      return;
+    if (data != null) {
+      if ((data['account_status'] as String? ?? 'active') == 'deleted') {
+        await clear();
+        return;
+      }
+      final locale    = data['locale']        as String? ?? 'ko';
+      final timezone  = data['timezone']      as String? ?? 'Asia/Seoul';
+      _locale = locale;
+      _timezone = timezone;
+      await prefs.setString(_keyLocale, locale);
+      await prefs.setString(_keyTimezone, timezone);
+      notifyListeners();
     }
-
-    final name      = data['name']          as String? ?? '';
-    final phone     = data['phone_number']  as String? ?? '';
-    final photo     = data['profile_image'] as String?;
-    final locale    = data['locale']        as String? ?? 'ko';
-    final timezone  = data['timezone']      as String? ?? 'Asia/Seoul';
-    final locName   = data['activity_location_name'] as String? ?? '';
-    final gp        = data['activity_location'] as GeoPoint?;
-    final interests = List<String>.from(data['interests'] as List? ?? []);
-
-    _name         = name;
-    _phoneNumber  = phone;
-    _photoUrl     = photo;
-    _locale       = locale;
-    _timezone     = timezone;
-    _locationName = locName;
-    _locationLat  = gp?.latitude;
-    _locationLng  = gp?.longitude;
-    _interests    = interests;
-    _loaded = true;
-    notifyListeners();
-
-    // 3) 캐시 갱신
-    await prefs.setString(_keyUid, _uid);
-    await prefs.setString(_keyName, name);
-    await prefs.setString(_keyPhone, phone);
-    if (photo != null) {
-      await prefs.setString(_keyPhoto, photo);
-    } else {
-      await prefs.remove(_keyPhoto);
-    }
-    await prefs.setString(_keyLocale, locale);
-    await prefs.setString(_keyTimezone, timezone);
-    await prefs.setString(_keyLocationName, locName);
-    if (gp != null) {
-      await prefs.setDouble(_keyLocationLat, gp.latitude);
-      await prefs.setDouble(_keyLocationLng, gp.longitude);
-    } else {
-      await prefs.remove(_keyLocationLat);
-      await prefs.remove(_keyLocationLng);
-    }
-    await prefs.setStringList(_keyInterests, interests);
   }
 
   // ── 활동 위치 업데이트 ───────────────────────────────────────────────────
@@ -149,10 +139,12 @@ class UserProvider extends ChangeNotifier {
     _locationName = name;
     notifyListeners();
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_keyLocationLat, lat);
-    await prefs.setDouble(_keyLocationLng, lng);
-    await prefs.setString(_keyLocationName, name);
+    // 로컬 캐시 갱신
+    final cache = await _userRepo.getCachedProfile(_uid) ?? UserProfileCache(uid: _uid);
+    cache.locationLat = lat;
+    cache.locationLng = lng;
+    cache.locationName = name;
+    await _userRepo.saveProfileLocal(cache);
   }
 
   // ── 관심사 업데이트 ──────────────────────────────────────────────────────
@@ -162,8 +154,10 @@ class UserProvider extends ChangeNotifier {
     _interests = interests;
     notifyListeners();
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_keyInterests, interests);
+    // 로컬 캐시 갱신
+    final cache = await _userRepo.getCachedProfile(_uid) ?? UserProfileCache(uid: _uid);
+    cache.interests = interests;
+    await _userRepo.saveProfileLocal(cache);
   }
 
   // ── 프로필 사진 업로드 ───────────────────────────────────────────────────
@@ -190,8 +184,10 @@ class UserProvider extends ChangeNotifier {
       UserCache.invalidate(_uid);
       notifyListeners();
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_keyPhoto, newUrl);
+      // 로컬 캐시 갱신
+      final cache = await _userRepo.getCachedProfile(_uid) ?? UserProfileCache(uid: _uid);
+      cache.photoUrl = newUrl;
+      await _userRepo.saveProfileLocal(cache);
 
       await _syncProfileImageToFriends(newUrl);
       await _syncProfileImageToGroups(newUrl);
@@ -250,8 +246,11 @@ class UserProvider extends ChangeNotifier {
     _name = newName;
     UserCache.invalidate(_uid);
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyName, newName);
+
+    // 로컬 캐시 갱신
+    final cache = await _userRepo.getCachedProfile(_uid) ?? UserProfileCache(uid: _uid);
+    cache.name = newName;
+    await _userRepo.saveProfileLocal(cache);
   }
 
   // ── 타임존 변경 ──────────────────────────────────────────────────────────
@@ -266,6 +265,7 @@ class UserProvider extends ChangeNotifier {
 
   // ── 로그아웃 시 초기화 ───────────────────────────────────────────────────
   Future<void> clear() async {
+    final oldUid = _uid;
     _uid = ''; _name = ''; _phoneNumber = ''; _photoUrl = null;
     _locale = 'ko'; _timezone = 'Asia/Seoul';
     _locationLat = null; _locationLng = null; _locationName = '';
@@ -275,6 +275,11 @@ class UserProvider extends ChangeNotifier {
 
     // Hive 캐시 초기화
     await GroupCacheService.clearAll();
+    if (oldUid.isNotEmpty) {
+      await _userRepo.clearProfileCache(oldUid);
+      final notifBox = await HiveService.openBox<NotificationSettingsCache>('notification_settings');
+      await notifBox.delete(oldUid);
+    }
 
     final prefs = await SharedPreferences.getInstance();
     for (final key in [

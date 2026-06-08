@@ -12,6 +12,8 @@ import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../config/env_config.dart';
 import 'analytics_service.dart';
+import '../models/auth_meta.dart';
+import 'hive_service.dart';
 
 class AuthService extends ChangeNotifier {
   FirebaseAuth get _auth => FirebaseAuth.instance;
@@ -24,18 +26,17 @@ class AuthService extends ChangeNotifier {
 
   GoogleSignIn? _googleSignIn;
 
-  static const _keyIsRegistered = 'auth_is_registered';
-  static const _keyRegisteredUid = 'auth_registered_uid';
-  static const _keyLastUsedProvider = 'last_used_provider';
-
   Future<void> setLastUsedProvider(String provider) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyLastUsedProvider, provider);
+    final box = await HiveService.openBox<AuthMeta>('auth_meta');
+    final meta = box.get('current') ?? AuthMeta();
+    meta.lastUsedProvider = provider;
+    await box.put('current', meta);
   }
 
   Future<String?> getLastUsedProvider() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyLastUsedProvider);
+    final box = await HiveService.openBox<AuthMeta>('auth_meta');
+    final meta = box.get('current');
+    return meta?.lastUsedProvider;
   }
 
   User? get currentUser {
@@ -75,12 +76,11 @@ class AuthService extends ChangeNotifier {
     if (_isFirebaseSupported) {
       _auth.authStateChanges().listen((user) async {
         if (user != null) {
-          final prefs = await SharedPreferences.getInstance();
-          final cachedUid = prefs.getString(_keyRegisteredUid);
-          final cachedRegistered = prefs.getBool(_keyIsRegistered);
+          final box = await HiveService.openBox<AuthMeta>('auth_meta');
+          final meta = box.get('current');
 
-          if (cachedUid == user.uid && cachedRegistered != null) {
-            _isRegisteredUser = cachedRegistered;
+          if (meta != null && meta.registeredUid == user.uid && meta.isRegistered != null) {
+            _isRegisteredUser = meta.isRegistered;
             notifyListeners();
           }
           await _checkAndSetRegisteredUser(user.uid);
@@ -104,9 +104,11 @@ class AuthService extends ChangeNotifier {
       final analytics = AnalyticsService();
       await analytics.setUserProperties(uid: uid, locale: locale);
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_keyIsRegistered, registered);
-      await prefs.setString(_keyRegisteredUid, uid);
+      final box = await HiveService.openBox<AuthMeta>('auth_meta');
+      final meta = box.get('current') ?? AuthMeta();
+      meta.isRegistered = registered;
+      meta.registeredUid = uid;
+      await box.put('current', meta);
 
       if (registered) {
         await _db.collection('users').doc(uid).update({
@@ -404,6 +406,13 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    final box = await HiveService.openBox<AuthMeta>('auth_meta');
+    final meta = box.get('current');
+    if (meta != null) {
+      meta.isRegistered = null;
+      meta.registeredUid = null;
+      await box.put('current', meta);
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
     await _googleSignIn?.signOut();
