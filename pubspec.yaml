@@ -94,6 +94,7 @@ flutter_launcher_icons:
   min_sdk_android: 21
 
 flutter:
+  swift-package-manager: false
   assets:
     - assets/images/answer_logo.png
     - assets/markdown/
