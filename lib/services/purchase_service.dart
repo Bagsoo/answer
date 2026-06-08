@@ -41,18 +41,18 @@ class GroupPurchaseService {
 
   static final GroupPurchaseService instance = GroupPurchaseService._();
 
-  static const String androidSubscriptionId = 'group_plan';
-  static const String plusMonthly = 'plus-monthly';
-  static const String plusYearly = 'plus-yearly';
-  static const String proMonthly = 'pro-monthly';
-  static const String proYearly = 'pro-yearly';
+  static String get androidSubscriptionId => 'group_plan';
+  static String get plusMonthly => defaultTargetPlatform == TargetPlatform.iOS ? 'plus_monthly' : 'plus-monthly';
+  static String get plusYearly => defaultTargetPlatform == TargetPlatform.iOS ? 'plus_yearly' : 'plus-yearly';
+  static String get proMonthly => defaultTargetPlatform == TargetPlatform.iOS ? 'pro_monthly' : 'pro-monthly';
+  static String get proYearly => defaultTargetPlatform == TargetPlatform.iOS ? 'pro_yearly' : 'pro-yearly';
 
-  static const Set<String> logicalProductIds = <String>{
-    plusMonthly,
-    plusYearly,
-    proMonthly,
-    proYearly,
-  };
+  static Set<String> get logicalProductIds => <String>{
+        plusMonthly,
+        plusYearly,
+        proMonthly,
+        proYearly,
+      };
 
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
   final FirebaseFunctions _functions =
@@ -194,17 +194,16 @@ class GroupPurchaseService {
   }
 
   String _androidTitle(String logicalProductId) {
-    switch (logicalProductId) {
-      case plusMonthly:
-        return 'PLUS Monthly';
-      case plusYearly:
-        return 'PLUS Yearly';
-      case proMonthly:
-        return 'PRO Monthly';
-      case proYearly:
-        return 'PRO Yearly';
-      default:
-        return logicalProductId;
+    if (logicalProductId == plusMonthly) {
+      return 'PLUS Monthly';
+    } else if (logicalProductId == plusYearly) {
+      return 'PLUS Yearly';
+    } else if (logicalProductId == proMonthly) {
+      return 'PRO Monthly';
+    } else if (logicalProductId == proYearly) {
+      return 'PRO Yearly';
+    } else {
+      return logicalProductId;
     }
   }
 
@@ -306,17 +305,16 @@ class GroupPurchaseService {
   }
 
   int _sortIndex(String logicalProductId) {
-    switch (logicalProductId) {
-      case plusMonthly:
-        return 0;
-      case plusYearly:
-        return 1;
-      case proMonthly:
-        return 2;
-      case proYearly:
-        return 3;
-      default:
-        return 100;
+    if (logicalProductId == plusMonthly) {
+      return 0;
+    } else if (logicalProductId == plusYearly) {
+      return 1;
+    } else if (logicalProductId == proMonthly) {
+      return 2;
+    } else if (logicalProductId == proYearly) {
+      return 3;
+    } else {
+      return 100;
     }
   }
 

@@ -38,7 +38,17 @@ const PRODUCT_CONFIG: Record<
     billingCycle: "monthly",
     pricingKey: "plus_monthly",
   },
+  "plus_monthly": {
+    plan: "plus",
+    billingCycle: "monthly",
+    pricingKey: "plus_monthly",
+  },
   "plus-yearly": {
+    plan: "plus",
+    billingCycle: "yearly",
+    pricingKey: "plus_yearly",
+  },
+  "plus_yearly": {
     plan: "plus",
     billingCycle: "yearly",
     pricingKey: "plus_yearly",
@@ -48,7 +58,17 @@ const PRODUCT_CONFIG: Record<
     billingCycle: "monthly",
     pricingKey: "pro_monthly",
   },
+  "pro_monthly": {
+    plan: "pro",
+    billingCycle: "monthly",
+    pricingKey: "pro_monthly",
+  },
   "pro-yearly": {
+    plan: "pro",
+    billingCycle: "yearly",
+    pricingKey: "pro_yearly",
+  },
+  "pro_yearly": {
     plan: "pro",
     billingCycle: "yearly",
     pricingKey: "pro_yearly",
@@ -57,9 +77,13 @@ const PRODUCT_CONFIG: Record<
 
 const FALLBACK_PRICES: Record<string, number> = {
   "plus-monthly": 4.99,
+  "plus_monthly": 4.99,
   "plus-yearly": 49.99,
+  "plus_yearly": 49.99,
   "pro-monthly": 7.99,
+  "pro_monthly": 7.99,
   "pro-yearly": 85.99,
+  "pro_yearly": 85.99,
 };
 
 async function getPricingData(productId: string) {
