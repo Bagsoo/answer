@@ -66,7 +66,7 @@ class DefaultFirebaseOptions {
     storageBucket: 'answer-application.firebasestorage.app',
     androidClientId: '577703671325-13b50n2rugna5i55det9csk7368mt27t.apps.googleusercontent.com',
     iosClientId: '577703671325-ti2i1ietksdh5pct64qg5d8cpe8v8ope.apps.googleusercontent.com',
-    iosBundleId: 'com.answer.app',
+    iosBundleId: 'com.answer.application',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
