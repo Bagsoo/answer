@@ -316,14 +316,16 @@ class NotificationService {
       onDidReceiveNotificationResponse: _onNotificationTap,
     );
 
-    final androidPlugin = _plugin
-        .resolvePlatformSpecificImplementation
-            AndroidFlutterLocalNotificationsPlugin>();
-    await androidPlugin?.createNotificationChannel(_chatChannel);
-    await androidPlugin?.createNotificationChannel(_scheduleChannel);
-    await androidPlugin?.createNotificationChannel(_joinRequestChannel);
-    await androidPlugin?.createNotificationChannel(_marketingChannel);
-    await androidPlugin?.requestNotificationsPermission();
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final androidPlugin = _plugin
+          .resolvePlatformSpecificImplementation
+              AndroidFlutterLocalNotificationsPlugin>();
+      await androidPlugin?.createNotificationChannel(_chatChannel);
+      await androidPlugin?.createNotificationChannel(_scheduleChannel);
+      await androidPlugin?.createNotificationChannel(_joinRequestChannel);
+      await androidPlugin?.createNotificationChannel(_marketingChannel);
+      await androidPlugin?.requestNotificationsPermission();
+    }
 
     _pluginInitialized = true;
   }
