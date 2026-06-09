@@ -82,8 +82,8 @@ void main() async {
 
     final isMobile = defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS;
     if (isMobile) {
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-      NotificationService().init();
+      // FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      // NotificationService().init();
       Future.delayed(Duration(seconds: 2), () async => await initializeAds());
     }
   }
