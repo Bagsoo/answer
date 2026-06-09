@@ -301,6 +301,30 @@ class NotificationService {
     return '$type|$id';
   }
 
+  // 안드로이드 빌드 버전
+  // Future<void> _ensureLocalNotificationsInitialized() async {
+  //   if (_pluginInitialized) return;
+
+  //   const android = AndroidInitializationSettings('@drawable/ic_notification');
+  //   const settings = InitializationSettings(android: android);
+  //   await _plugin.initialize(
+  //     settings,
+  //     onDidReceiveNotificationResponse: _onNotificationTap,
+  //   );
+
+  //   final androidPlugin = _plugin
+  //       .resolvePlatformSpecificImplementation<
+  //           AndroidFlutterLocalNotificationsPlugin>();
+  //   await androidPlugin?.createNotificationChannel(_chatChannel);
+  //   await androidPlugin?.createNotificationChannel(_scheduleChannel);
+  //   await androidPlugin?.createNotificationChannel(_joinRequestChannel);
+  //   await androidPlugin?.createNotificationChannel(_marketingChannel);
+  //   await androidPlugin?.requestNotificationsPermission();
+
+  //   _pluginInitialized = true;
+  // }
+
+  // ios 빌드 버전
   Future<void> _ensureLocalNotificationsInitialized() async {
     if (_pluginInitialized) return;
 
@@ -315,17 +339,6 @@ class NotificationService {
       settings,
       onDidReceiveNotificationResponse: _onNotificationTap,
     );
-
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      final androidPlugin = _plugin
-          .resolvePlatformSpecificImplementation
-              AndroidFlutterLocalNotificationsPlugin>();
-      await androidPlugin?.createNotificationChannel(_chatChannel);
-      await androidPlugin?.createNotificationChannel(_scheduleChannel);
-      await androidPlugin?.createNotificationChannel(_joinRequestChannel);
-      await androidPlugin?.createNotificationChannel(_marketingChannel);
-      await androidPlugin?.requestNotificationsPermission();
-    }
 
     _pluginInitialized = true;
   }
