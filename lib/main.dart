@@ -154,11 +154,7 @@ class MessengerApp extends StatelessWidget {
       // home: const AppNoticeGate(
       //   child: AuthWrapper(),
       // ),
-      home: const Scaffold(
-        body: Center(
-          child: Text("TEST"),
-        ),
-      ),
+      home: const AuthWrapper(),
       debugShowCheckedModeBanner: false,
     );
   }
