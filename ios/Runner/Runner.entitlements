@@ -7,11 +7,9 @@
         <string>group.com.answer.application</string>
     </array>
 
-    <key>com.apple.developer.applesignin</key>
-    <array>
-        <string>Default</string>
-    </array>
-
-	<key>com.apple.developer.in-app-purchase</key>
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
 </dict>
 </plist>

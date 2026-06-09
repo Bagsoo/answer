@@ -239,6 +239,10 @@ class AuthService extends ChangeNotifier {
         await _syncLinkedAuthState(user: userCredential.user, lastSignInProvider: _providerApple);
       }
       return 'ok';
+    } on SignInWithAppleAuthorizationException catch (e) {
+      final detail = _describeAppleAuthorizationException(e);
+      debugPrint('Apple sign in authorization error: $detail');
+      return 'error:$detail';
     } on FirebaseAuthException catch (e) {
       final detail = _describeAppleAuthException(e);
       debugPrint('Apple sign in error: $detail');
@@ -247,6 +251,12 @@ class AuthService extends ChangeNotifier {
       debugPrint('Apple sign in error: ${e.runtimeType}: $e');
       return 'error:${e.runtimeType}: $e';
     }
+  }
+
+  String _describeAppleAuthorizationException(SignInWithAppleAuthorizationException e) {
+    final code = e.code.toString();
+    final message = e.message;
+    return 'SignInWithAppleAuthorizationException($code): $message';
   }
 
   String _describeAppleAuthException(FirebaseAuthException e) {
