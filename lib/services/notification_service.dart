@@ -305,14 +305,19 @@ class NotificationService {
     if (_pluginInitialized) return;
 
     const android = AndroidInitializationSettings('@drawable/ic_notification');
-    const settings = InitializationSettings(android: android);
+    const ios = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    const settings = InitializationSettings(android: android, iOS: ios);
     await _plugin.initialize(
       settings,
       onDidReceiveNotificationResponse: _onNotificationTap,
     );
 
     final androidPlugin = _plugin
-        .resolvePlatformSpecificImplementation<
+        .resolvePlatformSpecificImplementation
             AndroidFlutterLocalNotificationsPlugin>();
     await androidPlugin?.createNotificationChannel(_chatChannel);
     await androidPlugin?.createNotificationChannel(_scheduleChannel);

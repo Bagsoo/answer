@@ -151,10 +151,9 @@ class MessengerApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      // home: const AppNoticeGate(
-      //   child: AuthWrapper(),
-      // ),
-      home: const AuthWrapper(),
+      home: const AppNoticeGate(
+        child: AuthWrapper(),
+      ),      
       debugShowCheckedModeBanner: false,
     );
   }
