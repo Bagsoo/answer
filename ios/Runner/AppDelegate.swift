@@ -13,7 +13,10 @@ import google_mobile_ads
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     
-    let controller : FlutterViewController = window?.rootViewController as! FlutterViewController
+    // let controller : FlutterViewController = window?.rootViewController as! FlutterViewController
+    guard let controller = window?.rootViewController as? FlutterViewController else {
+        return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    }
     let shareChannel = FlutterMethodChannel(name: "com.answer.messenger/share",
                                               binaryMessenger: controller.binaryMessenger)
     let eventChannel = FlutterEventChannel(name: "com.answer.messenger/share_events",
