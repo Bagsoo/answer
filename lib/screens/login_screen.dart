@@ -236,6 +236,11 @@ class _LoginScreenState extends State<LoginScreen> {
         _errorMessage = 'Apple 로그인에 실패했습니다.';
         _isLoading = false;
       });
+    } else if (result.startsWith('error:')) {
+      setState(() {
+        _errorMessage = result.substring('error:'.length);
+        _isLoading = false;
+      });
     } else if (result == 'cancel') {
       setState(() => _isLoading = false);
     }

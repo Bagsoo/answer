@@ -222,13 +222,9 @@ class AuthService extends ChangeNotifier {
       final idToken = credential.identityToken;
       if (idToken == null) return 'error';
 
-      final oauthCredential = AppleAuthProvider.credentialWithIDToken(
-        idToken,
-        rawNonce,
-        AppleFullPersonName(
-          givenName: credential.givenName,
-          familyName: credential.familyName,
-        ),
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: idToken,
+        rawNonce: rawNonce,
       );
 
       final userCredential = await _auth.signInWithCredential(oauthCredential);
@@ -243,9 +239,29 @@ class AuthService extends ChangeNotifier {
         await _syncLinkedAuthState(user: userCredential.user, lastSignInProvider: _providerApple);
       }
       return 'ok';
+    } on FirebaseAuthException catch (e) {
+      final detail = _describeAppleAuthException(e);
+      debugPrint('Apple sign in error: $detail');
+      return 'error:$detail';
     } catch (e) {
-      debugPrint('Apple sign in error: $e');
-      return 'error';
+      debugPrint('Apple sign in error: ${e.runtimeType}: $e');
+      return 'error:${e.runtimeType}: $e';
+    }
+  }
+
+  String _describeAppleAuthException(FirebaseAuthException e) {
+    final message = e.message ?? 'unknown error';
+    switch (e.code) {
+      case 'operation-not-allowed':
+        return 'Apple 로그인이 Firebase Console에서 아직 활성화되지 않았습니다. (${e.code})';
+      case 'invalid-credential':
+        return 'Apple 인증 토큰이 Firebase에서 거부되었습니다. Service ID, redirect URI, nonce 설정을 확인하세요. (${e.code})';
+      case 'account-exists-with-different-credential':
+        return '이 이메일은 이미 다른 로그인 방식으로 가입되어 있습니다. 계정 연결이 필요합니다. (${e.code})';
+      case 'email-already-in-use':
+        return '이 이메일은 이미 사용 중입니다. 기존 계정으로 로그인하거나 계정을 연결하세요. (${e.code})';
+      default:
+        return 'FirebaseAuthException(${e.code}): $message';
     }
   }
 

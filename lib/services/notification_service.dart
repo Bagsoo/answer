@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -301,44 +302,37 @@ class NotificationService {
     return '$type|$id';
   }
 
-  // 안드로이드 빌드 버전
-  // Future<void> _ensureLocalNotificationsInitialized() async {
-  //   if (_pluginInitialized) return;
-
-  //   const android = AndroidInitializationSettings('@drawable/ic_notification');
-  //   const settings = InitializationSettings(android: android);
-  //   await _plugin.initialize(
-  //     settings,
-  //     onDidReceiveNotificationResponse: _onNotificationTap,
-  //   );
-
-  //   final androidPlugin = _plugin
-  //       .resolvePlatformSpecificImplementation<
-  //           AndroidFlutterLocalNotificationsPlugin>();
-  //   await androidPlugin?.createNotificationChannel(_chatChannel);
-  //   await androidPlugin?.createNotificationChannel(_scheduleChannel);
-  //   await androidPlugin?.createNotificationChannel(_joinRequestChannel);
-  //   await androidPlugin?.createNotificationChannel(_marketingChannel);
-  //   await androidPlugin?.requestNotificationsPermission();
-
-  //   _pluginInitialized = true;
-  // }
-
-  // ios 빌드 버전
   Future<void> _ensureLocalNotificationsInitialized() async {
     if (_pluginInitialized) return;
 
+    // 1. 안드로이드 세팅
     const android = AndroidInitializationSettings('@drawable/ic_notification');
+    
+    // 2. iOS 세팅 (기존 ios 빌드 버전 설정 그대로 적용)
     const ios = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
       requestSoundPermission: false,
     );
+
+    // 3. 두 플랫폼 설정을 한 번에 주입 (플러터가 알아서 골라 씁니다)
     const settings = InitializationSettings(android: android, iOS: ios);
     await _plugin.initialize(
       settings,
       onDidReceiveNotificationResponse: _onNotificationTap,
     );
+
+    // 4. 안드로이드일 때만 실행되어야 하는 채널 생성 및 권한 요청 로직 분기
+    if (Platform.isAndroid) {
+      final androidPlugin = _plugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      await androidPlugin?.createNotificationChannel(_chatChannel);
+      await androidPlugin?.createNotificationChannel(_scheduleChannel);
+      await androidPlugin?.createNotificationChannel(_joinRequestChannel);
+      await androidPlugin?.createNotificationChannel(_marketingChannel);
+      await androidPlugin?.requestNotificationsPermission();
+    }
 
     _pluginInitialized = true;
   }

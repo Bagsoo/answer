@@ -70,6 +70,14 @@
 				<string>messenger-share</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.577703671325-ti2i1ietksdh5pct64qg5d8cpe8v8ope</string>
+			</array>
+		</dict>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
     <string>We need your location to show nearby places.</string>

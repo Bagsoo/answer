@@ -3,7 +3,7 @@ import {
   onDocumentDeleted,
   onDocumentWritten,
 } from "firebase-functions/v2/firestore";
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as admin from "firebase-admin";
 import {
@@ -500,4 +500,18 @@ export const onGroupLikeDeletedV2 = onDocumentDeleted("groups/{groupId}/likes/{u
     });
   });
   return null;
+});
+
+export const appleSignInCallback = onRequest({ cors: true }, (req, res) => {
+  const code = req.body.code || req.query.code;
+  const idToken = req.body.id_token || req.query.id_token;
+  const state = req.body.state || req.query.state;
+  const user = req.body.user || req.query.user;
+
+  let redirectUrl = `signinwithapple://callback?code=${encodeURIComponent(code || "")}&id_token=${encodeURIComponent(idToken || "")}&state=${encodeURIComponent(state || "")}`;
+  if (user) {
+    redirectUrl += `&user=${encodeURIComponent(user)}`;
+  }
+
+  res.redirect(302, redirectUrl);
 });
