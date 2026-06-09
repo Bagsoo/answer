@@ -202,6 +202,9 @@ class AuthService extends ChangeNotifier {
       final isWeb = kIsWeb;
       final supportsWebFlow =
           EnvConfig.appleServiceId.isNotEmpty && EnvConfig.appleRedirectUri.isNotEmpty;
+      final isApplePlatform = !kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.iOS ||
+              defaultTargetPlatform == TargetPlatform.macOS);
 
       final credential = await SignInWithApple.getAppleIDCredential(
         scopes: [
@@ -220,12 +223,31 @@ class AuthService extends ChangeNotifier {
       );
 
       final idToken = credential.identityToken;
-      if (idToken == null) return 'error';
-
-      final oauthCredential = OAuthProvider('apple.com').credential(
-        idToken: idToken,
+      final debugInfo = _buildAppleSignInDebugInfo(
         rawNonce: rawNonce,
+        nonce: nonce,
+        isWeb: isWeb,
+        supportsWebFlow: supportsWebFlow,
+        isApplePlatform: isApplePlatform,
+        hasIdentityToken: idToken != null,
+        identityTokenLength: idToken?.length,
+        authorizationCodeLength: credential.authorizationCode.length,
       );
+      if (idToken == null) return 'error:Apple 로그인은 성공했지만 identityToken 이 비어 있습니다.\n$debugInfo';
+
+      final oauthCredential = isApplePlatform
+          ? AppleAuthProvider.credentialWithIDToken(
+              idToken,
+              rawNonce,
+              AppleFullPersonName(
+                givenName: credential.givenName,
+                familyName: credential.familyName,
+              ),
+            )
+          : OAuthProvider('apple.com').credential(
+              idToken: idToken,
+              rawNonce: rawNonce,
+            );
 
       final userCredential = await _auth.signInWithCredential(oauthCredential);
       await setLastUsedProvider(_providerApple);
@@ -246,11 +268,47 @@ class AuthService extends ChangeNotifier {
     } on FirebaseAuthException catch (e) {
       final detail = _describeAppleAuthException(e);
       debugPrint('Apple sign in error: $detail');
-      return 'error:$detail';
+      return 'error:$detail\n${_buildAppleSignInDebugInfoForFailure()}';
     } catch (e) {
       debugPrint('Apple sign in error: ${e.runtimeType}: $e');
-      return 'error:${e.runtimeType}: $e';
+      return 'error:${e.runtimeType}: $e\n${_buildAppleSignInDebugInfoForFailure()}';
     }
+  }
+
+  String _buildAppleSignInDebugInfo({
+    required String rawNonce,
+    required String nonce,
+    required bool isWeb,
+    required bool supportsWebFlow,
+    required bool isApplePlatform,
+    required bool hasIdentityToken,
+    required int? identityTokenLength,
+    required int authorizationCodeLength,
+  }) {
+    return [
+      'Apple sign-in debug:',
+      'platform=${defaultTargetPlatform.name}',
+      'isWeb=$isWeb',
+      'supportsWebFlow=$supportsWebFlow',
+      'isApplePlatform=$isApplePlatform',
+      'rawNonceLength=${rawNonce.length}',
+      'nonceLength=${nonce.length}',
+      'identityTokenPresent=$hasIdentityToken',
+      'identityTokenLength=${identityTokenLength ?? 0}',
+      'authorizationCodeLength=$authorizationCodeLength',
+      'appleServiceIdSet=${EnvConfig.appleServiceId.isNotEmpty}',
+      'appleRedirectUriSet=${EnvConfig.appleRedirectUri.isNotEmpty}',
+    ].join('\n');
+  }
+
+  String _buildAppleSignInDebugInfoForFailure() {
+    return [
+      'Apple sign-in debug:',
+      'platform=${defaultTargetPlatform.name}',
+      'appleServiceIdSet=${EnvConfig.appleServiceId.isNotEmpty}',
+      'appleRedirectUriSet=${EnvConfig.appleRedirectUri.isNotEmpty}',
+      'isIosOrMac=${!kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS)}',
+    ].join('\n');
   }
 
   String _describeAppleAuthorizationException(SignInWithAppleAuthorizationException e) {
