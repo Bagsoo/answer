@@ -73,18 +73,18 @@ class Schedule {
 
   factory Schedule.fromJson(Map<String, dynamic> json) {
     return Schedule(
-      id: json['id'],
-      title: json['title'],
-      description: json['description'],
-      cost: json['cost'],
-      startTime: DateTime.parse(json['start_time']),
-      endTime: DateTime.parse(json['end_time']),
-      location: json['location'],
-      type: ScheduleType.values.byName(json['type']),
-      groupId: json['group_id'],
-      groupName: json['group_name'],
-      createdBy: json['created_by'],
-      createdAt: DateTime.parse(json['created_at']),
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      cost: json['cost'] as String? ?? '',
+      startTime: DateTime.parse(json['start_time'] as String? ?? DateTime.now().toIso8601String()),
+      endTime: DateTime.parse(json['end_time'] as String? ?? DateTime.now().toIso8601String()),
+      location: json['location'] as Map<String, dynamic>?,
+      type: ScheduleType.values.byName(json['type'] as String? ?? 'personal'),
+      groupId: json['group_id'] as String?,
+      groupName: json['group_name'] as String?,
+      createdBy: json['created_by'] as String? ?? '',
+      createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
     );
   }
 }
