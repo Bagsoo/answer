@@ -56,8 +56,8 @@
 	</dict>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-3027819032479365~5537088662</string>
-	<key>NSUserTrackingUsageDescription</key>
-	<string>More relevant ads are shown based on this.</string>
+	<!-- <key>NSUserTrackingUsageDescription</key>
+	<string>More relevant ads are shown based on this.</string> -->
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>We need access to your photo library to save and send photos.</string>
 	<key>CFBundleURLTypes</key>
@@ -75,7 +75,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.577703671325-ti2i1ietksdh5pct64qg5d8cpe8v8ope</string>
+				<string>com.googleusercontent.apps.577703671325-f9ak8pkr0m2ul5roqsd877p00o8qpn0n</string>
 			</array>
 		</dict>
 	</array>
