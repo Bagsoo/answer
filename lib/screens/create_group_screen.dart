@@ -91,84 +91,119 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     if (_isLoading) return;
     setState(() => _isLoading = true);
 
-    final groupService = context.read<GroupService>();
-    final displayName = context.read<UserProvider>().name;
+    try {
+      final groupService = context.read<GroupService>();
+      final displayName = context.read<UserProvider>().name;
 
-    // 표시 문자열 → 키로 역변환해서 저장
-    final categoryKey = GroupTypeCategoryData.labelToKey(
-            _selectedCategory!, _selectedType!, l) ??
-        _selectedCategory!;
+      // 표시 문자열 → 키로 역변환해서 저장
+      final categoryKey = GroupTypeCategoryData.labelToKey(
+              _selectedCategory!, _selectedType!, l) ??
+          _selectedCategory!;
 
-    final startPlan = 'free'; // 서버 보안상 클라이언트는 일단 free, 결제 성공시 서버가 업그레이드
-    final startStatus = _plan == 'free' ? 'active' : 'pending';
+      final startPlan = 'free'; // 서버 보안상 클라이언트는 일단 free, 결제 성공시 서버가 업그레이드
+      final startStatus = _plan == 'free' ? 'active' : 'pending';
 
-    final newGroupId = await groupService.createGroup(
-      name: _nameController.text.trim(),
-      type: _selectedType!,
-      category: categoryKey,
-      requireApproval: _requireApproval,
-      displayName: displayName,
-      memberLimit: null,
-      plan: startPlan,
-      status: startStatus,
-      location: (_locationLat != null && _locationLng != null)
-          ? GeoPoint(_locationLat!, _locationLng!)
-          : null,
-      locationName: _locationName,
-      ownerName: displayName,
-      ownerPhotoUrl: context.read<UserProvider>().photoUrl ?? '',
-    );
+      debugPrint('Creating group: name=${_nameController.text.trim()}, plan=$startPlan, status=$startStatus');
 
-    if (!mounted) return;
+      final newGroupId = await groupService.createGroup(
+        name: _nameController.text.trim(),
+        type: _selectedType!,
+        category: categoryKey,
+        requireApproval: _requireApproval,
+        displayName: displayName,
+        memberLimit: null,
+        plan: startPlan,
+        status: startStatus,
+        location: (_locationLat != null && _locationLng != null)
+            ? GeoPoint(_locationLat!, _locationLng!)
+            : null,
+        locationName: _locationName,
+        ownerName: displayName,
+        ownerPhotoUrl: context.read<UserProvider>().photoUrl ?? '',
+      );
 
-    if (newGroupId != null) {
-      if (_plan != 'free') {
-        try {
-          final catalog = await GroupPurchaseService.instance.loadCatalog();
-          final logicalId = '$_plan-monthly';
-          final items = catalog.items.where((i) => i.logicalProductId == logicalId).toList();
-          
-          if (items.isEmpty) throw Exception('Store item not found for $_plan. Created as free.');
+      if (!mounted) return;
 
-          await GroupPurchaseService.instance.purchaseGroupPlan(
-            groupId: newGroupId,
-            item: items.first,
-          );
+      if (newGroupId != null) {
+        debugPrint('Group created successfully: $newGroupId');
+        if (_plan != 'free') {
+          try {
+            debugPrint('Starting purchase flow for plan: $_plan');
+            final catalog = await GroupPurchaseService.instance.loadCatalog();
+            
+            // iOS와 Android의 ID 형식이 다를 수 있음
+            final suffix = Theme.of(context).platform == TargetPlatform.iOS ? '_monthly' : '-monthly';
+            final logicalId = '$_plan$suffix';
+            
+            debugPrint('Looking for logicalId: $logicalId in ${catalog.items.length} items');
+            final items = catalog.items.where((i) => i.logicalProductId == logicalId).toList();
+            
+            if (items.isEmpty) {
+              debugPrint('Store item not found for $logicalId. Available: ${catalog.items.map((e) => e.logicalProductId).toList()}');
+              throw Exception('Store item not found for $_plan. Created as free.');
+            }
 
-          for (int i = 0; i < 15; i++) {
-            final doc = await FirebaseFirestore.instance.collection('groups').doc(newGroupId).get(const GetOptions(source: Source.server));
-            if (doc.data()?['plan'] == _plan && doc.data()?['status'] == 'active') break;
-            await Future.delayed(const Duration(milliseconds: 500));
-          }
+            await GroupPurchaseService.instance.purchaseGroupPlan(
+              groupId: newGroupId,
+              item: items.first,
+            );
 
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Purchase completed successfully!')));
-        } catch (e) {
-          if (mounted) {
-            final eStr = e.toString().replaceFirst("Exception: ", "");
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$eStr\nGroup created as pending. Please upgrade later.')));
+            debugPrint('Purchase request sent. Waiting for server update...');
+            for (int i = 0; i < 15; i++) {
+              final doc = await FirebaseFirestore.instance.collection('groups').doc(newGroupId).get(const GetOptions(source: Source.server));
+              if (doc.data()?['plan'] == _plan && doc.data()?['status'] == 'active') {
+                debugPrint('Server updated group plan to $_plan');
+                break;
+              }
+              await Future.delayed(const Duration(milliseconds: 500));
+            }
+
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Purchase completed successfully!')));
+          } catch (e) {
+            debugPrint('Purchase error: $e');
+            if (mounted) {
+              final eStr = e.toString().replaceFirst("Exception: ", "");
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('$eStr\nGroup created as pending. Please upgrade later.'),
+                duration: const Duration(seconds: 5),
+              ));
+            }
           }
         }
-      }
 
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => GroupDetailScreen(
-              groupId: newGroupId,
-              groupName: _nameController.text.trim(),
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => GroupDetailScreen(
+                groupId: newGroupId,
+                groupName: _nameController.text.trim(),
+              ),
             ),
+          );
+          if (_plan == 'free') {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.groupCreatedSuccess)));
+          }
+        }
+      } else {
+        debugPrint('Group creation returned null groupId');
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.groupCreateFailed)),
+        );
+      }
+    } catch (e, stack) {
+      debugPrint('CRITICAL ERROR in _createGroup: $e\n$stack');
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 10),
           ),
         );
-        if (_plan == 'free') {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.groupCreatedSuccess)));
-        }
       }
-    } else {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.groupCreateFailed)),
-      );
     }
   }
 

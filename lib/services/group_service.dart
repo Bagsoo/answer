@@ -66,7 +66,7 @@ class GroupService {
 
     batch.set(groupDoc, {
       'name': name,
-      'status': 'active',
+      'status': status,
       'type': type,
       'category': category,
       'require_approval': requireApproval,
@@ -86,6 +86,8 @@ class GroupService {
         tags: [],
         locationName: locationName,
       ),
+      'location': location,
+      'location_name': locationName,
       'owner_name': ownerName,
       'owner_photo_url': ownerPhotoUrl,
     });

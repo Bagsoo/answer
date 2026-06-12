@@ -23,10 +23,12 @@ class HiveService {
       Hive.registerAdapter(NotificationSettingsCacheAdapter());
     }
 
-    // 기본 박스 열기
+    // 기본 박스 열기 (iOS 크래시 방지를 위해 미리 오픈)
     await Hive.openBox<UserProfileCache>('user_profile');
     await Hive.openBox<AuthMeta>('auth_meta');
     await Hive.openBox<NotificationSettingsCache>('notification_settings');
+    await Hive.openBox<GroupCache>('joined_groups');
+    await Hive.openBox<String>('group_names');
 
     // 구형 SharedPreferences 데이터 정리 (마이그레이션 불필요시)
     final prefs = await SharedPreferences.getInstance();
