@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -84,7 +86,24 @@ void main() async {
     if (isMobile) {
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       NotificationService().init();
-      Future.delayed(Duration(seconds: 2), () async => await initializeAds());
+      Future.delayed(Duration(seconds: 2), () async {
+        if (Platform.isIOS) {
+          await Future.delayed(const Duration(milliseconds: 500));
+
+          final status =
+              await AppTrackingTransparency.trackingAuthorizationStatus;
+
+          if (status == TrackingStatus.notDetermined) {
+            final result =
+                await AppTrackingTransparency.requestTrackingAuthorization();
+
+            debugPrint('ATT Status: $result');
+          } else {
+            debugPrint('ATT already decided: $status');
+          }
+        }
+        await initializeAds();
+      });
     }
   }
   
