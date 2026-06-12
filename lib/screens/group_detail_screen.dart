@@ -66,6 +66,7 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
   Map<String, dynamic>? _selectedSchedule;
   String? _selectedRoomId;
   bool _tabsInitialized = false;
+  bool _analyticsLogged = false;
 
   bool get _showMemberPanel =>
       _tabController.index == 0 && _selectedMember != null;
@@ -88,28 +89,24 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
     } else {
       _tabsInitialized = true;
     }
-
-    // ── Analytics 로그 (그룹 상세 조회) ──
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final gp = context.read<GroupProvider>();
-        context.read<AnalyticsService>().logViewGroup(
-          groupId: gp.groupId,
-          groupName: gp.name,
-          category: gp.category,
-        );
-      }
-    });
   }
 
   Future<void> _initLastTab() async {
     final gp = context.read<GroupProvider>();
     final key = 'last_tab_${gp.groupId}';
-    final lastIndex = await LocalPreferencesService.getInt(key) ?? 0;
+    
+    try {
+      final lastIndex = await LocalPreferencesService.getInt(key) ?? 0;
 
-    if (mounted && lastIndex < _tabController.length) {
-      _tabController.index = lastIndex;
-      setState(() => _tabsInitialized = true);
+      if (mounted && lastIndex >= 0 && lastIndex < _tabController.length) {
+        _tabController.index = lastIndex;
+        setState(() => _tabsInitialized = true);
+      } else {
+        if (mounted) setState(() => _tabsInitialized = true);
+      }
+    } catch (e) {
+      debugPrint('Error loading last tab: $e');
+      if (mounted) setState(() => _tabsInitialized = true);
     }
   }
 
@@ -233,6 +230,21 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
     final colorScheme = Theme.of(context).colorScheme;
     final isDesktopMode = MediaQuery.sizeOf(context).width >= 900;
 
+    // 데이터가 완전히 로드되었고 아직 로깅하지 않았다면 Analytics 전송
+    if (loaded && !_analyticsLogged) {
+      _analyticsLogged = true;
+      final gp = context.read<GroupProvider>();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.read<AnalyticsService>().logViewGroup(
+            groupId: gp.groupId,
+            groupName: gp.name,
+            category: gp.category,
+          );
+        }
+      });
+    }
+
     if (!loaded || !_tabsInitialized) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -290,7 +302,12 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
 
     return Scaffold(
       appBar: AppBar(
-        leading: Selector<GroupProvider, (String, String)>(
+        leadingWidth: 40,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Selector<GroupProvider, (String, String)>(
           selector: (_, gp) => (gp.profileImageUrl, gp.name),
           builder: (context, data, _) {
             final profileImageUrl = data.$1;
@@ -330,68 +347,70 @@ class _GroupDetailBodyState extends State<_GroupDetailBody>
             );
           },
         ),
-        title: Selector<GroupProvider, (String, int)>(
-          selector: (_, gp) => (gp.name, gp.memberCount),
-          builder: (context, data, _) {
-            final name = data.$1;
-            final memberCount = data.$2;
-            return Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Flexible(
-                  child: Text(
-                    name.isNotEmpty ? name : widget.groupName,
-                    overflow: TextOverflow.ellipsis,
+        titleSpacing: 0,
+        centerTitle: false,
+        actions: [
+          Selector<GroupProvider, (String, int)>(
+            selector: (_, gp) => (gp.name, gp.memberCount),
+            builder: (context, data, _) {
+              final name = data.$1;
+              final memberCount = data.$2;
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Flexible(
+                    child: Text(
+                      name.isNotEmpty ? name : widget.groupName,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-                if (memberCount > 0) ...[
-                  const SizedBox(width: 6),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 1),
-                    child: GestureDetector(
-                      onTap: () {
-                        if (isDesktopMode) {
-                          _tabController.animateTo(0);
-                          return;
-                        }
-                        _showMembersModal(context);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.people_outline,
-                              size: 13,
-                              color: colorScheme.onSurface.withOpacity(0.6),
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              '$memberCount',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.onSurface.withOpacity(0.7),
+                  if (memberCount > 0) ...[
+                    const SizedBox(width: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 1),
+                      child: GestureDetector(
+                        onTap: () {
+                          if (isDesktopMode) {
+                            _tabController.animateTo(0);
+                            return;
+                          }
+                          _showMembersModal(context);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.people_outline,
+                                size: 13,
+                                color: colorScheme.onSurface.withOpacity(0.6),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 3),
+                              Text(
+                                '$memberCount',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.onSurface.withOpacity(0.7),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
-            );
-          },
-        ),
-        actions: [
+              );
+            },
+          ),
           Selector<GroupProvider, (bool, int)>(
             selector: (_, gp) => (gp.isLiked, gp.likesCount),
             builder: (context, data, _) {

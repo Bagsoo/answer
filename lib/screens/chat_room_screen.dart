@@ -1791,54 +1791,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         automaticallyImplyLeading: !isDesktopPanel,
-        leading: isDm
-            ? Padding(
-                padding: const EdgeInsets.all(10),
-                child: GestureDetector(
-                  onTap: (meta?.otherUserUid.isNotEmpty ?? false)
-                      ? () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => UserProfileDetailScreen(
-                              uid: meta!.otherUserUid,
-                              displayName: dmDisplayName,
-                              photoUrl: meta.otherUserPhoto,
-                            ),
-                          ),
-                        )
-                      : null,
-                  child: CircleAvatar(
-                    radius: 16,
-                    backgroundColor: colorScheme.tertiaryContainer,
-                    backgroundImage: hasOtherPhoto
-                        ? CachedNetworkImageProvider(otherUserPhoto)
-                        : null,
-                    onBackgroundImageError: hasOtherPhoto ? (_, __) {} : null,
-                    child: hasOtherPhoto
-                        ? null
-                        : (meta?.otherUserDeleted ?? false)
-                        ? Icon(
-                            Icons.person_off_outlined,
-                            size: 16,
-                            color: colorScheme.onTertiaryContainer,
-                          )
-                        : (dmDisplayName.isNotEmpty
-                              ? Text(
-                                  dmDisplayName[0].toUpperCase(),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.onTertiaryContainer,
-                                  ),
-                                )
-                              : Icon(
-                                  Icons.person,
-                                  size: 16,
-                                  color: colorScheme.onTertiaryContainer,
-                                )),
-                  ),
-                ),
-              )
-            : null,
+        leading: isDesktopPanel
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
         title: _isSearching
             ? TextField(
                 controller: _searchController,
