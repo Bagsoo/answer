@@ -86,24 +86,6 @@ void main() async {
     if (isMobile) {
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       NotificationService().init();
-      Future.delayed(Duration(seconds: 2), () async {
-        if (Platform.isIOS) {
-          await Future.delayed(const Duration(milliseconds: 500));
-
-          final status =
-              await AppTrackingTransparency.trackingAuthorizationStatus;
-
-          if (status == TrackingStatus.notDetermined) {
-            final result =
-                await AppTrackingTransparency.requestTrackingAuthorization();
-
-            debugPrint('ATT Status: $result');
-          } else {
-            debugPrint('ATT already decided: $status');
-          }
-        }
-        await initializeAds();
-      });
     }
   }
   
@@ -141,8 +123,46 @@ void main() async {
   );
 }
 
-class MessengerApp extends StatelessWidget {
+class MessengerApp extends StatefulWidget {
   const MessengerApp({super.key});
+
+  @override
+  State<MessengerApp> createState() => _MessengerAppState();
+}
+
+class _MessengerAppState extends State<MessengerApp> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initATT();
+    });
+  }
+
+  Future<void> _initATT() async {
+    final isMobile = !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
+    if (isMobile) {
+      if (Platform.isIOS) {
+        try {
+          final status = await AppTrackingTransparency.trackingAuthorizationStatus;
+          if (status == TrackingStatus.notDetermined) {
+            // Wait for native window/UI transition to fully complete
+            await Future.delayed(const Duration(milliseconds: 1500));
+            final result = await AppTrackingTransparency.requestTrackingAuthorization();
+            debugPrint('ATT Status: $result');
+          } else {
+            debugPrint('ATT already decided: $status');
+          }
+        } catch (e) {
+          debugPrint('ATT request error: $e');
+        }
+      }
+      await initializeAds();
+      
+      // ATT 권한 요청 및 광고 SDK 초기화 이후 알림 권한 팝업 호출
+      await NotificationService().requestPermission();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

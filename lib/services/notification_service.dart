@@ -91,13 +91,6 @@ class NotificationService {
     }
 
     try {
-      final settings2 = await _fcm.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-      debugPrint('FCM permission: ${settings2.authorizationStatus}');
-
       await _fcm.setForegroundNotificationPresentationOptions(
         alert: false,
         badge: true,
@@ -116,10 +109,30 @@ class NotificationService {
         _handleNavigationFromData(initialMessage.data);
       }
 
-      await _saveFcmToken();
       _fcm.onTokenRefresh.listen((token) => _saveToken(token));
     } catch (e) {
       debugPrint('NotificationService: FCM init failed: $e');
+    }
+  }
+
+  // ── 권한 요청 및 토큰 저장 ──────────────────────────────────────────────────
+  Future<NotificationSettings?> requestPermission() async {
+    final isMobile = !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
+    if (!isMobile) return null;
+    try {
+      final settings = await _fcm.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      debugPrint('FCM permission: ${settings.authorizationStatus}');
+      
+      await _saveFcmToken();
+      
+      return settings;
+    } catch (e) {
+      debugPrint('NotificationService: requestPermission failed: $e');
+      return null;
     }
   }
 

@@ -459,15 +459,17 @@ class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
                       isLoading: _dmLoading,
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _MainActionButton(
-                      icon: Icons.videocam_outlined,
-                      label: l.attachVideoCall,
-                      onTap: _startVideoCall,
-                      isLoading: _dmLoading,
+                  if (Theme.of(context).platform != TargetPlatform.iOS) ...[
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _MainActionButton(
+                        icon: Icons.videocam_outlined,
+                        label: l.attachVideoCall,
+                        onTap: _startVideoCall,
+                        isLoading: _dmLoading,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),

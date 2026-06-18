@@ -2104,7 +2104,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
       builder: (context, roomSnap) {
         final roomData = roomSnap.data?.data();
         final activeCallId = roomData?['active_call_id'] as String?;
-        if (activeCallId == null || activeCallId.isEmpty) {
+        if (activeCallId == null || activeCallId.isEmpty || Platform.isIOS) {
           return const SizedBox.shrink();
         }
 
@@ -2920,13 +2920,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
         color: Colors.orange,
         onTap: _sendVoiceMessage,
       ),
-      AttachItem(
-        icon: Icons.call_outlined,
-        label: l.attachCall,
-        color: Colors.blue,
-        onTap: () => _handleVoiceCallTap(l),
-      ),
-      if (_roomMeta?.roomType == 'group_all' || _roomMeta?.roomType == 'group_sub')
+      if (!Platform.isIOS)
+        AttachItem(
+          icon: Icons.call_outlined,
+          label: l.attachCall,
+          color: Colors.blue,
+          onTap: () => _handleVoiceCallTap(l),
+        ),
+      if (!Platform.isIOS && (_roomMeta?.roomType == 'group_all' || _roomMeta?.roomType == 'group_sub'))
         AttachItem(
           icon: Icons.videocam,
           label: l.attachVideoCall,
