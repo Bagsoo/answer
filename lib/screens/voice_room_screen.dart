@@ -53,6 +53,7 @@ class _VoiceRoomScreenState extends State<VoiceRoomScreen>
   bool _muted = false;
   bool _speakerOn = true;
   String _statusText = '';
+  StreamSubscription<DocumentSnapshot>? _callSubscription;
 
   @override
   void initState() {
@@ -60,6 +61,7 @@ class _VoiceRoomScreenState extends State<VoiceRoomScreen>
     WidgetsBinding.instance.addObserver(this);
     context.read<VoiceCallService>().isInVoiceRoom.value = true;
     context.read<VoiceCallService>().endVoiceRoomTransition();
+    _listenToCallStatus();
     CallkitService.instance.bindCallListeners(
       onAccept: (data) async {
         debugPrint('Callkit Accepted within Room: $data');
@@ -86,6 +88,7 @@ class _VoiceRoomScreenState extends State<VoiceRoomScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _heartbeatTimer?.cancel();
+    _callSubscription?.cancel();
     context.read<VoiceCallService>().isInVoiceRoom.value = false;
     context.read<VoiceCallService>().endVoiceRoomTransition();
     unawaited(CallkitService.instance.unbind());
@@ -292,10 +295,28 @@ class _VoiceRoomScreenState extends State<VoiceRoomScreen>
     }
   }
 
+  void _listenToCallStatus() {
+    _callSubscription = FirebaseFirestore.instance
+        .collection('chat_rooms')
+        .doc(widget.roomId)
+        .collection('calls')
+        .doc(widget.callId)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists) {
+        final data = snapshot.data() as Map<String, dynamic>?;
+        if (data != null && data['status'] == 'ended' && !_leaving && mounted) {
+          _leaveVoiceRoom();
+        }
+      }
+    });
+  }
+
   Future<void> _leaveVoiceRoom({bool popAfterLeave = true}) async {
     if (_leaving) return;
     _leaving = true;
     _heartbeatTimer?.cancel();
+    _callSubscription?.cancel();
     final engine = _engine;
     _engine = null;
 

@@ -242,13 +242,13 @@ async function endCallIfEmpty(roomId: string, callId: string) {
     const [, callSnap] = await Promise.all([tx.get(roomRef), tx.get(callRef)]);
     if (!callSnap.exists) return;
     const call = callSnap.data() ?? {};
-    if (call.status !== "active") return;
+    if (call.status === "ended") return;
 
     // ✅ 이미 있는 participant_count 필드 직접 사용
     const activeCount = (call.participant_count as number) ?? 0;
     const updates: any = { last_activity_at: admin.firestore.FieldValue.serverTimestamp() };
 
-    if (activeCount <= 0) {
+    if (activeCount <= 0 || (activeCount <= 1 && call.status === "active")) {
       updates.status = "ended";
       updates.ended_at = admin.firestore.FieldValue.serverTimestamp();
       tx.update(roomRef, { active_call_id: admin.firestore.FieldValue.delete(), active_call_type: admin.firestore.FieldValue.delete() });
@@ -280,7 +280,7 @@ export const startVoiceCall = onCall({ region: "asia-northeast3", secrets: ["AGO
     await getDb().runTransaction(async (tx) => {
       tx.set(callRef, {
         type: callType,
-        status: "active",
+        status: "ringing",
         started_by: uid,
         started_at: admin.firestore.FieldValue.serverTimestamp(),
         channel_name: channelName,
@@ -318,7 +318,9 @@ export const joinVoiceCall = onCall({ region: "asia-northeast3", secrets: ["AGOR
 
     const result = await getDb().runTransaction(async (tx) => {
       const [callSnap, pSnap] = await Promise.all([tx.get(callRef), tx.get(participantRef)]);
-      if (!callSnap.exists || callSnap.data()?.status !== "active") throw new HttpsError("failed-precondition", "Call not active.");
+      if (!callSnap.exists || (callSnap.data()?.status !== "active" && callSnap.data()?.status !== "ringing")) {
+        throw new HttpsError("failed-precondition", "Call not active.");
+      }
 
       const callData = callSnap.data() ?? {};
       const participantCount = (callData.participant_count as number | undefined) ?? 0;
@@ -340,7 +342,18 @@ export const joinVoiceCall = onCall({ region: "asia-northeast3", secrets: ["AGOR
         last_seen: admin.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
 
-      if (!wasActive) tx.update(callRef, { participant_count: admin.firestore.FieldValue.increment(1) });
+      const newCount = wasActive ? participantCount : participantCount + 1;
+      const updates: any = {};
+      if (!wasActive) {
+        updates.participant_count = admin.firestore.FieldValue.increment(1);
+      }
+      if (newCount >= 2 && callData.status === "ringing") {
+        updates.status = "active";
+      }
+
+      if (Object.keys(updates).length > 0) {
+        tx.update(callRef, updates);
+      }
 
       return { channelName: callData.channel_name as string };
     });

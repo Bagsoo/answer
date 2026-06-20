@@ -91,6 +91,7 @@ class CallkitService {
     required Future<void> Function(Map<String, dynamic> data) onAccept,
     required Future<void> Function(Map<String, dynamic> data) onDecline,
     required Future<void> Function() onEnded,
+    Future<void> Function(Map<String, dynamic> data)? onClicked,
   }) {
     _subscription?.cancel();
     if (kIsWeb) return; // Web에서는 CallKit 미지원
@@ -107,6 +108,8 @@ class CallkitService {
         await onDecline(body);
       } else if (eventName.contains('ACTION_CALL_ENDED')) {
         await onEnded();
+      } else if (eventName.contains('ACTION_CALL_CLICK') && onClicked != null) {
+        await onClicked(body);
       }
     });
   }

@@ -221,6 +221,22 @@ class NotificationService {
       onEnded: () async {
         debugPrint('Callkit Ended');
       },
+      onClicked: (data) async {
+        debugPrint('Callkit Clicked: $data');
+        final nav = navigatorKey.currentState;
+        if (nav == null) return;
+        
+        final roomId = data['roomId'] as String?;
+        if (roomId == null || roomId.isEmpty) return;
+
+        if (roomId == ChatService().currentRoomId) return;
+
+        await nav.push(
+          MaterialPageRoute(
+            builder: (_) => ChatRoomScreen(roomId: roomId),
+          ),
+        );
+      },
     );
   }
 
@@ -271,7 +287,7 @@ class NotificationService {
     if (parts.length < 2) return;
     _handleNavigationFromData({
       'type': parts[0],
-      'roomId': parts[0] == 'chat' ? parts[1] : '',
+      'roomId': (parts[0] == 'chat' || parts[0] == 'voice_call' || parts[0] == 'video_call') ? parts[1] : '',
       'groupId':
           parts[0] == 'join_request' || parts[0] == 'group_notice' ? parts[1] : '',
     });
@@ -431,7 +447,8 @@ class NotificationService {
       }
     });
 
-    if (type == 'chat' && roomId.isNotEmpty) {
+    if ((type == 'chat' || type == 'voice_call' || type == 'video_call') && roomId.isNotEmpty) {
+      if (roomId == ChatService().currentRoomId) return;
       nav.push(
         MaterialPageRoute(
           builder: (_) => ChatRoomScreen(roomId: roomId),

@@ -40,19 +40,42 @@ class _VideoRoomScreenState extends State<VideoRoomScreen> {
   bool _isCameraOff = false;
   bool _isFrontCamera = true;
   Timer? _heartbeatTimer;
+  StreamSubscription<DocumentSnapshot>? _callSubscription;
+  bool _leaving = false;
 
   @override
   void initState() {
     super.initState();
     _initAgora();
     _startHeartbeat();
+    _listenToCallStatus();
   }
 
   @override
   void dispose() {
+    _callSubscription?.cancel();
     _heartbeatTimer?.cancel();
-    _leaveChannel();
+    if (!_leaving) {
+      _leaveChannel();
+    }
     super.dispose();
+  }
+
+  void _listenToCallStatus() {
+    _callSubscription = FirebaseFirestore.instance
+        .collection('chat_rooms')
+        .doc(widget.roomId)
+        .collection('calls')
+        .doc(widget.callId)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists) {
+        final data = snapshot.data() as Map<String, dynamic>?;
+        if (data != null && data['status'] == 'ended' && !_leaving && mounted) {
+          _leaveChannel();
+        }
+      }
+    });
   }
 
   Future<void> _initAgora() async {
@@ -152,7 +175,10 @@ class _VideoRoomScreenState extends State<VideoRoomScreen> {
   }
 
   Future<void> _leaveChannel() async {
+    if (_leaving) return;
+    _leaving = true;
     _heartbeatTimer?.cancel();
+    _callSubscription?.cancel();
     final uid = FirebaseAuth.instance.currentUser?.uid;
     try {
       final roomRef = FirebaseFirestore.instance.collection('chat_rooms').doc(widget.roomId);
@@ -164,15 +190,22 @@ class _VideoRoomScreenState extends State<VideoRoomScreen> {
 
         final currentCount = (callSnap.data()?['participant_count'] as num?)?.toInt() ?? 0;
         final newCount = (currentCount - 1).clamp(0, 100);
+        final status = callSnap.data()?['status'] as String?;
 
         transaction.update(callRef.collection('participants').doc(uid), {'left_at': FieldValue.serverTimestamp()});
+        
+        final shouldEnd = newCount == 0 || (newCount == 1 && status == 'active');
+        
         transaction.update(callRef, {
           'participant_count': newCount,
-          if (newCount == 0) 'status': 'ended',
+          if (shouldEnd) 'status': 'ended',
         });
 
-        if (newCount == 0) {
-          transaction.update(roomRef, {'active_call_id': FieldValue.delete()});
+        if (shouldEnd) {
+          transaction.update(roomRef, {
+            'active_call_id': FieldValue.delete(),
+            'active_call_type': FieldValue.delete(),
+          });
         }
       });
     } catch (e) {
