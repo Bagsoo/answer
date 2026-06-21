@@ -110,6 +110,26 @@ class _DmTileState extends State<DmTile> {
     _loadOtherUser();
   }
 
+  @override
+  void didUpdateWidget(covariant DmTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldMemberIds =
+        List<String>.from(oldWidget.room['member_ids'] as List? ?? []);
+    final newMemberIds =
+        List<String>.from(widget.room['member_ids'] as List? ?? []);
+    final oldOtherUid = oldMemberIds.firstWhere(
+      (id) => id != oldWidget.myUid,
+      orElse: () => '',
+    );
+    final newOtherUid = newMemberIds.firstWhere(
+      (id) => id != widget.myUid,
+      orElse: () => '',
+    );
+    if (oldOtherUid != newOtherUid) {
+      _loadOtherUser();
+    }
+  }
+
   Future<void> _loadOtherUser() async {
     final memberIds =
         List<String>.from(widget.room['member_ids'] as List? ?? []);

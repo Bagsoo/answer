@@ -122,6 +122,8 @@ class _VideoRoomScreenState extends State<VideoRoomScreen> {
         clientRoleType: ClientRoleType.clientRoleBroadcaster,
         publishCameraTrack: true,
         publishMicrophoneTrack: true,
+        autoSubscribeVideo: true,
+        autoSubscribeAudio: true,
       ),
     );
   }

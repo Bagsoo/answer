@@ -132,6 +132,7 @@ class _GroupChatSectionState extends State<GroupChatSection> {
               final type = room['type'] as String? ?? '';
               if (type == 'direct') {
                 return DmTile(
+                  key: ValueKey(room['id']),
                   room: room,
                   colorScheme: colorScheme,
                   myUid: widget.myUid,
@@ -139,6 +140,7 @@ class _GroupChatSectionState extends State<GroupChatSection> {
                 );
               }
               return ChatTile(
+                key: ValueKey(room['id']),
                 room: room,
                 colorScheme: colorScheme,
                 isInGroup: true,
@@ -289,6 +291,7 @@ class _PrivateChatSectionState extends State<PrivateChatSection> {
               final type = room['type'] as String? ?? '';
               if (type == 'direct') {
                 return DmTile(
+                  key: ValueKey(room['id']),
                   room: room,
                   colorScheme: colorScheme,
                   myUid: widget.myUid,
@@ -296,6 +299,7 @@ class _PrivateChatSectionState extends State<PrivateChatSection> {
                 );
               }
               return ChatTile(
+                key: ValueKey(room['id']),
                 room: room,
                 colorScheme: colorScheme,
                 myUid: widget.myUid,
