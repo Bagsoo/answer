@@ -193,24 +193,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
 
       final appBarTitle = _getAppBarTitle(l);
 
-      if (actualCallType == 'video') {
+      if (actualCallType == 'video' || true) {
         await Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => VideoRoomScreen(
-              roomId: widget.roomId,
-              roomName: appBarTitle,
-              callId: callId!,
-              token: joinResult.token,
-              appId: joinResult.appId,
-              channelName: joinResult.channelName,
-              agoraUid: joinResult.uid,
-            ),
-          ),
-        );
-      } else {
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => VoiceRoomScreen(
               roomId: widget.roomId,
               roomName: appBarTitle,
               callId: callId!,
@@ -244,7 +230,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
   }
 
   Future<void> _handleVoiceCallTap(AppLocalizations l) =>
-      _joinVoiceCall(l, startIfMissing: true);
+      _joinVoiceCall(l, startIfMissing: true, type: 'video');
 
   String get _deviceType {
     if (Platform.isAndroid) return 'android';

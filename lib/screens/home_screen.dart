@@ -17,7 +17,7 @@ import '../services/voice_call_service.dart';
 import '../l10n/app_localizations.dart';
 import 'chat_list_screen.dart' hide GroupListScreen;
 import 'chat_room_screen.dart';
-import 'voice_room_screen.dart';
+import 'video_room_screen.dart';
 import 'group_list_screen.dart';
 import 'group_detail_screen.dart';
 import 'app_settings_screen.dart';
@@ -197,7 +197,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (!mounted || restored == null) return;
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => VoiceRoomScreen(
+          builder: (_) => VideoRoomScreen(
             roomId: roomId,
             roomName: session['roomName'] as String? ?? roomId,
             callId: callId,
@@ -748,7 +748,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 if (!context.mounted) return;
                 await Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => VoiceRoomScreen(
+                    builder: (_) => VideoRoomScreen(
                       roomId: roomId,
                       roomName: (room['name'] as String? ?? roomId),
                       callId: callId,
