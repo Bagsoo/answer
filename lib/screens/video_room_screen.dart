@@ -6,6 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../l10n/app_localizations.dart';
 import '../utils/user_cache.dart';
+import 'package:provider/provider.dart';
+import '../services/voice_call_service.dart';
+import '../services/callkit_service.dart';
 
 class VideoRoomScreen extends StatefulWidget {
   final String roomId;
@@ -181,43 +184,35 @@ class _VideoRoomScreenState extends State<VideoRoomScreen> {
     _leaving = true;
     _heartbeatTimer?.cancel();
     _callSubscription?.cancel();
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+
     try {
-      final roomRef = FirebaseFirestore.instance.collection('chat_rooms').doc(widget.roomId);
-      final callRef = roomRef.collection('calls').doc(widget.callId);
-
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        final callSnap = await transaction.get(callRef);
-        if (!callSnap.exists) return;
-
-        final currentCount = (callSnap.data()?['participant_count'] as num?)?.toInt() ?? 0;
-        final newCount = (currentCount - 1).clamp(0, 100);
-        final status = callSnap.data()?['status'] as String?;
-
-        transaction.update(callRef.collection('participants').doc(uid), {'left_at': FieldValue.serverTimestamp()});
-        
-        final shouldEnd = newCount == 0 || (newCount == 1 && status == 'active');
-        
-        transaction.update(callRef, {
-          'participant_count': newCount,
-          if (shouldEnd) 'status': 'ended',
-        });
-
-        if (shouldEnd) {
-          transaction.update(roomRef, {
-            'active_call_id': FieldValue.delete(),
-            'active_call_type': FieldValue.delete(),
-          });
-        }
-      });
+      await _engine.leaveChannel();
     } catch (e) {
-      debugPrint("Transaction error: $e");
+      debugPrint("Agora leaveChannel error: $e");
     }
 
     try {
-      await _engine.stopPreview();
+      await context.read<VoiceCallService>().leaveVoiceCall(
+            roomId: widget.roomId,
+            callId: widget.callId,
+          );
+    } catch (e) {
+      debugPrint("leaveVoiceCall error: $e");
+    }
+
+    try {
+      await _engine.release();
     } catch (e) {
       debugPrint("Agora release error: $e");
+    }
+
+    try {
+      await context.read<VoiceCallService>().clearActiveSession();
+      await context.read<VoiceCallService>().stopSystemCallNotification();
+      await CallkitService.instance.endCall(widget.callId);
+      await CallkitService.instance.unbind();
+    } catch (e) {
+      debugPrint("Service cleanup error: $e");
     }
 
     if (mounted) Navigator.of(context).pop();
@@ -267,21 +262,27 @@ class _VideoRoomScreenState extends State<VideoRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          _buildVideoLayout(),
-          Positioned(bottom: 40, left: 0, right: 0, child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              GestureDetector(
-                onTap: _leaveChannel,
-                child: Container(width: 70, height: 70, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle), child: const Icon(Icons.call_end, color: Colors.white, size: 36)),
-              ),
-            ],
-          )),
-        ],
+    return WillPopScope(
+      onWillPop: () async {
+        await _leaveChannel();
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          children: [
+            _buildVideoLayout(),
+            Positioned(bottom: 40, left: 0, right: 0, child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                GestureDetector(
+                  onTap: _leaveChannel,
+                  child: Container(width: 70, height: 70, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle), child: const Icon(Icons.call_end, color: Colors.white, size: 36)),
+                ),
+              ],
+            )),
+          ],
+        ),
       ),
     );
   }

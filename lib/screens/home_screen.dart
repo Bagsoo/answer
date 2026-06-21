@@ -18,6 +18,7 @@ import '../l10n/app_localizations.dart';
 import 'chat_list_screen.dart' hide GroupListScreen;
 import 'chat_room_screen.dart';
 import 'video_room_screen.dart';
+import 'voice_room_screen.dart';
 import 'group_list_screen.dart';
 import 'group_detail_screen.dart';
 import 'app_settings_screen.dart';
@@ -195,17 +196,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         device: _homeDeviceType,
       );
       if (!mounted || restored == null) return;
+      final callType = await voiceCallService.getActiveCallType(roomId) ?? 'voice';
+      if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => VideoRoomScreen(
-            roomId: roomId,
-            roomName: session['roomName'] as String? ?? roomId,
-            callId: callId,
-            token: restored.token,
-            appId: restored.appId,
-            channelName: restored.channelName,
-            agoraUid: restored.uid,
-          ),
+          builder: (_) => callType == 'video'
+              ? VideoRoomScreen(
+                  roomId: roomId,
+                  roomName: session['roomName'] as String? ?? roomId,
+                  callId: callId,
+                  token: restored.token,
+                  appId: restored.appId,
+                  channelName: restored.channelName,
+                  agoraUid: restored.uid,
+                )
+              : VoiceRoomScreen(
+                  roomId: roomId,
+                  roomName: session['roomName'] as String? ?? roomId,
+                  callId: callId,
+                  token: restored.token,
+                  appId: restored.appId,
+                  channelName: restored.channelName,
+                  agoraUid: restored.uid,
+                ),
         ),
       );
     } catch (_) {
@@ -746,17 +759,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       device: _homeDeviceType,
                     );
                 if (!context.mounted) return;
+                final callType = await voiceCallService.getActiveCallType(roomId) ?? 'voice';
+                if (!context.mounted) return;
                 await Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => VideoRoomScreen(
-                      roomId: roomId,
-                      roomName: (room['name'] as String? ?? roomId),
-                      callId: callId,
-                      token: result.token,
-                      appId: result.appId,
-                      channelName: result.channelName,
-                      agoraUid: result.uid,
-                    ),
+                    builder: (_) => callType == 'video'
+                        ? VideoRoomScreen(
+                            roomId: roomId,
+                            roomName: (room['name'] as String? ?? roomId),
+                            callId: callId,
+                            token: result.token,
+                            appId: result.appId,
+                            channelName: result.channelName,
+                            agoraUid: result.uid,
+                          )
+                        : VoiceRoomScreen(
+                            roomId: roomId,
+                            roomName: (room['name'] as String? ?? roomId),
+                            callId: callId,
+                            token: result.token,
+                            appId: result.appId,
+                            channelName: result.channelName,
+                            agoraUid: result.uid,
+                          ),
                   ),
                 );
               } on Exception catch (_) {

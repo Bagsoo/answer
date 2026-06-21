@@ -17,7 +17,7 @@ const VOICE_CALL_MAX_PARTICIPANTS = 8;
 const VIDEO_CALL_MAX_PARTICIPANTS = 4; // 초기에 4명으로 제한
 const VOICE_CALL_MAX_GROUP_MEMBERS = 20;
 const VIDEO_CALL_MAX_GROUP_MEMBERS = 20;
-const VOICE_CALL_COOLDOWN_MS = 300 * 1000;
+const VOICE_CALL_COOLDOWN_MS = 120 * 1000;
 const VOICE_CALL_MAX_DURATION_MS = 3 * 60 * 60 * 1000;
 const VOICE_CALL_DAILY_START_LIMIT = 20;
 const VOICE_CALL_HEARTBEAT_STALE_MS = 3 * 60 * 1000;
@@ -192,7 +192,7 @@ async function notifyCallStarted(roomId: string, callerUid: string, callId: stri
 
   const callerDoc = await getDb().collection("users").doc(callerUid).get();
   const callerName = callerDoc.data()?.name ?? "알 수 없는 사용자";
-  
+
   // FlutterCallkitIncoming이 요구하는 데이터 구조
   const payload = {
     data: {
@@ -203,7 +203,7 @@ async function notifyCallStarted(roomId: string, callerUid: string, callId: stri
       channelName: channelName,
       callerName: callerName,
       // CallKit 전용 데이터
-      action: "show_incoming_call", 
+      action: "show_incoming_call",
     },
     // 안드로이드/iOS 모두 데이터 메시지로 처리하여 백그라운드에서도 수신 가능하게 함
     android: {

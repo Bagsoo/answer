@@ -203,15 +203,25 @@ class NotificationService {
         
         await nav.push(
           MaterialPageRoute(
-            builder: (_) => VideoRoomScreen(
-              roomId: roomId,
-              roomName: callerName,
-              callId: callId,
-              token: joinResult.token,
-              appId: joinResult.appId,
-              channelName: joinResult.channelName,
-              agoraUid: joinResult.uid,
-            ),
+            builder: (_) => callType == 'video'
+                ? VideoRoomScreen(
+                    roomId: roomId,
+                    roomName: callerName,
+                    callId: callId,
+                    token: joinResult.token,
+                    appId: joinResult.appId,
+                    channelName: joinResult.channelName,
+                    agoraUid: joinResult.uid,
+                  )
+                : VoiceRoomScreen(
+                    roomId: roomId,
+                    roomName: callerName,
+                    callId: callId,
+                    token: joinResult.token,
+                    appId: joinResult.appId,
+                    channelName: joinResult.channelName,
+                    agoraUid: joinResult.uid,
+                  ),
           ),
         );
       },
