@@ -11,8 +11,8 @@ const String kDefaultAndroidNoticeUrl =
     'https://play.google.com/store/apps/details?id=com.answer.app&pli=1';
 // ios url 임시
 const String kDefaultIOSNoticeUrl =
-    'https://daum.net';
-const String kDefaultNoticeUrl = 'https://naver.com';
+    'https://apps.apple.com/us/app/answer/id6777887678';
+const String kDefaultNoticeUrl = 'https://answer-home.vercel.app/';
 
 class AppNotice {
   final String id;
