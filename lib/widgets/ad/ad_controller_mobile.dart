@@ -8,7 +8,8 @@ enum AdState { loading, loaded, failed }
 class AdController extends ChangeNotifier {
   static const _testAdUnitAndroid = 'ca-app-pub-3940256099942544/2247696110';
   static const _testAdUnitIos     = 'ca-app-pub-3940256099942544/3986624511';
-  static const _prodAdUnit        = 'ca-app-pub-3027819032479365/6866554616';
+  static const _prodAdUnitAndroid = 'ca-app-pub-3027819032479365/6866554616';
+  static const _prodAdUnitIos     = 'ca-app-pub-3027819032479365/6385223753';
   static const _kTimeout          = Duration(seconds: 3);
 
   AdState _state = AdState.loading;
@@ -16,12 +17,12 @@ class AdController extends ChangeNotifier {
   AdState get state => _state;
 
   String get _adUnitId {
+    final isIos = defaultTargetPlatform == TargetPlatform.iOS;
+
     if (kReleaseMode) {
-      return _prodAdUnit;
+      return isIos ? _prodAdUnitIos : _prodAdUnitAndroid;
     } else {
-      return defaultTargetPlatform == TargetPlatform.iOS
-          ? _testAdUnitIos
-          : _testAdUnitAndroid;
+      return isIos ? _testAdUnitIos : _testAdUnitAndroid;
     }
   }
 
