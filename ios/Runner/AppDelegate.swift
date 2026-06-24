@@ -94,6 +94,10 @@ class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
     func createNativeAd(_ nativeAd: GADNativeAd, customOptions: [AnyHashable : Any]? = nil) -> GADNativeAdView? {
         let adView = GADNativeAdView()
         
+        // [Fix] Ensure the view has a proper size
+        adView.translatesAutoresizingMaskIntoConstraints = false
+        adView.heightAnchor.constraint(equalToConstant: 72).isActive = true
+        
         // Container
         let container = UIView()
         container.translatesAutoresizingMaskIntoConstraints = false
