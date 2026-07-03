@@ -47,7 +47,7 @@ class _NativeAdTileState extends State<NativeAdTileMobile> {
   Widget build(BuildContext context) {
     return switch (_ctrl.state) {
       AdState.loading => const _AdPlaceholder(),
-      AdState.failed  => const SizedBox.shrink(),
+      AdState.failed  => _AdErrorTile(error: _ctrl.lastError),
       AdState.loaded  => _AdWrapper(ad: _ctrl.nativeAd!),
     };
   }
@@ -106,6 +106,27 @@ class _AdPlaceholder extends StatelessWidget {
             ),
           ),
         ]),
+      ),
+    );
+  }
+}
+
+class _AdErrorTile extends StatelessWidget {
+  final String? error;
+  const _AdErrorTile({required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 72,
+      color: Colors.red.withOpacity(0.1),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      alignment: Alignment.centerLeft,
+      child: Text(
+        'AD FAILED: ${error ?? "unknown"}',
+        style: const TextStyle(fontSize: 11, color: Colors.red),
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

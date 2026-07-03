@@ -13,6 +13,7 @@ class AdController extends ChangeNotifier {
 
   AdState _state = AdState.loading;
   NativeAd? nativeAd;
+  String? lastError;
 
   AdState get state => _state;
 
@@ -43,7 +44,8 @@ class AdController extends ChangeNotifier {
         onAdLoaded: (_) {
           if (!completer.isCompleted) completer.complete(true);
         },
-        onAdFailedToLoad: (ad, _) {
+        onAdFailedToLoad: (ad, error) {
+          lastError = 'code:${error.code} domain:${error.domain} msg:${error.message}';
           ad.dispose();
           if (!completer.isCompleted) completer.complete(false);
         },
@@ -52,6 +54,7 @@ class AdController extends ChangeNotifier {
 
     final success = await completer.future
         .timeout(_kTimeout, onTimeout: () {
+          lastError = 'timeout after ${_kTimeout.inSeconds}s';
           ad.dispose();
           return false;
         });
