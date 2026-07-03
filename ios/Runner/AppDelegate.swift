@@ -38,14 +38,15 @@ import google_mobile_ads
 
     if let apiKey = Bundle.main.object(forInfoDictionaryKey: "GoogleMapsApiKey") as? String {
         GMSServices.provideAPIKey(apiKey)
-    }
+    }    
     
+    GeneratedPluginRegistrant.register(with: self)
+
     // Register the iOS NativeAdFactory
     FLTGoogleMobileAdsPlugin.registerNativeAdFactory(
         self, factoryId: "listTile", nativeAdFactory: ListTileNativeAdFactory()
     )
     
-    GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 

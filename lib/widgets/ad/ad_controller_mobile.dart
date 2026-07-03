@@ -1,76 +1,76 @@
-import 'dart:async';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+// import 'dart:async';
+// import 'package:flutter/foundation.dart';
+// import 'package:flutter/material.dart';
+// import 'package:google_mobile_ads/google_mobile_ads.dart';
 
-enum AdState { loading, loaded, failed }
+// enum AdState { loading, loaded, failed }
 
-class AdController extends ChangeNotifier {
-  static const _testAdUnitAndroid = 'ca-app-pub-3940256099942544/2247696110';
-  static const _testAdUnitIos     = 'ca-app-pub-3940256099942544/3986624511';
-  static const _prodAdUnitAndroid = 'ca-app-pub-3027819032479365/6866554616';
-  static const _prodAdUnitIos     = 'ca-app-pub-3027819032479365/6385223753';
-  static const _kTimeout          = Duration(seconds: 3);
+// class AdController extends ChangeNotifier {
+//   static const _testAdUnitAndroid = 'ca-app-pub-3940256099942544/2247696110';
+//   static const _testAdUnitIos     = 'ca-app-pub-3940256099942544/3986624511';
+//   static const _prodAdUnitAndroid = 'ca-app-pub-3027819032479365/6866554616';
+//   static const _prodAdUnitIos     = 'ca-app-pub-3027819032479365/6385223753';
+//   static const _kTimeout          = Duration(seconds: 3);
 
-  AdState _state = AdState.loading;
-  NativeAd? nativeAd;
-  AdState get state => _state;
+//   AdState _state = AdState.loading;
+//   NativeAd? nativeAd;
+//   AdState get state => _state;
 
-  String get _adUnitId {
-    final isIos = defaultTargetPlatform == TargetPlatform.iOS;
+//   String get _adUnitId {
+//     final isIos = defaultTargetPlatform == TargetPlatform.iOS;
 
-    if (kReleaseMode) {
-      return isIos ? _prodAdUnitIos : _prodAdUnitAndroid;
-    } else {
-      return isIos ? _testAdUnitIos : _testAdUnitAndroid;
-    }
-  }
+//     if (kReleaseMode) {
+//       return isIos ? _prodAdUnitIos : _prodAdUnitAndroid;
+//     } else {
+//       return isIos ? _testAdUnitIos : _testAdUnitAndroid;
+//     }
+//   }
 
-  Future<void> load({
-    NativeTemplateStyle? templateStyle,
-    String? factoryId,
-    Map<String, Object>? customOptions,
-  }) async {
-    final completer = Completer<bool>();
-    final ad = NativeAd(
-      adUnitId: _adUnitId,
-      request: const AdRequest(),
-      nativeTemplateStyle: templateStyle,
-      factoryId: factoryId,
-      customOptions: customOptions,
-      listener: NativeAdListener(
-        onAdLoaded: (_) {
-          if (!completer.isCompleted) completer.complete(true);
-        },
-        onAdFailedToLoad: (ad, _) {
-          ad.dispose();
-          if (!completer.isCompleted) completer.complete(false);
-        },
-      ),
-    )..load();
+//   Future<void> load({
+//     NativeTemplateStyle? templateStyle,
+//     String? factoryId,
+//     Map<String, Object>? customOptions,
+//   }) async {
+//     final completer = Completer<bool>();
+//     final ad = NativeAd(
+//       adUnitId: _adUnitId,
+//       request: const AdRequest(),
+//       nativeTemplateStyle: templateStyle,
+//       factoryId: factoryId,
+//       customOptions: customOptions,
+//       listener: NativeAdListener(
+//         onAdLoaded: (_) {
+//           if (!completer.isCompleted) completer.complete(true);
+//         },
+//         onAdFailedToLoad: (ad, _) {
+//           ad.dispose();
+//           if (!completer.isCompleted) completer.complete(false);
+//         },
+//       ),
+//     )..load();
 
-    final success = await completer.future.timeout(_kTimeout, onTimeout: () {
-      ad.dispose();
-      return false;
-    });
+//     final success = await completer.future.timeout(_kTimeout, onTimeout: () {
+//       ad.dispose();
+//       return false;
+//     });
 
-    if (!_disposed) {
-      if (success) {
-        nativeAd = ad;
-        _state = AdState.loaded;
-      } else {
-        _state = AdState.failed;
-      }
-      notifyListeners();
-    }
-  }
+//     if (!_disposed) {
+//       if (success) {
+//         nativeAd = ad;
+//         _state = AdState.loaded;
+//       } else {
+//         _state = AdState.failed;
+//       }
+//       notifyListeners();
+//     }
+//   }
 
-  bool _disposed = false;
+//   bool _disposed = false;
 
-  @override
-  void dispose() {
-    _disposed = true;
-    nativeAd?.dispose();
-    super.dispose();
-  }
-}
+//   @override
+//   void dispose() {
+//     _disposed = true;
+//     nativeAd?.dispose();
+//     super.dispose();
+//   }
+// }
