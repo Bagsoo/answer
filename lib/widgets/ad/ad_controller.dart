@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import '../../utils/ads_init_future.dart';
 
 enum AdState { loading, loaded, failed }
 
@@ -9,7 +10,7 @@ class AdController extends ChangeNotifier {
   static const _testAdUnitIos     = 'ca-app-pub-3940256099942544/3986624511'; // 테스트
   static const _prodAdUnitAndroid = 'ca-app-pub-3027819032479365/6866554616'; // 실제 (Android)
   static const _prodAdUnitIos     = 'ca-app-pub-3027819032479365/6385223753'; // 실제 (iOS)
-  static const _kTimeout          = Duration(seconds: 10);
+  static const _kTimeout          = Duration(seconds: 15); // iOS는 초기화 완료 대기 필요
 
   AdState _state = AdState.loading;
   NativeAd? nativeAd;
@@ -32,6 +33,9 @@ class AdController extends ChangeNotifier {
     String? factoryId,
     Map<String, Object>? customOptions,
   }) async {
+    // iOS 초기화 완료 대기 (시간 제약 없음)
+    await AdsInit.ready;
+
     final completer = Completer<bool>();
 
     final ad = NativeAd(
