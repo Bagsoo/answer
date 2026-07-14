@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../../utils/ads_init_future.dart';
+import '../../utils/ads_helper.dart';
 
 enum AdState { loading, loaded, failed }
 
@@ -69,6 +70,11 @@ class AdController extends ChangeNotifier {
         _state = AdState.loaded;
       } else {
         _state = AdState.failed;
+        if (adsInitErrorLog != null) {
+          lastError = (lastError == null) 
+              ? 'InitLog: $adsInitErrorLog' 
+              : '$lastError | InitLog: $adsInitErrorLog';
+        }
       }
       notifyListeners();
     }
