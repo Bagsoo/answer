@@ -41,19 +41,6 @@ import google_mobile_ads
 
     GeneratedPluginRegistrant.register(with: self)
 
-    // Register the iOS NativeAdFactory for the custom native ad view.
-    let factory = ListTileNativeAdFactory()
-    let registered = FLTGoogleMobileAdsPlugin.registerNativeAdFactory(
-      self,
-      factoryId: "listTile",
-      nativeAdFactory: factory
-    )
-    if !registered {
-      NSLog("AdMob: failed to register native ad factory with id=listTile")
-    } else {
-      NSLog("AdMob: registered native ad factory with id=listTile")
-    }
-
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
@@ -83,6 +70,18 @@ import google_mobile_ads
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+
+    let factory = ListTileNativeAdFactory()
+    let registered = FLTGoogleMobileAdsPlugin.registerNativeAdFactory(
+      self,
+      factoryId: "listTile",
+      nativeAdFactory: factory
+    )
+    if !registered {
+      NSLog("AdMob: failed to register native ad factory with id=listTile")
+    } else {
+      NSLog("AdMob: registered native ad factory with id=listTile")
+    }
   }
 }
 
