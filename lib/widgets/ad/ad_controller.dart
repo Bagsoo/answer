@@ -10,7 +10,7 @@ class AdController extends ChangeNotifier {
   static const _testAdUnitAndroid = 'ca-app-pub-3940256099942544/2247696110'; // 테스트
   static const _testAdUnitIos     = 'ca-app-pub-3940256099942544/3986624511'; // 테스트
   static const _prodAdUnitAndroid = 'ca-app-pub-3027819032479365/6866554616'; // 실제 (Android)
-  static const _prodAdUnitIos     = 'ca-app-pub-3027819032479365/6385223753'; // 실제 (iOS)
+  static const _prodAdUnitIos     = 'ca-app-pub-3940256099942544/3986624511'; // 실제 (iOS)
   static const _kTimeout          = Duration(seconds: 15); // iOS는 초기화 완료 대기 필요
 
   AdState _state = AdState.loading;
