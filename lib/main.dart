@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -131,6 +132,8 @@ class MessengerApp extends StatefulWidget {
 }
 
 class _MessengerAppState extends State<MessengerApp> {
+  static const MethodChannel _adDebugChannel = MethodChannel('com.answer.messenger/ad_debug');
+
   @override
   void initState() {
     super.initState();
@@ -142,21 +145,32 @@ class _MessengerAppState extends State<MessengerApp> {
   Future<void> _initATT() async {
     final isMobile = !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
     if (isMobile) {
+      String attStatus = 'unknown';
       if (Platform.isIOS) {
         try {
           final status = await AppTrackingTransparency.trackingAuthorizationStatus;
+          attStatus = status.toString();
           if (status == TrackingStatus.notDetermined) {
             // Wait for native window/UI transition to fully complete
             await Future.delayed(const Duration(milliseconds: 1500));
             final result = await AppTrackingTransparency.requestTrackingAuthorization();
+            attStatus = result.toString();
             debugPrint('ATT Status: $result');
           } else {
             debugPrint('ATT already decided: $status');
           }
         } catch (e) {
+          attStatus = 'error: $e';
           debugPrint('ATT request error: $e');
         }
       }
+
+      try {
+        await _adDebugChannel.invokeMethod('attStatus', {'attStatus': attStatus});
+      } catch (e) {
+        debugPrint('ad_debug channel send error: $e');
+      }
+
       await AdsInit.ready;
 
       // ATT 권한 요청 및 광고 SDK 초기화 이후 알림 권한 팝업 호출

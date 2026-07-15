@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../../l10n/app_localizations.dart';
 import 'ad_controller.dart';
@@ -11,8 +12,17 @@ class NativeAdTileMobile extends StatefulWidget {
 }
 
 class _NativeAdTileState extends State<NativeAdTileMobile> {
+  static const MethodChannel _debugChannel = MethodChannel('com.answer.messenger/ad_debug');
+
   late final AdController _ctrl;
   bool _initialized = false;
+  bool _dialogShown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _debugChannel.setMethodCallHandler(_handleDebugMessage);
+  }
 
   @override
   void didChangeDependencies() {
@@ -28,8 +38,100 @@ class _NativeAdTileState extends State<NativeAdTileMobile> {
     }
   }
 
-  void _onChanged() {
+  Future<void> _handleDebugMessage(MethodCall call) async {
+    if (!mounted) return;
+
+    switch (call.method) {
+      case 'nativeAdFactoryRegistered':
+        final args = call.arguments as Map?;
+        final registered = args?['factoryRegistered'] as bool? ?? false;
+        _ctrl.markFactoryRegistered(registered);
+        break;
+      case 'attStatus':
+        final args = call.arguments as Map?;
+        final status = args?['attStatus'] as String?;
+        _ctrl.updateAttStatus(status);
+        break;
+      default:
+        break;
+    }
+
+    if (_ctrl.state == AdState.failed && !_dialogShown) {
+      _dialogShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _showAdFailureDialog();
+      });
+    }
+
     if (mounted) setState(() {});
+  }
+
+  void _onChanged() {
+    if (mounted) {
+      if (_ctrl.state == AdState.failed && !_dialogShown) {
+        _dialogShown = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _showAdFailureDialog();
+        });
+      }
+      setState(() {});
+    }
+  }
+
+  Future<void> _showAdFailureDialog() async {
+    final errorText = _ctrl.lastError ?? 'unknown error';
+    final unitId = _ctrl.debugAdUnitId;
+    final factoryId = 'listTile';
+    final initLog = _ctrl.debugInitLog;
+    final factoryRegistered = _ctrl.debugFactoryRegistered;
+    final engineCallbackFired = _ctrl.debugEngineCallbackFired;
+    final attemptIndex = _ctrl.debugAttemptIndex;
+    final activeLoadCount = _ctrl.debugActiveLoadCount;
+    final attStatus = _ctrl.debugAttStatus;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Ad load failed'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Native ad load failed. Details:'),
+                const SizedBox(height: 8),
+                Text('unitId: $unitId'),
+                const SizedBox(height: 4),
+                Text('factoryId: $factoryId'),
+                const SizedBox(height: 4),
+                Text('error: $errorText'),
+                const SizedBox(height: 4),
+                Text('initLog: ${initLog ?? "none"}'),
+                const SizedBox(height: 4),
+                Text('factoryRegistered: $factoryRegistered'),
+                const SizedBox(height: 4),
+                Text('engineCallbackFired: $engineCallbackFired'),
+                const SizedBox(height: 4),
+                Text('attStatus: $attStatus'),
+                const SizedBox(height: 4),
+                Text('attemptIndex: $attemptIndex'),
+                const SizedBox(height: 4),
+                Text('concurrentAdLoads: $activeLoadCount'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override

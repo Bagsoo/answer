@@ -7,6 +7,7 @@ import google_mobile_ads
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var eventSink: FlutterEventSink?
   private let suiteName = "group.com.answer.app"
+  private var adDebugChannel: FlutterMethodChannel?
 
   override func application(
     _ application: UIApplication,
@@ -20,6 +21,8 @@ import google_mobile_ads
                                              binaryMessenger: controller.binaryMessenger)
     let eventChannel = FlutterEventChannel(name: "com.answer.messenger/share_events",
                                             binaryMessenger: controller.binaryMessenger)
+    adDebugChannel = FlutterMethodChannel(name: "com.answer.messenger/ad_debug",
+                                           binaryMessenger: controller.binaryMessenger)
 
     shareChannel.setMethodCallHandler({
       (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
@@ -79,8 +82,16 @@ import google_mobile_ads
     )
     if !registered {
       NSLog("AdMob: failed to register native ad factory with id=listTile")
+      adDebugChannel?.invokeMethod("nativeAdFactoryRegistered", arguments: [
+        "factoryId": "listTile",
+        "factoryRegistered": false,
+      ])
     } else {
       NSLog("AdMob: registered native ad factory with id=listTile")
+      adDebugChannel?.invokeMethod("nativeAdFactoryRegistered", arguments: [
+        "factoryId": "listTile",
+        "factoryRegistered": true,
+      ])
     }
   }
 }

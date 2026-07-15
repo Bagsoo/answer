@@ -16,8 +16,32 @@ class AdController extends ChangeNotifier {
   AdState _state = AdState.loading;
   NativeAd? nativeAd;
   String? lastError;
+  int _attemptIndex = 0;
+  static int _activeLoadCount = 0;
+  bool _factoryRegistered = false;
+  bool _engineCallbackFired = false;
+  String? _attStatus;
 
   AdState get state => _state;
+  String get debugAdUnitId => _adUnitId;
+  String? get debugInitLog => adsInitErrorLog;
+  int get debugAttemptIndex => _attemptIndex;
+  int get debugActiveLoadCount => _activeLoadCount;
+  bool get debugFactoryRegistered => _factoryRegistered;
+  bool get debugEngineCallbackFired => _engineCallbackFired;
+  String get debugAttStatus => _attStatus ?? 'unknown';
+
+  void markFactoryRegistered(bool value) {
+    _factoryRegistered = value;
+  }
+
+  void markEngineCallbackFired(bool value) {
+    _engineCallbackFired = value;
+  }
+
+  void updateAttStatus(String? value) {
+    _attStatus = value;
+  }
 
   String get _adUnitId {
     final isIos = defaultTargetPlatform == TargetPlatform.iOS;
@@ -34,6 +58,10 @@ class AdController extends ChangeNotifier {
     String? factoryId,
     Map<String, Object>? customOptions,
   }) async {
+    _attemptIndex += 1;
+    _activeLoadCount += 1;
+    _engineCallbackFired = false;
+
     // iOS 초기화 완료 대기 (시간 제약 없음)
     debugPrint('AdMob: waiting for ads init before loading native ad');
     await AdsInit.ready;
@@ -49,10 +77,12 @@ class AdController extends ChangeNotifier {
       customOptions: customOptions,
       listener: NativeAdListener(
         onAdLoaded: (_) {
+          _engineCallbackFired = true;
           debugPrint('AdMob: native ad loaded for unit=$_adUnitId');
           if (!completer.isCompleted) completer.complete(true);
         },
         onAdFailedToLoad: (ad, error) {
+          _engineCallbackFired = true;
           final msg = 'code:${error.code} domain:${error.domain} msg:${error.message}';
           debugPrint('AdMob: native ad failed for unit=$_adUnitId -> $msg');
           lastError = msg;
@@ -64,11 +94,14 @@ class AdController extends ChangeNotifier {
 
     final success = await completer.future
         .timeout(_kTimeout, onTimeout: () {
+          _engineCallbackFired = false;
           debugPrint('AdMob: native ad load timed out for unit=$_adUnitId');
           lastError = 'timeout after ${_kTimeout.inSeconds}s';
           ad.dispose();
           return false;
         });
+
+    _activeLoadCount = (_activeLoadCount > 0) ? _activeLoadCount - 1 : 0;
 
     if (!_disposed) {
       if (success) {
