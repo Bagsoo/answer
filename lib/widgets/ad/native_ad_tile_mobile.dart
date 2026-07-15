@@ -117,15 +117,19 @@ class _AdErrorTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final message = (error == null || error!.trim().isEmpty)
+        ? 'AD FAILED: unknown error'
+        : 'AD FAILED: $error';
+
     return Container(
-      height: 72,
+      minHeight: 72,
       color: Colors.red.withOpacity(0.1),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       alignment: Alignment.centerLeft,
       child: Text(
-        'AD FAILED: ${error ?? "unknown"}',
+        message,
         style: const TextStyle(fontSize: 11, color: Colors.red),
-        maxLines: 3,
+        maxLines: 6,
         overflow: TextOverflow.ellipsis,
       ),
     );

@@ -12,16 +12,15 @@ import google_mobile_ads
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    
-    // let controller : FlutterViewController = window?.rootViewController as! FlutterViewController
     guard let controller = window?.rootViewController as? FlutterViewController else {
-        return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+      return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
+
     let shareChannel = FlutterMethodChannel(name: "com.answer.messenger/share",
-                                              binaryMessenger: controller.binaryMessenger)
-    let eventChannel = FlutterEventChannel(name: "com.answer.messenger/share_events",
                                              binaryMessenger: controller.binaryMessenger)
-    
+    let eventChannel = FlutterEventChannel(name: "com.answer.messenger/share_events",
+                                            binaryMessenger: controller.binaryMessenger)
+
     shareChannel.setMethodCallHandler({
       (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
       if (call.method == "getInitialSharedPayload") {
@@ -33,20 +32,28 @@ import google_mobile_ads
         result(FlutterMethodNotImplemented)
       }
     })
-    
+
     eventChannel.setStreamHandler(self)
 
     if let apiKey = Bundle.main.object(forInfoDictionaryKey: "GoogleMapsApiKey") as? String {
-        GMSServices.provideAPIKey(apiKey)
-    }    
-    
+      GMSServices.provideAPIKey(apiKey)
+    }
+
     GeneratedPluginRegistrant.register(with: self)
 
-    // Register the iOS NativeAdFactory
-    FLTGoogleMobileAdsPlugin.registerNativeAdFactory(
-        self, factoryId: "listTile", nativeAdFactory: ListTileNativeAdFactory()
+    // Register the iOS NativeAdFactory for the custom native ad view.
+    let factory = ListTileNativeAdFactory()
+    let registered = FLTGoogleMobileAdsPlugin.registerNativeAdFactory(
+      self,
+      factoryId: "listTile",
+      nativeAdFactory: factory
     )
-    
+    if !registered {
+      NSLog("AdMob: failed to register native ad factory with id=listTile")
+    } else {
+      NSLog("AdMob: registered native ad factory with id=listTile")
+    }
+
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
