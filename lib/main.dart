@@ -9,7 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'utils/ads_helper.dart';
+import 'utils/ads_init_future.dart';
 
 import 'services/chat_service.dart';
 import 'services/auth_service.dart';
@@ -157,8 +157,8 @@ class _MessengerAppState extends State<MessengerApp> {
           debugPrint('ATT request error: $e');
         }
       }
-      await initializeAds();
-      
+      await AdsInit.ready;
+
       // ATT 권한 요청 및 광고 SDK 초기화 이후 알림 권한 팝업 호출
       await NotificationService().requestPermission();
     }

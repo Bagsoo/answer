@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../../l10n/app_localizations.dart';
@@ -121,16 +120,18 @@ class _AdErrorTile extends StatelessWidget {
         ? 'AD FAILED: unknown error'
         : 'AD FAILED: $error';
 
-    return Container(
-      minHeight: 72,
-      color: Colors.red.withOpacity(0.1),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      alignment: Alignment.centerLeft,
-      child: Text(
-        message,
-        style: const TextStyle(fontSize: 11, color: Colors.red),
-        maxLines: 6,
-        overflow: TextOverflow.ellipsis,
+    return SizedBox(
+      height: 72,
+      child: Container(
+        color: Colors.red.withValues(alpha: 0.1),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        alignment: Alignment.centerLeft,
+        child: Text(
+          message,
+          style: const TextStyle(fontSize: 11, color: Colors.red),
+          maxLines: 6,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
     );
   }
