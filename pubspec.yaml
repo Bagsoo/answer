@@ -2,7 +2,7 @@ name: messenger
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.3+41
+version: 1.0.3+42
 
 environment:
   sdk: ^3.11.0

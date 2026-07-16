@@ -20,6 +20,7 @@ class AdController extends ChangeNotifier {
   static int _activeLoadCount = 0;
   bool _factoryRegistered = false;
   bool _engineCallbackFired = false;
+  bool _implicitEngineCallbackFired = false;
   String? _attStatus;
 
   AdState get state => _state;
@@ -29,6 +30,7 @@ class AdController extends ChangeNotifier {
   int get debugActiveLoadCount => _activeLoadCount;
   bool get debugFactoryRegistered => _factoryRegistered;
   bool get debugEngineCallbackFired => _engineCallbackFired;
+  bool get debugImplicitEngineCallbackFired => _implicitEngineCallbackFired;
   String get debugAttStatus => _attStatus ?? 'unknown';
 
   void markFactoryRegistered(bool value) {
@@ -37,6 +39,10 @@ class AdController extends ChangeNotifier {
 
   void markEngineCallbackFired(bool value) {
     _engineCallbackFired = value;
+  }
+
+  void markImplicitEngineCallbackFired(bool value) {
+    _implicitEngineCallbackFired = value;
   }
 
   void updateAttStatus(String? value) {

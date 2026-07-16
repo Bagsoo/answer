@@ -132,7 +132,7 @@ class MessengerApp extends StatefulWidget {
 }
 
 class _MessengerAppState extends State<MessengerApp> {
-  static const MethodChannel _adDebugChannel = MethodChannel('com.answer.messenger/ad_debug');
+  static const MethodChannel _adDebugChannel = MethodChannel('com.answer.messenger/debug');
 
   @override
   void initState() {
@@ -166,7 +166,7 @@ class _MessengerAppState extends State<MessengerApp> {
       }
 
       try {
-        await _adDebugChannel.invokeMethod('attStatus', {'attStatus': attStatus});
+        await _adDebugChannel.invokeMethod('setAttStatus', {'attStatus': attStatus});
       } catch (e) {
         debugPrint('ad_debug channel send error: $e');
       }

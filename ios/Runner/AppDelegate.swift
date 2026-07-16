@@ -21,8 +21,26 @@ import google_mobile_ads
                                              binaryMessenger: controller.binaryMessenger)
     let eventChannel = FlutterEventChannel(name: "com.answer.messenger/share_events",
                                             binaryMessenger: controller.binaryMessenger)
-    adDebugChannel = FlutterMethodChannel(name: "com.answer.messenger/ad_debug",
+    adDebugChannel = FlutterMethodChannel(name: "com.answer.messenger/debug",
                                            binaryMessenger: controller.binaryMessenger)
+    adDebugChannel?.setMethodCallHandler({ [weak self] (call, result) in
+      switch call.method {
+      case "getNativeAdDebugInfo":
+        let payload: [String: Any] = [
+          "registered": UserDefaults.standard.bool(forKey: "native_ad_factory_registered"),
+          "engineCallbackFired": UserDefaults.standard.bool(forKey: "implicit_engine_callback_fired"),
+          "attStatus": UserDefaults.standard.string(forKey: "ad_att_status") ?? "unknown",
+        ]
+        result(payload)
+      case "setAttStatus":
+        if let args = call.arguments as? [String: Any], let status = args["attStatus"] as? String {
+          UserDefaults.standard.set(status, forKey: "ad_att_status")
+        }
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    })
 
     shareChannel.setMethodCallHandler({
       (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
@@ -43,8 +61,33 @@ import google_mobile_ads
     }
 
     GeneratedPluginRegistrant.register(with: self)
+    registerNativeAdFactoryForLaunchPath()
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  private func registerNativeAdFactoryForLaunchPath() {
+    let factory = ListTileNativeAdFactory()
+    let registered = FLTGoogleMobileAdsPlugin.registerNativeAdFactory(
+      self,
+      factoryId: "listTile",
+      nativeAdFactory: factory
+    )
+
+    UserDefaults.standard.set(registered, forKey: "native_ad_factory_registered")
+    UserDefaults.standard.set(true, forKey: "implicit_engine_callback_fired")
+    UserDefaults.standard.synchronize()
+
+    if !registered {
+      NSLog("AdMob: failed to register native ad factory with id=listTile")
+    } else {
+      NSLog("AdMob: registered native ad factory with id=listTile")
+    }
+
+    adDebugChannel?.invokeMethod("nativeAdFactoryRegistered", arguments: [
+      "factoryId": "listTile",
+      "factoryRegistered": registered,
+    ])
   }
 
   override func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
@@ -73,26 +116,6 @@ import google_mobile_ads
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-
-    let factory = ListTileNativeAdFactory()
-    let registered = FLTGoogleMobileAdsPlugin.registerNativeAdFactory(
-      self,
-      factoryId: "listTile",
-      nativeAdFactory: factory
-    )
-    if !registered {
-      NSLog("AdMob: failed to register native ad factory with id=listTile")
-      adDebugChannel?.invokeMethod("nativeAdFactoryRegistered", arguments: [
-        "factoryId": "listTile",
-        "factoryRegistered": false,
-      ])
-    } else {
-      NSLog("AdMob: registered native ad factory with id=listTile")
-      adDebugChannel?.invokeMethod("nativeAdFactoryRegistered", arguments: [
-        "factoryId": "listTile",
-        "factoryRegistered": true,
-      ])
-    }
   }
 }
 

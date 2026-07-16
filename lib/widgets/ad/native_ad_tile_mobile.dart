@@ -12,7 +12,7 @@ class NativeAdTileMobile extends StatefulWidget {
 }
 
 class _NativeAdTileState extends State<NativeAdTileMobile> {
-  static const MethodChannel _debugChannel = MethodChannel('com.answer.messenger/ad_debug');
+  static const MethodChannel _debugChannel = MethodChannel('com.answer.messenger/debug');
 
   late final AdController _ctrl;
   bool _initialized = false;
@@ -31,10 +31,29 @@ class _NativeAdTileState extends State<NativeAdTileMobile> {
       _initialized = true;
       _ctrl = AdController();
       _ctrl.addListener(_onChanged);
+      _syncAdDebugState();
       _ctrl.load(
         factoryId: 'listTile',
         customOptions: {'adLabel': AppLocalizations.of(context).adLabel},
       );
+    }
+  }
+
+  Future<void> _syncAdDebugState() async {
+    try {
+      final payload = await _debugChannel.invokeMethod<Map>('getNativeAdDebugInfo');
+      if (!mounted) return;
+      final registered = payload?['registered'] as bool? ?? false;
+      final implicitEngineCallback = payload?['engineCallbackFired'] as bool? ?? false;
+      final attStatus = payload?['attStatus'] as String?;
+      _ctrl.markFactoryRegistered(registered);
+      _ctrl.markImplicitEngineCallbackFired(implicitEngineCallback);
+      if (attStatus != null) {
+        _ctrl.updateAttStatus(attStatus);
+      }
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('ad_debug sync error: $e');
     }
   }
 
@@ -87,6 +106,7 @@ class _NativeAdTileState extends State<NativeAdTileMobile> {
     final initLog = _ctrl.debugInitLog;
     final factoryRegistered = _ctrl.debugFactoryRegistered;
     final engineCallbackFired = _ctrl.debugEngineCallbackFired;
+    final implicitEngineCallbackFired = _ctrl.debugImplicitEngineCallbackFired;
     final attemptIndex = _ctrl.debugAttemptIndex;
     final activeLoadCount = _ctrl.debugActiveLoadCount;
     final attStatus = _ctrl.debugAttStatus;
@@ -114,6 +134,8 @@ class _NativeAdTileState extends State<NativeAdTileMobile> {
                 Text('factoryRegistered: $factoryRegistered'),
                 const SizedBox(height: 4),
                 Text('engineCallbackFired: $engineCallbackFired'),
+                const SizedBox(height: 4),
+                Text('implicitEngineCallbackFired: $implicitEngineCallbackFired'),
                 const SizedBox(height: 4),
                 Text('attStatus: $attStatus'),
                 const SizedBox(height: 4),
