@@ -34,7 +34,7 @@ dependencies:
   flutter_callkit_incoming: ^3.0.0
   record: ^6.1.1
   in_app_purchase: ^3.2.0
-  in_app_purchase_android: ^0.4.0+10
+  in_app_purchase_android: ^0.5.0
   video_player: ^2.8.6
   geolocator: ^13.0.2
   google_mobile_ads: ^5.3.0
