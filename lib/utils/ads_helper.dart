@@ -4,6 +4,21 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 String? adsInitErrorLog;
 
+Future<void> _initializeMobileAdsAndLog() async {
+  try {
+    final status = await MobileAds.instance.initialize();
+    final consentStatus = await ConsentInformation.instance.getConsentStatus();
+    final canRequestAds = await ConsentInformation.instance.canRequestAds();
+    final adapterDetails = status.adapterStatuses.entries
+        .map((e) => '${e.key}:${e.value.state.name}(${e.value.description})')
+        .join(",");
+    final detailLog = 'Adapters:[$adapterDetails] | UMP:${consentStatus.name} | canRequest:$canRequestAds';
+    adsInitErrorLog = (adsInitErrorLog != null) ? '$adsInitErrorLog | $detailLog' : detailLog;
+  } catch (e) {
+    adsInitErrorLog = (adsInitErrorLog != null) ? '$adsInitErrorLog | AdsInit Exception: $e' : 'AdsInit Exception: $e';
+  }
+}
+
 Future<void> initializeAds() async {
   final completer = Completer<void>();
 
@@ -33,15 +48,7 @@ Future<void> initializeAds() async {
             debugPrint('ConsentForm error: ${formError.message}');
             adsInitErrorLog = 'ConsentForm error: ${formError.message}';
           }
-          // canRequestAds가 false여도 SDK 초기화 자체는 진행하여 ad.load()가 무한 대기(Timeout)에 빠지지 않게 합니다.
-          try {
-            final status = await MobileAds.instance.initialize();
-            adsInitErrorLog = (adsInitErrorLog != null) 
-                ? '${adsInitErrorLog} | AdsInit OK: ${status.adapterStatuses.keys.join(",")}' 
-                : 'AdsInit OK: ${status.adapterStatuses.keys.join(",")}';
-          } catch (e) {
-            adsInitErrorLog = (adsInitErrorLog != null) ? '${adsInitErrorLog} | AdsInit Exception: $e' : 'AdsInit Exception: $e';
-          }
+          await _initializeMobileAdsAndLog();
           completer.complete();
         },
       );
@@ -49,13 +56,7 @@ Future<void> initializeAds() async {
     (FormError error) async {
       debugPrint('requestConsentInfoUpdate error: ${error.message} (${error.errorCode})');
       adsInitErrorLog = 'ConsentUpdate error: ${error.message} (code:${error.errorCode})';
-      
-      try {
-        final status = await MobileAds.instance.initialize();
-        adsInitErrorLog = '${adsInitErrorLog} | AdsInit OK: ${status.adapterStatuses.keys.join(",")}';
-      } catch (e) {
-        adsInitErrorLog = '${adsInitErrorLog} | AdsInit Exception: $e';
-      }
+      await _initializeMobileAdsAndLog();
       completer.complete();
     },
   );
