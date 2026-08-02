@@ -8,6 +8,7 @@ import google_mobile_ads
   private var eventSink: FlutterEventSink?
   private let suiteName = "group.com.answer.app"
   private var adDebugChannel: FlutterMethodChannel?
+  private var adFactoryRegistrationAttempted = false  // 중복 등록 방지 플래그
 
   override func application(
     _ application: UIApplication,
@@ -19,13 +20,15 @@ import google_mobile_ads
 
     let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
-    if let controller = window?.rootViewController as? FlutterViewController {
+    if let registrar = self.registrar(forPlugin: "MessengerAppPlugin") {
+      let messenger = registrar.messenger()
+      
       let shareChannel = FlutterMethodChannel(name: "com.answer.messenger/share",
-                                               binaryMessenger: controller.binaryMessenger)
+                                               binaryMessenger: messenger)
       let eventChannel = FlutterEventChannel(name: "com.answer.messenger/share_events",
-                                              binaryMessenger: controller.binaryMessenger)
+                                              binaryMessenger: messenger)
       adDebugChannel = FlutterMethodChannel(name: "com.answer.messenger/debug",
-                                             binaryMessenger: controller.binaryMessenger)
+                                             binaryMessenger: messenger)
       adDebugChannel?.setMethodCallHandler({ [weak self] (call, result) in
         switch call.method {
         case "getNativeAdDebugInfo":
@@ -59,35 +62,14 @@ import google_mobile_ads
       })
 
       eventChannel.setStreamHandler(self)
-      registerNativeAdFactoryForLaunchPath()
     }
+
+    // 폴백: didInitializeImplicitFlutterEngine이 안 불렸을 경우를 대비
+    registerNativeAdFactoryIfNeeded(self)
 
     return result
   }
 
-  private func registerNativeAdFactoryForLaunchPath() {
-    let factory = ListTileNativeAdFactory()
-    let registered = FLTGoogleMobileAdsPlugin.registerNativeAdFactory(
-      self,
-      factoryId: "listTile",
-      nativeAdFactory: factory
-    )
-
-    UserDefaults.standard.set(registered, forKey: "native_ad_factory_registered")
-    UserDefaults.standard.set(true, forKey: "implicit_engine_callback_fired")
-    UserDefaults.standard.synchronize()
-
-    if !registered {
-      NSLog("AdMob: failed to register native ad factory with id=listTile")
-    } else {
-      NSLog("AdMob: registered native ad factory with id=listTile")
-    }
-
-    adDebugChannel?.invokeMethod("nativeAdFactoryRegistered", arguments: [
-      "factoryId": "listTile",
-      "factoryRegistered": registered,
-    ])
-  }
 
   override func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
     if url.scheme == "messenger-share" {
@@ -115,6 +97,26 @@ import google_mobile_ads
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    registerNativeAdFactoryIfNeeded(engineBridge.pluginRegistry)
+  }
+
+  private func registerNativeAdFactoryIfNeeded(_ registry: FlutterPluginRegistry) {
+    guard !adFactoryRegistrationAttempted else { return }
+
+    let factory = ListTileNativeAdFactory()
+    let registered = FLTGoogleMobileAdsPlugin.registerNativeAdFactory(
+      registry,
+      factoryId: "listTile",
+      nativeAdFactory: factory
+    )
+    if registered {
+      adFactoryRegistrationAttempted = true  // 성공했을 때만 잠금
+    }
+    UserDefaults.standard.set(registered, forKey: "native_ad_factory_registered")
+    UserDefaults.standard.set(true, forKey: "implicit_engine_callback_fired")
+    UserDefaults.standard.synchronize()
+
+    NSLog("AdMob: registerNativeAdFactory = \(registered)")
   }
 }
 
