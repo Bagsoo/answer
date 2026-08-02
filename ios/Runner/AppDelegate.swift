@@ -13,7 +13,9 @@ import google_mobile_ads
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    GeneratedPluginRegistrant.register(with: self)
+    if let apiKey = Bundle.main.object(forInfoDictionaryKey: "GoogleMapsApiKey") as? String {
+      GMSServices.provideAPIKey(apiKey)
+    }
 
     let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
@@ -58,10 +60,6 @@ import google_mobile_ads
 
       eventChannel.setStreamHandler(self)
       registerNativeAdFactoryForLaunchPath()
-    }
-
-    if let apiKey = Bundle.main.object(forInfoDictionaryKey: "GoogleMapsApiKey") as? String {
-      GMSServices.provideAPIKey(apiKey)
     }
 
     return result
