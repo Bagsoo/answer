@@ -13,57 +13,58 @@ import google_mobile_ads
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    guard let controller = window?.rootViewController as? FlutterViewController else {
-      return super.application(application, didFinishLaunchingWithOptions: launchOptions)
-    }
+    GeneratedPluginRegistrant.register(with: self)
 
-    let shareChannel = FlutterMethodChannel(name: "com.answer.messenger/share",
+    let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+
+    if let controller = window?.rootViewController as? FlutterViewController {
+      let shareChannel = FlutterMethodChannel(name: "com.answer.messenger/share",
+                                               binaryMessenger: controller.binaryMessenger)
+      let eventChannel = FlutterEventChannel(name: "com.answer.messenger/share_events",
+                                              binaryMessenger: controller.binaryMessenger)
+      adDebugChannel = FlutterMethodChannel(name: "com.answer.messenger/debug",
                                              binaryMessenger: controller.binaryMessenger)
-    let eventChannel = FlutterEventChannel(name: "com.answer.messenger/share_events",
-                                            binaryMessenger: controller.binaryMessenger)
-    adDebugChannel = FlutterMethodChannel(name: "com.answer.messenger/debug",
-                                           binaryMessenger: controller.binaryMessenger)
-    adDebugChannel?.setMethodCallHandler({ [weak self] (call, result) in
-      switch call.method {
-      case "getNativeAdDebugInfo":
-        let payload: [String: Any] = [
-          "registered": UserDefaults.standard.bool(forKey: "native_ad_factory_registered"),
-          "engineCallbackFired": UserDefaults.standard.bool(forKey: "implicit_engine_callback_fired"),
-          "attStatus": UserDefaults.standard.string(forKey: "ad_att_status") ?? "unknown",
-        ]
-        result(payload)
-      case "setAttStatus":
-        if let args = call.arguments as? [String: Any], let status = args["attStatus"] as? String {
-          UserDefaults.standard.set(status, forKey: "ad_att_status")
+      adDebugChannel?.setMethodCallHandler({ [weak self] (call, result) in
+        switch call.method {
+        case "getNativeAdDebugInfo":
+          let payload: [String: Any] = [
+            "registered": UserDefaults.standard.bool(forKey: "native_ad_factory_registered"),
+            "engineCallbackFired": UserDefaults.standard.bool(forKey: "implicit_engine_callback_fired"),
+            "attStatus": UserDefaults.standard.string(forKey: "ad_att_status") ?? "unknown",
+          ]
+          result(payload)
+        case "setAttStatus":
+          if let args = call.arguments as? [String: Any], let status = args["attStatus"] as? String {
+            UserDefaults.standard.set(status, forKey: "ad_att_status")
+          }
+          result(nil)
+        default:
+          result(FlutterMethodNotImplemented)
         }
-        result(nil)
-      default:
-        result(FlutterMethodNotImplemented)
-      }
-    })
+      })
 
-    shareChannel.setMethodCallHandler({
-      (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
-      if (call.method == "getInitialSharedPayload") {
-        result(self.getSharedPayload())
-      } else if (call.method == "clearSharedPayload") {
-        self.clearSharedPayload()
-        result(nil)
-      } else {
-        result(FlutterMethodNotImplemented)
-      }
-    })
+      shareChannel.setMethodCallHandler({ [weak self]
+        (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
+        guard let self = self else { return }
+        if (call.method == "getInitialSharedPayload") {
+          result(self.getSharedPayload())
+        } else if (call.method == "clearSharedPayload") {
+          self.clearSharedPayload()
+          result(nil)
+        } else {
+          result(FlutterMethodNotImplemented)
+        }
+      })
 
-    eventChannel.setStreamHandler(self)
+      eventChannel.setStreamHandler(self)
+      registerNativeAdFactoryForLaunchPath()
+    }
 
     if let apiKey = Bundle.main.object(forInfoDictionaryKey: "GoogleMapsApiKey") as? String {
       GMSServices.provideAPIKey(apiKey)
     }
 
-    GeneratedPluginRegistrant.register(with: self)
-    registerNativeAdFactoryForLaunchPath()
-
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    return result
   }
 
   private func registerNativeAdFactoryForLaunchPath() {
