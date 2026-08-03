@@ -58,6 +58,11 @@
 	<false/>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-3027819032479365~8570579569</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>More relevant ads are shown based on this.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
