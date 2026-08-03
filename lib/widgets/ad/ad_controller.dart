@@ -12,7 +12,7 @@ class AdController extends ChangeNotifier {
   static const _testAdUnitIos     = 'ca-app-pub-3940256099942544/3986624511'; // 테스트
   static const _prodAdUnitAndroid = 'ca-app-pub-3027819032479365/6866554616'; // 실제 (Android)
   static const _prodAdUnitIos     = 'ca-app-pub-3027819032479365/6385223753'; // 실제 (iOS) ca-app-pub-3027819032479365/6385223753
-  static const _kTimeout          = Duration(seconds: 15); // iOS는 초기화 완료 대기 필요
+  static const _kTimeout          = Duration(seconds: 60); // 임시로 늘려서 대기 지연 및 타임아웃 테스트
 
   AdState _state = AdState.loading;
   NativeAd? nativeAd;
@@ -67,15 +67,21 @@ class AdController extends ChangeNotifier {
     String? factoryId,
     Map<String, Object>? customOptions,
   }) async {
-    // 진단용 임시 코드
+    // 진단용 임시 코드 (2차 개선형)
     try {
-      final sw = Stopwatch()..start();
-      final res = await http
-          .get(Uri.parse('https://googleads.g.doubleclick.net/'))
-          .timeout(const Duration(seconds: 10));
-      sw.stop();
-      debugPrint('Raw network test: status=${res.statusCode} time=${sw.elapsedMilliseconds}ms');
-      rawNetResult = 'RawNet: ${res.statusCode} in ${sw.elapsedMilliseconds}ms';
+      final sw1 = Stopwatch()..start();
+      final res1 = await http
+          .get(Uri.parse('https://pagead2.googlesyndication.com/pagead/gen_204?id=mobileads-sdk-core'))
+          .timeout(const Duration(seconds: 5));
+      sw1.stop();
+      
+      final sw2 = Stopwatch()..start();
+      final res2 = await http
+          .get(Uri.parse('https://pubads.g.doubleclick.net/gampad/ads'))
+          .timeout(const Duration(seconds: 5));
+      sw2.stop();
+      
+      rawNetResult = 'PageAd:${res1.statusCode}(${sw1.elapsedMilliseconds}ms) | PubAds:${res2.statusCode}(${sw2.elapsedMilliseconds}ms)';
     } catch (e) {
       debugPrint('Raw network test FAILED: $e');
       rawNetResult = 'RawNet FAILED: $e';
