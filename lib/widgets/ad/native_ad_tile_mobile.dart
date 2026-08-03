@@ -101,6 +101,7 @@ class _NativeAdTileState extends State<NativeAdTileMobile> {
 
   Future<void> _showAdFailureDialog() async {
     final errorText = _ctrl.lastError ?? 'unknown error';
+    final rawNet = _ctrl.debugRawNetResult;
     final unitId = _ctrl.debugAdUnitId;
     final factoryId = 'listTile';
     final initLog = _ctrl.debugInitLog;
@@ -128,6 +129,8 @@ class _NativeAdTileState extends State<NativeAdTileMobile> {
                 Text('factoryId: $factoryId'),
                 const SizedBox(height: 4),
                 Text('error: $errorText'),
+                const SizedBox(height: 4),
+                Text('rawNet: $rawNet'),
                 const SizedBox(height: 4),
                 Text('initLog: ${initLog ?? "none"}'),
                 const SizedBox(height: 4),

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:http/http.dart' as http;
 import '../../utils/ads_init_future.dart';
 import '../../utils/ads_helper.dart';
 
@@ -16,6 +17,7 @@ class AdController extends ChangeNotifier {
   AdState _state = AdState.loading;
   NativeAd? nativeAd;
   String? lastError;
+  String? rawNetResult; // 새 필드 추가
   int _attemptIndex = 0;
   static int _activeLoadCount = 0;
   bool _factoryRegistered = false;
@@ -32,6 +34,7 @@ class AdController extends ChangeNotifier {
   bool get debugEngineCallbackFired => _engineCallbackFired;
   bool get debugImplicitEngineCallbackFired => _implicitEngineCallbackFired;
   String get debugAttStatus => _attStatus ?? 'unknown';
+  String get debugRawNetResult => rawNetResult ?? 'not run';
 
   void markFactoryRegistered(bool value) {
     _factoryRegistered = value;
@@ -64,6 +67,21 @@ class AdController extends ChangeNotifier {
     String? factoryId,
     Map<String, Object>? customOptions,
   }) async {
+    // 진단용 임시 코드
+    try {
+      final sw = Stopwatch()..start();
+      final res = await http
+          .get(Uri.parse('https://googleads.g.doubleclick.net/'))
+          .timeout(const Duration(seconds: 10));
+      sw.stop();
+      debugPrint('Raw network test: status=${res.statusCode} time=${sw.elapsedMilliseconds}ms');
+      rawNetResult = 'RawNet: ${res.statusCode} in ${sw.elapsedMilliseconds}ms';
+    } catch (e) {
+      debugPrint('Raw network test FAILED: $e');
+      rawNetResult = 'RawNet FAILED: $e';
+    }
+    // 여기까지
+
     _attemptIndex += 1;
     _activeLoadCount += 1;
     _engineCallbackFired = false;
