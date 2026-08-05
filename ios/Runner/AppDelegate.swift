@@ -20,6 +20,8 @@ import google_mobile_ads
 
     let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
+    MobileAds.shared.start()
+
     if let registrar = self.registrar(forPlugin: "MessengerAppPlugin") {
       let messenger = registrar.messenger()
       
