@@ -1,7 +1,7 @@
 import Flutter
 import UIKit
 import GoogleMaps
-import google_mobile_ads
+import GoogleMobileAds
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -20,7 +20,7 @@ import google_mobile_ads
 
     let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
-    MobileAds.shared.start()
+    GADMobileAds.sharedInstance().start(completionHandler: nil)
 
     if let registrar = self.registrar(forPlugin: "MessengerAppPlugin") {
       let messenger = registrar.messenger()
