@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import google_mobile_ads
 import GoogleMobileAds
 
 class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {

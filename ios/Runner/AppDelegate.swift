@@ -1,6 +1,7 @@
 import Flutter
 import UIKit
 import GoogleMaps
+import google_mobile_ads
 import GoogleMobileAds
 
 @main
