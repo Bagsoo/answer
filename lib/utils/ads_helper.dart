@@ -37,6 +37,16 @@ Future<void> initializeAds() async {
     consentDebugSettings: debugSettings,
   );
 
+  // 10초 타임아웃 타이머 설정하여 콜백이 불리지 않는 경우에 대비
+  final timeoutTimer = Timer(const Duration(seconds: 10), () async {
+    if (!completer.isCompleted) {
+      debugPrint('ConsentInfo update timed out, falling back to initializing MobileAds');
+      adsInitErrorLog = 'ConsentInfo update timed out';
+      await _initializeMobileAdsAndLog();
+      completer.complete();
+    }
+  });
+
   ConsentInformation.instance.requestConsentInfoUpdate(
     params,
     () async {
@@ -44,20 +54,22 @@ Future<void> initializeAds() async {
 
       ConsentForm.loadAndShowConsentFormIfRequired(
         (FormError? formError) async {
+          timeoutTimer.cancel();
           if (formError != null) {
             debugPrint('ConsentForm error: ${formError.message}');
             adsInitErrorLog = 'ConsentForm error: ${formError.message}';
           }
           await _initializeMobileAdsAndLog();
-          completer.complete();
+          if (!completer.isCompleted) completer.complete();
         },
       );
     },
     (FormError error) async {
+      timeoutTimer.cancel();
       debugPrint('requestConsentInfoUpdate error: ${error.message} (${error.errorCode})');
       adsInitErrorLog = 'ConsentUpdate error: ${error.message} (code:${error.errorCode})';
       await _initializeMobileAdsAndLog();
-      completer.complete();
+      if (!completer.isCompleted) completer.complete();
     },
   );
 
