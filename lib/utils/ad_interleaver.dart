@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../widgets/ad/native_ad_tile.dart';
 
 // ── 광고 삽입 상수 ──────────────────────────────────────────────────────────
-const int _kMinItemsBeforeFirstAd = 3; // 첫 광고 전 최소 아이템 수
+const int _kMinItemsBeforeFirstAd = kDebugMode ? 1 : 3; // 첫 광고 전 최소 아이템 수 (디버그 시 1개로 완화)
 const int _kMinItemsBetweenAds    = 5; // 광고 간 최소 간격
 const int _kMaxAdsPerList         = 2; // 전체 최대 광고 수
 
