@@ -99,12 +99,15 @@ class AdController extends ChangeNotifier {
 
     final completer = Completer<bool>();
 
+    // 기존 광고가 있으면 먼저 해제
+    nativeAd?.dispose();
+    
     final ad = NativeAd(
       adUnitId: _adUnitId,
       request: const AdRequest(),
-      nativeTemplateStyle: templateStyle,
       factoryId: factoryId,
       customOptions: customOptions,
+      nativeTemplateStyle: factoryId != null ? null : templateStyle,
       listener: NativeAdListener(
         onAdLoaded: (_) {
           _engineCallbackFired = true;
@@ -120,7 +123,11 @@ class AdController extends ChangeNotifier {
           if (!completer.isCompleted) completer.complete(false);
         },
       ),
-    )..load();
+    );
+
+    // GC 방지를 위해 인스턴스 변수에 즉시 보관 (강한 참조 유지)
+    nativeAd = ad;
+    ad.load();
 
     final success = await completer.future
         .timeout(_kTimeout, onTimeout: () {
@@ -135,9 +142,9 @@ class AdController extends ChangeNotifier {
 
     if (!_disposed) {
       if (success) {
-        nativeAd = ad;
         _state = AdState.loaded;
       } else {
+        nativeAd = null;
         _state = AdState.failed;
         if (adsInitErrorLog != null) {
           lastError = (lastError == null) 

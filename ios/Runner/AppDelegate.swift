@@ -177,6 +177,7 @@ class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
         ctaButton.setTitleColor(.black, for: .normal)
         ctaButton.titleLabel?.font = UIFont.systemFont(ofSize: 12)
         ctaButton.contentEdgeInsets = UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
+        ctaButton.isUserInteractionEnabled = false
         container.addSubview(ctaButton)
         NSLayoutConstraint.activate([
             ctaButton.trailingAnchor.constraint(equalTo: container.trailingAnchor),
@@ -184,6 +185,17 @@ class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
             ctaButton.heightAnchor.constraint(equalToConstant: 32)
         ])
         adView.callToActionView = ctaButton
+
+        let adChoicesView = AdChoicesView()
+        adChoicesView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(adChoicesView)
+        NSLayoutConstraint.activate([
+            adChoicesView.topAnchor.constraint(equalTo: container.topAnchor),
+            adChoicesView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            adChoicesView.widthAnchor.constraint(equalToConstant: 20),
+            adChoicesView.heightAnchor.constraint(equalToConstant: 20)
+        ])
+        adView.adChoicesView = adChoicesView
         
         // V-Stack
         let vStack = UIStackView()
@@ -201,6 +213,7 @@ class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
         let headlineView = UILabel()
         headlineView.font = UIFont.boldSystemFont(ofSize: 16)
         headlineView.textColor = UIColor(red: 29/255.0, green: 27/255.0, blue: 32/255.0, alpha: 1.0)
+        headlineView.numberOfLines = 1
         vStack.addArrangedSubview(headlineView)
         adView.headlineView = headlineView
         
@@ -218,6 +231,7 @@ class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
         badgeView.textColor = UIColor(red: 29/255.0, green: 27/255.0, blue: 32/255.0, alpha: 1.0)
         let adLabel = customOptions?["adLabel"] as? String ?? "Ad"
         badgeView.text = " \(adLabel) "
+        badgeView.textAlignment = .center
         badgeView.layer.masksToBounds = true
         badgeView.layer.cornerRadius = 2
         hStack.addArrangedSubview(badgeView)
@@ -226,6 +240,7 @@ class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
         let bodyView = UILabel()
         bodyView.font = UIFont.systemFont(ofSize: 12)
         bodyView.textColor = UIColor(red: 29/255.0, green: 27/255.0, blue: 32/255.0, alpha: 0.6)
+        bodyView.numberOfLines = 1
         hStack.addArrangedSubview(bodyView)
         adView.bodyView = bodyView
         
