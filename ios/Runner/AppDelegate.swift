@@ -2,7 +2,6 @@ import Flutter
 import UIKit
 import GoogleMaps
 import google_mobile_ads
-import GoogleMobileAds
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -21,7 +20,7 @@ import GoogleMobileAds
 
     let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
-    GADMobileAds.sharedInstance().start(completionHandler: nil)
+    MobileAds.shared.start()
 
     if let registrar = self.registrar(forPlugin: "MessengerAppPlugin") {
       let messenger = registrar.messenger()
@@ -136,8 +135,8 @@ extension AppDelegate: FlutterStreamHandler {
 }
 
 class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
-    func createNativeAd(_ nativeAd: GADNativeAd, customOptions: [AnyHashable : Any]? = nil) -> GADNativeAdView? {
-        let adView = GADNativeAdView()
+    func createNativeAd(_ nativeAd: NativeAd, customOptions: [AnyHashable : Any]? = nil) -> NativeAdView? {
+        let adView = NativeAdView()
         
         // [Fix] Ensure the view has a proper size
         adView.translatesAutoresizingMaskIntoConstraints = false
