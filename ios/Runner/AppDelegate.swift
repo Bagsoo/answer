@@ -7,8 +7,6 @@ import google_mobile_ads
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var eventSink: FlutterEventSink?
   private let suiteName = "group.com.answer.app"
-  private var adDebugChannel: FlutterMethodChannel?
-  private var adFactoryRegistrationAttempted = false  // 중복 등록 방지 플래그
 
   override func application(
     _ application: UIApplication,
@@ -20,42 +18,24 @@ import google_mobile_ads
 
     let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
-    MobileAds.shared.start()
-
     if let registrar = self.registrar(forPlugin: "MessengerAppPlugin") {
       let messenger = registrar.messenger()
-      
-      let shareChannel = FlutterMethodChannel(name: "com.answer.messenger/share",
-                                               binaryMessenger: messenger)
-      let eventChannel = FlutterEventChannel(name: "com.answer.messenger/share_events",
-                                              binaryMessenger: messenger)
-      adDebugChannel = FlutterMethodChannel(name: "com.answer.messenger/debug",
-                                             binaryMessenger: messenger)
-      adDebugChannel?.setMethodCallHandler({ [weak self] (call, result) in
-        switch call.method {
-        case "getNativeAdDebugInfo":
-          let payload: [String: Any] = [
-            "registered": UserDefaults.standard.bool(forKey: "native_ad_factory_registered"),
-            "engineCallbackFired": UserDefaults.standard.bool(forKey: "implicit_engine_callback_fired"),
-            "attStatus": UserDefaults.standard.string(forKey: "ad_att_status") ?? "unknown",
-          ]
-          result(payload)
-        case "setAttStatus":
-          if let args = call.arguments as? [String: Any], let status = args["attStatus"] as? String {
-            UserDefaults.standard.set(status, forKey: "ad_att_status")
-          }
-          result(nil)
-        default:
-          result(FlutterMethodNotImplemented)
-        }
-      })
+
+      let shareChannel = FlutterMethodChannel(
+        name: "com.answer.messenger/share",
+        binaryMessenger: messenger
+      )
+      let eventChannel = FlutterEventChannel(
+        name: "com.answer.messenger/share_events",
+        binaryMessenger: messenger
+      )
 
       shareChannel.setMethodCallHandler({ [weak self]
         (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
         guard let self = self else { return }
-        if (call.method == "getInitialSharedPayload") {
+        if call.method == "getInitialSharedPayload" {
           result(self.getSharedPayload())
-        } else if (call.method == "clearSharedPayload") {
+        } else if call.method == "clearSharedPayload" {
           self.clearSharedPayload()
           result(nil)
         } else {
@@ -66,194 +46,177 @@ import google_mobile_ads
       eventChannel.setStreamHandler(self)
     }
 
-    // 폴백: didInitializeImplicitFlutterEngine이 안 불렸을 경우를 대비
-    registerNativeAdFactoryIfNeeded(self)
-
     return result
   }
 
-
-  override func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
+  override func application(
+    _ app: UIApplication,
+    open url: URL,
+    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+  ) -> Bool {
     if url.scheme == "messenger-share" {
-        if let payload = getSharedPayload() {
-            eventSink?(payload)
-        }
-        return true
+      if let payload = getSharedPayload() {
+        eventSink?(payload)
+      }
+      return true
     }
     return super.application(app, open: url, options: options)
   }
 
   private func getSharedPayload() -> [String: Any]? {
     if let userDefaults = UserDefaults(suiteName: suiteName) {
-        return userDefaults.dictionary(forKey: "incoming_share_payload")
+      return userDefaults.dictionary(forKey: "incoming_share_payload")
     }
     return nil
   }
 
   private func clearSharedPayload() {
     if let userDefaults = UserDefaults(suiteName: suiteName) {
-        userDefaults.removeObject(forKey: "incoming_share_payload")
-        userDefaults.synchronize()
+      userDefaults.removeObject(forKey: "incoming_share_payload")
+      userDefaults.synchronize()
     }
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    registerNativeAdFactoryIfNeeded(engineBridge.pluginRegistry)
-  }
-
-  private func registerNativeAdFactoryIfNeeded(_ registry: FlutterPluginRegistry) {
-    guard !adFactoryRegistrationAttempted else { return }
 
     let factory = ListTileNativeAdFactory()
-    let registered = FLTGoogleMobileAdsPlugin.registerNativeAdFactory(
-      registry,
+    FLTGoogleMobileAdsPlugin.registerNativeAdFactory(
+      engineBridge.pluginRegistry,
       factoryId: "listTile",
       nativeAdFactory: factory
     )
-    if registered {
-      adFactoryRegistrationAttempted = true  // 성공했을 때만 잠금
-    }
-    UserDefaults.standard.set(registered, forKey: "native_ad_factory_registered")
-    UserDefaults.standard.set(true, forKey: "implicit_engine_callback_fired")
-    UserDefaults.standard.synchronize()
-
-    NSLog("AdMob: registerNativeAdFactory = \(registered)")
   }
 }
 
 extension AppDelegate: FlutterStreamHandler {
-    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
-        self.eventSink = events
-        return nil
-    }
-    
-    func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        self.eventSink = nil
-        return nil
-    }
+  func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+    self.eventSink = events
+    return nil
+  }
+
+  func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    self.eventSink = nil
+    return nil
+  }
 }
 
 class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
-    func createNativeAd(_ nativeAd: NativeAd, customOptions: [AnyHashable : Any]? = nil) -> NativeAdView? {
-        let adView = NativeAdView()
-        
-        // [Fix] Ensure the view has a proper size
-        adView.translatesAutoresizingMaskIntoConstraints = false
-        adView.heightAnchor.constraint(equalToConstant: 72).isActive = true
-        
-        // Container
-        let container = UIView()
-        container.translatesAutoresizingMaskIntoConstraints = false
-        adView.addSubview(container)
-        NSLayoutConstraint.activate([
-            container.topAnchor.constraint(equalTo: adView.topAnchor, constant: 12),
-            container.bottomAnchor.constraint(equalTo: adView.bottomAnchor, constant: -12),
-            container.leadingAnchor.constraint(equalTo: adView.leadingAnchor, constant: 16),
-            container.trailingAnchor.constraint(equalTo: adView.trailingAnchor, constant: -16)
-        ])
-        
-        // Icon
-        let iconView = UIImageView()
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.layer.cornerRadius = 24
-        iconView.clipsToBounds = true
-        iconView.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
-        iconView.contentMode = .scaleAspectFill
-        container.addSubview(iconView)
-        NSLayoutConstraint.activate([
-            iconView.widthAnchor.constraint(equalToConstant: 48),
-            iconView.heightAnchor.constraint(equalToConstant: 48),
-            iconView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            iconView.centerYAnchor.constraint(equalTo: container.centerYAnchor)
-        ])
-        adView.iconView = iconView
-        
-        // CTA Button
-        let ctaButton = UIButton(type: .system)
-        ctaButton.translatesAutoresizingMaskIntoConstraints = false
-        ctaButton.backgroundColor = UIColor(red: 255/255.0, green: 219/255.0, blue: 178/255.0, alpha: 1.0)
-        ctaButton.setTitleColor(.black, for: .normal)
-        ctaButton.titleLabel?.font = UIFont.systemFont(ofSize: 12)
-        ctaButton.contentEdgeInsets = UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
-        ctaButton.isUserInteractionEnabled = false
-        container.addSubview(ctaButton)
-        NSLayoutConstraint.activate([
-            ctaButton.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            ctaButton.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            ctaButton.heightAnchor.constraint(equalToConstant: 32)
-        ])
-        adView.callToActionView = ctaButton
+  func createNativeAd(_ nativeAd: NativeAd, customOptions: [AnyHashable : Any]? = nil) -> NativeAdView? {
+    let adView = NativeAdView()
 
-        let adChoicesView = AdChoicesView()
-        adChoicesView.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(adChoicesView)
-        NSLayoutConstraint.activate([
-            adChoicesView.topAnchor.constraint(equalTo: container.topAnchor),
-            adChoicesView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            adChoicesView.widthAnchor.constraint(equalToConstant: 20),
-            adChoicesView.heightAnchor.constraint(equalToConstant: 20)
-        ])
-        adView.adChoicesView = adChoicesView
-        
-        // V-Stack
-        let vStack = UIStackView()
-        vStack.axis = .vertical
-        vStack.translatesAutoresizingMaskIntoConstraints = false
-        vStack.spacing = 2
-        container.addSubview(vStack)
-        NSLayoutConstraint.activate([
-            vStack.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 16),
-            vStack.trailingAnchor.constraint(equalTo: ctaButton.leadingAnchor, constant: -16),
-            vStack.centerYAnchor.constraint(equalTo: container.centerYAnchor)
-        ])
-        
-        // Headline
-        let headlineView = UILabel()
-        headlineView.font = UIFont.boldSystemFont(ofSize: 16)
-        headlineView.textColor = UIColor(red: 29/255.0, green: 27/255.0, blue: 32/255.0, alpha: 1.0)
-        headlineView.numberOfLines = 1
-        vStack.addArrangedSubview(headlineView)
-        adView.headlineView = headlineView
-        
-        // H-Stack for Badge and Body
-        let hStack = UIStackView()
-        hStack.axis = .horizontal
-        hStack.spacing = 6
-        hStack.alignment = .center
-        vStack.addArrangedSubview(hStack)
-        
-        // Ad Badge
-        let badgeView = UILabel()
-        badgeView.font = UIFont.boldSystemFont(ofSize: 10)
-        badgeView.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
-        badgeView.textColor = UIColor(red: 29/255.0, green: 27/255.0, blue: 32/255.0, alpha: 1.0)
-        let adLabel = customOptions?["adLabel"] as? String ?? "Ad"
-        badgeView.text = " \(adLabel) "
-        badgeView.textAlignment = .center
-        badgeView.layer.masksToBounds = true
-        badgeView.layer.cornerRadius = 2
-        hStack.addArrangedSubview(badgeView)
-        
-        // Body
-        let bodyView = UILabel()
-        bodyView.font = UIFont.systemFont(ofSize: 12)
-        bodyView.textColor = UIColor(red: 29/255.0, green: 27/255.0, blue: 32/255.0, alpha: 0.6)
-        bodyView.numberOfLines = 1
-        hStack.addArrangedSubview(bodyView)
-        adView.bodyView = bodyView
-        
-        // Assign contents
-        (adView.headlineView as? UILabel)?.text = nativeAd.headline
-        (adView.bodyView as? UILabel)?.text = nativeAd.body
-        (adView.callToActionView as? UIButton)?.setTitle(nativeAd.callToAction, for: .normal)
-        (adView.iconView as? UIImageView)?.image = nativeAd.icon?.image
-        
-        adView.callToActionView?.isHidden = nativeAd.callToAction == nil
-        adView.iconView?.isHidden = nativeAd.icon == nil
-        adView.bodyView?.isHidden = nativeAd.body == nil
-        
-        adView.nativeAd = nativeAd
-        return adView
-    }
+    adView.translatesAutoresizingMaskIntoConstraints = false
+    adView.heightAnchor.constraint(equalToConstant: 72).isActive = true
+
+    let container = UIView()
+    container.translatesAutoresizingMaskIntoConstraints = false
+    adView.addSubview(container)
+    NSLayoutConstraint.activate([
+      container.topAnchor.constraint(equalTo: adView.topAnchor, constant: 12),
+      container.bottomAnchor.constraint(equalTo: adView.bottomAnchor, constant: -12),
+      container.leadingAnchor.constraint(equalTo: adView.leadingAnchor, constant: 16),
+      container.trailingAnchor.constraint(equalTo: adView.trailingAnchor, constant: -16)
+    ])
+
+    let iconView = UIImageView()
+    iconView.translatesAutoresizingMaskIntoConstraints = false
+    iconView.layer.cornerRadius = 22
+    iconView.clipsToBounds = true
+    iconView.backgroundColor = UIColor(red: 243/255.0, green: 222/255.0, blue: 218/255.0, alpha: 1.0)
+    iconView.contentMode = .scaleAspectFill
+    container.addSubview(iconView)
+    NSLayoutConstraint.activate([
+      iconView.widthAnchor.constraint(equalToConstant: 44),
+      iconView.heightAnchor.constraint(equalToConstant: 44),
+      iconView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+      iconView.centerYAnchor.constraint(equalTo: container.centerYAnchor)
+    ])
+    adView.iconView = iconView
+
+    let ctaButton = UIButton(type: .system)
+    ctaButton.translatesAutoresizingMaskIntoConstraints = false
+    ctaButton.backgroundColor = UIColor(red: 243/255.0, green: 222/255.0, blue: 218/255.0, alpha: 1.0)
+    ctaButton.setTitleColor(UIColor(red: 58/255.0, green: 9/255.0, blue: 9/255.0, alpha: 1.0), for: .normal)
+    ctaButton.titleLabel?.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
+    ctaButton.contentEdgeInsets = UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
+    ctaButton.layer.cornerRadius = 15
+    ctaButton.layer.masksToBounds = true
+    ctaButton.isUserInteractionEnabled = false
+    container.addSubview(ctaButton)
+    NSLayoutConstraint.activate([
+      ctaButton.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+      ctaButton.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+      ctaButton.heightAnchor.constraint(equalToConstant: 30),
+      ctaButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 56)
+    ])
+    adView.callToActionView = ctaButton
+
+    let adChoicesView = AdChoicesView()
+    adChoicesView.translatesAutoresizingMaskIntoConstraints = false
+    container.addSubview(adChoicesView)
+    NSLayoutConstraint.activate([
+      adChoicesView.topAnchor.constraint(equalTo: container.topAnchor),
+      adChoicesView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+      adChoicesView.widthAnchor.constraint(equalToConstant: 20),
+      adChoicesView.heightAnchor.constraint(equalToConstant: 20)
+    ])
+    adView.adChoicesView = adChoicesView
+
+    let vStack = UIStackView()
+    vStack.axis = .vertical
+    vStack.translatesAutoresizingMaskIntoConstraints = false
+    vStack.spacing = 2
+    container.addSubview(vStack)
+    NSLayoutConstraint.activate([
+      vStack.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 12),
+      vStack.trailingAnchor.constraint(equalTo: ctaButton.leadingAnchor, constant: -12),
+      vStack.centerYAnchor.constraint(equalTo: container.centerYAnchor)
+    ])
+
+    let headlineView = UILabel()
+    headlineView.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+    headlineView.textColor = UIColor(red: 26/255.0, green: 10/255.0, blue: 10/255.0, alpha: 1.0)
+    headlineView.numberOfLines = 1
+    headlineView.lineBreakMode = .byTruncatingTail
+    headlineView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    vStack.addArrangedSubview(headlineView)
+    adView.headlineView = headlineView
+
+    let hStack = UIStackView()
+    hStack.axis = .horizontal
+    hStack.spacing = 6
+    hStack.alignment = .center
+    vStack.addArrangedSubview(hStack)
+
+    let badgeView = UILabel()
+    badgeView.font = UIFont.boldSystemFont(ofSize: 10)
+    badgeView.backgroundColor = UIColor(red: 240/255.0, green: 222/255.0, blue: 218/255.0, alpha: 1.0)
+    badgeView.textColor = UIColor(red: 58/255.0, green: 9/255.0, blue: 9/255.0, alpha: 1.0)
+    let adLabel = customOptions?["adLabel"] as? String ?? "Ad"
+    badgeView.text = " \(adLabel) "
+    badgeView.layer.masksToBounds = true
+    badgeView.layer.cornerRadius = 8
+    hStack.addArrangedSubview(badgeView)
+
+    let bodyView = UILabel()
+    bodyView.font = UIFont.systemFont(ofSize: 12)
+    bodyView.textColor = UIColor(red: 92/255.0, green: 64/255.0, blue: 64/255.0, alpha: 0.78)
+    bodyView.numberOfLines = 1
+    bodyView.lineBreakMode = .byTruncatingTail
+    bodyView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    hStack.addArrangedSubview(bodyView)
+    adView.bodyView = bodyView
+
+    (adView.headlineView as? UILabel)?.text = nativeAd.headline
+    (adView.bodyView as? UILabel)?.text = nativeAd.body
+    (adView.callToActionView as? UIButton)?.setTitle(nativeAd.callToAction, for: .normal)
+    (adView.iconView as? UIImageView)?.image = nativeAd.icon?.image
+
+    adView.callToActionView?.isHidden = nativeAd.callToAction == nil
+    adView.iconView?.isHidden = nativeAd.icon == nil
+    adView.bodyView?.isHidden = nativeAd.body == nil
+
+    adView.nativeAd = nativeAd
+    return adView
+  }
 }
