@@ -1765,7 +1765,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with WidgetsBindingObse
     final cur = messages[index].data() as Map<String, dynamic>;
     final prev = messages[index + 1].data() as Map<String, dynamic>;
     if (cur['is_system'] == true || prev['is_system'] == true) return false;
-    return cur['sender_id'] == prev['sender_id'];
+    if (cur['sender_id'] != prev['sender_id']) return false;
+
+    final curTs = cur['created_at'] as Timestamp?;
+    final prevTs = prev['created_at'] as Timestamp?;
+    if (curTs == null || prevTs == null) return false;
+
+    final curDate = curTs.toDate();
+    final prevDate = prevTs.toDate();
+    final sameDay = curDate.year == prevDate.year &&
+        curDate.month == prevDate.month &&
+        curDate.day == prevDate.day;
+
+    return sameDay;
   }
 
   // ──────────────────────────────────────────────────────────────────────────
