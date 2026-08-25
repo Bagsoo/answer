@@ -159,38 +159,86 @@ class GroupService {
   Stream<List<Map<String, dynamic>>> searchGroups(String query, {GeoPoint? userLocation}) {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return Stream.value([]);
-    final expandedTerms = SearchDictionary.expandQuery(trimmed);
+    final normalized = trimmed.toLowerCase();
+    final expandedTerms = SearchDictionary.expandQuery(trimmed)
+        .map((term) => term.trim().toLowerCase())
+        .where((term) => term.isNotEmpty)
+        .toSet()
+      ..add(normalized);
 
-    return _db
-        .collection('groups')
-        .where('search_tokens', arrayContainsAny: expandedTerms)
-        .limit(40)
-        .snapshots()
-        .map((snapshot) {
+    return _db.collection('groups').snapshots().map((snapshot) {
       final results = snapshot.docs
           .map((doc) {
             final data = doc.data();
             if ((data['status'] as String? ?? 'active') == 'deleted') return null;
             data['id'] = doc.id;
+
+            final haystack = _buildSearchHaystack(data);
+            if (!_matchesSearch(haystack, normalized, expandedTerms)) return null;
+
             double rankingScore = 0;
             final groupLoc = data['location'] as GeoPoint?;
             final groupName = (data['name'] as String? ?? '').toLowerCase();
-            if (groupName.contains(trimmed.toLowerCase())) rankingScore += 100;
+            final tokens = List<String>.from(data['search_tokens'] as List? ?? [])
+                .map((e) => e.toString().toLowerCase())
+                .toList();
+
+            if (groupName == normalized) rankingScore += 140;
+            if (groupName.startsWith(normalized)) rankingScore += 120;
+            if (groupName.contains(normalized)) rankingScore += 90;
+            if (tokens.any((token) => token == normalized)) rankingScore += 60;
+            if (tokens.any((token) => token.startsWith(normalized))) rankingScore += 40;
+
             if (userLocation != null && groupLoc != null) {
-              final dist = _calculateDistance(userLocation.latitude, userLocation.longitude, groupLoc.latitude, groupLoc.longitude);
+              final dist = _calculateDistance(
+                userLocation.latitude,
+                userLocation.longitude,
+                groupLoc.latitude,
+                groupLoc.longitude,
+              );
               data['distance_km'] = dist.toStringAsFixed(1);
               if (dist <= 5) rankingScore += 50;
               else if (dist <= 15) rankingScore += 30;
               else if (dist <= 30) rankingScore += 10;
             }
+
             data['_ranking_score'] = rankingScore;
             return data;
           })
           .whereType<Map<String, dynamic>>()
           .toList();
-      results.sort((a, b) => (b['_ranking_score'] as double).compareTo(a['_ranking_score'] as double));
-      return results;
+
+      results.sort((a, b) => (b['_ranking_score'] as num).compareTo(a['_ranking_score'] as num));
+      return results.take(40).toList();
     });
+  }
+
+  String _buildSearchHaystack(Map<String, dynamic> data) {
+    final parts = <String>[
+      data['name'] as String? ?? '',
+      data['type'] as String? ?? '',
+      data['category'] as String? ?? '',
+      data['location_name'] as String? ?? '',
+      ...List<String>.from(data['tags'] as List? ?? const []),
+      ...List<String>.from(data['searchable_keywords'] as List? ?? const []),
+      ...List<String>.from(data['search_tokens'] as List? ?? const []),
+    ];
+
+    return parts
+        .map((part) => part.toLowerCase())
+        .join(' ');
+  }
+
+  bool _matchesSearch(
+    String haystack,
+    String normalizedQuery,
+    Set<String> expandedTerms,
+  ) {
+    if (haystack.contains(normalizedQuery)) return true;
+    for (final term in expandedTerms) {
+      if (haystack.contains(term)) return true;
+    }
+    return false;
   }
 
   double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {

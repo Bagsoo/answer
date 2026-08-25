@@ -106,28 +106,28 @@ class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
     let adView = NativeAdView()
 
     adView.translatesAutoresizingMaskIntoConstraints = false
-    adView.heightAnchor.constraint(equalToConstant: 144).isActive = true
+    adView.heightAnchor.constraint(equalToConstant: 120).isActive = true
 
     let container = UIView()
     container.translatesAutoresizingMaskIntoConstraints = false
     adView.addSubview(container)
     NSLayoutConstraint.activate([
-      container.topAnchor.constraint(equalTo: adView.topAnchor, constant: 12),
-      container.bottomAnchor.constraint(equalTo: adView.bottomAnchor, constant: -12),
-      container.leadingAnchor.constraint(equalTo: adView.leadingAnchor, constant: 16),
-      container.trailingAnchor.constraint(equalTo: adView.trailingAnchor, constant: -16)
+      container.topAnchor.constraint(equalTo: adView.topAnchor, constant: 0),
+      container.bottomAnchor.constraint(equalTo: adView.bottomAnchor, constant: 0),
+      container.leadingAnchor.constraint(equalTo: adView.leadingAnchor, constant: 12),
+      container.trailingAnchor.constraint(equalTo: adView.trailingAnchor, constant: -12)
     ])
 
     let iconView = UIImageView()
     iconView.translatesAutoresizingMaskIntoConstraints = false
-    iconView.layer.cornerRadius = 22
+    iconView.layer.cornerRadius = 20
     iconView.clipsToBounds = true
     iconView.backgroundColor = UIColor(red: 243/255.0, green: 222/255.0, blue: 218/255.0, alpha: 1.0)
     iconView.contentMode = .scaleAspectFill
     container.addSubview(iconView)
     NSLayoutConstraint.activate([
-      iconView.widthAnchor.constraint(equalToConstant: 44),
-      iconView.heightAnchor.constraint(equalToConstant: 44),
+      iconView.widthAnchor.constraint(equalToConstant: 40),
+      iconView.heightAnchor.constraint(equalToConstant: 40),
       iconView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
       iconView.centerYAnchor.constraint(equalTo: container.centerYAnchor)
     ])
@@ -146,8 +146,8 @@ class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
     NSLayoutConstraint.activate([
       ctaButton.trailingAnchor.constraint(equalTo: container.trailingAnchor),
       ctaButton.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-      ctaButton.heightAnchor.constraint(equalToConstant: 30),
-      ctaButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 56)
+      ctaButton.heightAnchor.constraint(equalToConstant: 28),
+      ctaButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 52)
     ])
     adView.callToActionView = ctaButton
 
@@ -157,8 +157,8 @@ class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
     NSLayoutConstraint.activate([
       adChoicesView.topAnchor.constraint(equalTo: container.topAnchor),
       adChoicesView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-      adChoicesView.widthAnchor.constraint(equalToConstant: 20),
-      adChoicesView.heightAnchor.constraint(equalToConstant: 20)
+      adChoicesView.widthAnchor.constraint(equalToConstant: 16),
+      adChoicesView.heightAnchor.constraint(equalToConstant: 16)
     ])
     adView.adChoicesView = adChoicesView
 
@@ -181,16 +181,16 @@ class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
     let vStack = UIStackView()
     vStack.axis = .vertical
     vStack.translatesAutoresizingMaskIntoConstraints = false
-    vStack.spacing = 2
+    vStack.spacing = 1
     container.addSubview(vStack)
     NSLayoutConstraint.activate([
-      vStack.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 12),
-      vStack.trailingAnchor.constraint(equalTo: ctaButton.leadingAnchor, constant: -12),
+      vStack.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 10),
+      vStack.trailingAnchor.constraint(equalTo: ctaButton.leadingAnchor, constant: -10),
       vStack.centerYAnchor.constraint(equalTo: container.centerYAnchor)
     ])
 
     let headlineView = UILabel()
-    headlineView.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+    headlineView.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
     headlineView.textColor = UIColor(red: 26/255.0, green: 10/255.0, blue: 10/255.0, alpha: 1.0)
     headlineView.numberOfLines = 1
     headlineView.lineBreakMode = .byTruncatingTail
@@ -200,7 +200,7 @@ class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
 
     let hStack = UIStackView()
     hStack.axis = .horizontal
-    hStack.spacing = 6
+    hStack.spacing = 4
     hStack.alignment = .center
     vStack.addArrangedSubview(hStack)
 
@@ -215,7 +215,7 @@ class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
     hStack.addArrangedSubview(badgeView)
 
     let bodyView = UILabel()
-    bodyView.font = UIFont.systemFont(ofSize: 12)
+    bodyView.font = UIFont.systemFont(ofSize: 11)
     bodyView.textColor = UIColor(red: 92/255.0, green: 64/255.0, blue: 64/255.0, alpha: 0.78)
     bodyView.numberOfLines = 1
     bodyView.lineBreakMode = .byTruncatingTail

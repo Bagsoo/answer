@@ -1,7 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/rendering.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/user_provider.dart';
@@ -9,14 +7,10 @@ import '../services/group_service.dart';
 import '../services/local_preferences_service.dart';
 import '../services/recommendation_service.dart';
 import '../widgets/groups/group_tile.dart';
-import '../screens/group_tabs/group_type_category_data.dart';
 import 'profile_screen.dart';
 import 'create_group_screen.dart';
 import 'group_detail_screen.dart';
 import 'group_preview_screen.dart';
-import 'group_qr_join_preview_screen.dart';
-import 'group_tabs/group_qr_scanner_screen.dart';
-import 'dart:convert';
 import '../utils/ad_interleaver.dart';
 import '../services/group_cache_service.dart';
 import '../models/group_cache.dart';
@@ -45,14 +39,9 @@ class _GroupListScreenState extends State<GroupListScreen>
   bool _fabVisible = true;
 
   late TabController _tabController;
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
 
   List<Map<String, dynamic>> _joinedGroups = [];
   bool _joinedLoading = true;
-
-  List<Map<String, dynamic>> _searchResults = [];
-  bool _searchLoading = false;
 
   List<Map<String, dynamic>> _recommendedGroups = [];
   bool _recommendLoading = false;
@@ -65,15 +54,16 @@ class _GroupListScreenState extends State<GroupListScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) return;
       LocalPreferencesService.setInt(_tabKey, _tabController.index);
-      if (_tabController.index == 1 && !_recommendLoaded) {
+      if (_tabController.index == 0 && !_recommendLoaded) {
         _loadRecommendations();
       }
     });
     _restoreSelectedTab();
+    _loadRecommendations();
     _loadCachedGroups();
     context.read<GroupService>().getMyJoinedGroups().listen((list) {
       if (mounted) {
@@ -152,73 +142,20 @@ class _GroupListScreenState extends State<GroupListScreen>
     _myGroupsScrollController.removeListener(_onScroll);
     _myGroupsScrollController.dispose();
     _tabController.dispose();
-    _searchController.dispose();
     super.dispose();
-  }
-
-  void _onSearchChanged(String val) {
-    final query = val.trim();
-    setState(() {
-      _searchQuery = query;
-      _searchResults = [];
-      if (query.isNotEmpty) _searchLoading = true;
-    });
-
-    if (query.isEmpty) {
-      setState(() => _searchLoading = false);
-      return;
-    }
-
-    // ── Analytics 로그 (검색) ──
-    context.read<AnalyticsService>().logSearchGroup(query);
-
-    context.read<GroupService>().searchGroups(query).listen((list) {
-      if (mounted) {
-        setState(() {
-          _searchResults =
-              list.map((g) => {'id': g['id'] ?? '', ...g}).toList();
-          _searchLoading = false;
-        });
-      }
-    });
   }
 
   Future<void> _restoreSelectedTab() async {
     final savedIndex = await LocalPreferencesService.getInt(_tabKey);
-    if (!mounted || savedIndex == null || savedIndex < 0 || savedIndex > 2) {
+    if (!mounted || savedIndex == null || savedIndex < 0 || savedIndex > 1) {
       return;
     }
     _tabController.animateTo(savedIndex);
   }
 
-  Future<void> _openQrJoinFlow() async {
-    final code = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const GroupQrScannerScreen()),
-    );
-
-    if (!mounted || code == null || code.trim().isEmpty) {
-      return;
-    }
-
-    final joined = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => GroupQrJoinPreviewScreen(rawValue: code),
-      ),
-    );
-
-    if (!mounted || joined != true) return;
-
-    setState(() {
-      _searchQuery = '';
-      _searchController.clear();
-      _searchResults = [];
-    });
-    _tabController.animateTo(0);
-  }
-
   void _handleGroupTap(Map<String, dynamic> group, bool isAlreadyJoined) {
     // ── Analytics 로그 (추천 클릭 시) ──
-    if (_tabController.index == 1) {
+    if (_tabController.index == 0) {
       context.read<AnalyticsService>().logClickRecommendation(
         groupId: group['id'] as String? ?? '',
         groupName: group['name'] as String? ?? '',
@@ -273,18 +210,16 @@ class _GroupListScreenState extends State<GroupListScreen>
           TabBar(
             controller: _tabController,
             tabs: [
-              Tab(icon: const Icon(Icons.group), text: l.myGroups),
               Tab(icon: const Icon(Icons.recommend_outlined), text: l.recommended),
-              Tab(icon: const Icon(Icons.search), text: l.findGroups),
+              Tab(icon: const Icon(Icons.group), text: l.myGroups),
             ],
           ),
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildMyGroupsTab(l, cs),
                 _buildRecommendTab(joinedIds, l, cs, userProvider),
-                _buildDiscoverTab(joinedIds, l, cs),
+                _buildMyGroupsTab(l, cs),
               ],
             ),
           ),
@@ -410,79 +345,6 @@ class _GroupListScreenState extends State<GroupListScreen>
       ),
     );
   }
-
-  Widget _buildDiscoverTab(
-      Set<String> joinedIds, AppLocalizations l, ColorScheme cs) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: l.searchGroupsHint,
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.qr_code_scanner),
-                    onPressed: _openQrJoinFlow,
-                  ),
-                  if (_searchQuery.isNotEmpty)
-                    IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        _onSearchChanged('');
-                      },
-                    ),
-                ],
-              ),
-            ),
-            onChanged: _onSearchChanged,
-          ),
-        ),
-        Expanded(
-          child: _searchQuery.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.travel_explore,
-                          size: 64,
-                          color: cs.onSurface.withOpacity(0.2)),
-                      const SizedBox(height: 16),
-                      Text(l.searchGroupsHint,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              color: cs.onSurface.withOpacity(0.4))),
-                    ],
-                  ),
-                )
-              : _searchLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _searchResults.isEmpty
-                      ? Center(child: Text(l.noGroupsFound))
-                      : ListView.separated(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          itemCount: _searchResults.length,
-                          itemBuilder: (context, i) {
-                            final group = _searchResults[i];
-                            final isJoined = joinedIds.contains(group['id'] as String? ?? '');
-                            return ExploreGroupTile(
-                              group: group,
-                              isAlreadyJoined: isJoined,
-                              onTap: () => _handleGroupTap(group, isJoined),
-                            );
-                          },
-                          separatorBuilder: (_, __) =>
-                              const Divider(height: 1),
-                        ),
-        ),
-      ],
-    );
-  }
 }
 
 class _RecommendSetupBanner extends StatelessWidget {
@@ -515,6 +377,7 @@ class _RecommendSetupBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(l.betterRecommendations,
@@ -527,12 +390,18 @@ class _RecommendSetupBanner extends StatelessWidget {
                   Text('• ${l.setActivityLocation}',
                       style: TextStyle(
                           fontSize: 12,
-                          color: cs.onSurface.withOpacity(0.7))),
+                          color: cs.onSurface.withOpacity(0.7)),
+                      softWrap: true,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
                 if (!hasInterests)
                   Text('• ${l.setInterests}',
                       style: TextStyle(
                           fontSize: 12,
-                          color: cs.onSurface.withOpacity(0.7))),
+                          color: cs.onSurface.withOpacity(0.7)),
+                      softWrap: true,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 6),
                 GestureDetector(
                   onTap: () {
@@ -546,7 +415,10 @@ class _RecommendSetupBanner extends StatelessWidget {
                           fontSize: 12,
                           color: cs.primary,
                           fontWeight: FontWeight.w600,
-                          decoration: TextDecoration.underline)),
+                          decoration: TextDecoration.underline),
+                      softWrap: true,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
                 ),
               ],
             ),

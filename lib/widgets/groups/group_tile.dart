@@ -134,33 +134,52 @@ class ExploreGroupTile extends StatelessWidget {
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 2,
                 children: [
-                  Text('${l.type}: $typeLabel  •  ${l.category}: $categoryLabel',
-                      style: TextStyle(
-                          fontSize: 12, color: colorScheme.onSurface.withOpacity(0.6))),
-                  if (distanceKm != null) ...[
-                    const SizedBox(width: 8),
-                    Icon(Icons.place_outlined,
-                        size: 12, color: colorScheme.primary.withOpacity(0.6)),
-                    const SizedBox(width: 3),
-                    Text('${distanceKm}km',
-                        style: TextStyle(
+                  Text(
+                    '${l.type}: $typeLabel  •  ${l.category}: $categoryLabel',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ),
+                  if (distanceKm != null)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.place_outlined,
+                            size: 12, color: colorScheme.primary.withOpacity(0.6)),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${distanceKm}km',
+                          style: TextStyle(
                             fontSize: 11,
-                            color: colorScheme.primary.withOpacity(0.7))),
-                  ],
+                            color: colorScheme.primary.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
               if (likesCount > 0)
-                Row(children: [
-                  Icon(Icons.favorite,
-                      size: 12, color: Colors.red.withOpacity(0.7)),
-                  const SizedBox(width: 3),
-                  Text('$likesCount',
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.favorite,
+                        size: 12, color: Colors.red.withOpacity(0.7)),
+                    const SizedBox(width: 3),
+                    Text(
+                      '$likesCount',
                       style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.red.withOpacity(0.7))),
-                ]),
+                        fontSize: 11,
+                        color: Colors.red.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
           trailing: isAlreadyJoined

@@ -51,7 +51,7 @@ class _NativeAdTileState extends State<NativeAdTileMobile> {
   Widget build(BuildContext context) {
     return switch (_ctrl.state) {
       AdState.loaded => SizedBox(
-          height: 144,
+          height: 120,
           width: double.infinity,
           child: AdWidget(ad: _ctrl.nativeAd!),
         ),
@@ -68,20 +68,20 @@ class _AdPlaceholder extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return SizedBox(
-      height: 144,
+      height: 120,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
         child: Row(
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: cs.primaryContainer,
                 shape: BoxShape.circle,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -91,16 +91,16 @@ class _AdPlaceholder extends StatelessWidget {
                     children: [
                       Container(
                         height: 12,
-                        width: 112,
+                        width: 104,
                         decoration: BoxDecoration(
                           color: cs.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(6),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Container(
-                        height: 16,
-                        width: 40,
+                        height: 14,
+                        width: 36,
                         decoration: BoxDecoration(
                           color: cs.secondaryContainer,
                           borderRadius: BorderRadius.circular(8),
@@ -111,7 +111,7 @@ class _AdPlaceholder extends StatelessWidget {
                   const SizedBox(height: 8),
                   Container(
                     height: 10,
-                    width: 176,
+                    width: 150,
                     decoration: BoxDecoration(
                       color: cs.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(6),
@@ -120,10 +120,10 @@ class _AdPlaceholder extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Container(
-              width: 56,
-              height: 30,
+              width: 52,
+              height: 28,
               decoration: BoxDecoration(
                 color: cs.secondaryContainer,
                 borderRadius: BorderRadius.circular(15),

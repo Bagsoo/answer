@@ -44,6 +44,7 @@ class SearchDictionary {
 
   /// 그룹 생성 시 모든 언어의 카테고리명을 토큰으로 저장
   /// 이 로직을 통해 일본어 유저가 'Sports'라고 검색해도 한국어 운동 그룹을 찾을 수 있음
+  /// 그리고 이름/지역/태그는 prefix 토큰도 저장해서 부분 검색이 가능하게 한다.
   static List<String> generateSearchTokens({
     required String name,
     required Map<String, String> localizedCategories, // {'ko': '운동', 'en': 'Sports', ...}
@@ -52,26 +53,50 @@ class SearchDictionary {
   }) {
     final tokens = <String>{};
 
-    // 1. 이름 (단어 단위 + 공백제거)
-    name.toLowerCase().split(RegExp(r'\s+')).forEach((p) { if (p.length >= 2) tokens.add(p); });
-    tokens.add(name.toLowerCase().replaceAll(' ', ''));
+    // 1. 이름 (단어 단위 + 공백제거 + prefix)
+    _addSearchTokens(tokens, name);
 
     // 2. 모든 언어의 카테고리명 추가 (가장 핵심적인 다국어 지원)
     localizedCategories.forEach((lang, value) {
-      final valLower = value.toLowerCase();
-      tokens.add(valLower);
+      _addSearchTokens(tokens, value);
       // 해당 언어의 유의어도 일부 추가
       if (_multiLangRelatedMap[lang]?.containsKey(value) ?? false) {
-        tokens.addAll(_multiLangRelatedMap[lang]![value]!.map((e) => e.toLowerCase()));
+        for (final related in _multiLangRelatedMap[lang]![value]!) {
+          _addSearchTokens(tokens, related);
+        }
       }
     });
 
     // 3. 태그 및 지역
-    for (var t in tags) { tokens.add(t.toLowerCase()); }
+    for (var t in tags) { _addSearchTokens(tokens, t); }
     if (locationName != null) {
-      locationName.toLowerCase().split(RegExp(r'[,\s]+')).forEach((p) { if (p.length >= 2) tokens.add(p); });
+      _addSearchTokens(tokens, locationName);
     }
 
     return tokens.toList().take(50).toList();
+  }
+
+  static void _addSearchTokens(Set<String> tokens, String value) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized.isEmpty) return;
+
+    final compact = normalized.replaceAll(RegExp(r'\s+'), '');
+    if (compact.length >= 2) {
+      tokens.add(compact);
+      _addPrefixes(tokens, compact);
+    }
+
+    for (final part in normalized.split(RegExp(r'[,\s]+'))) {
+      if (part.length < 2) continue;
+      tokens.add(part);
+      _addPrefixes(tokens, part);
+    }
+  }
+
+  static void _addPrefixes(Set<String> tokens, String value) {
+    final maxLen = value.length < 12 ? value.length : 12;
+    for (var i = 2; i <= maxLen; i++) {
+      tokens.add(value.substring(0, i));
+    }
   }
 }

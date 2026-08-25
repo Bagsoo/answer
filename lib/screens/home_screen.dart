@@ -27,6 +27,7 @@ import 'memo_screen.dart';
 import 'my_schedules_screen.dart';
 import 'profile_screen.dart';
 import 'incoming_share_screen.dart';
+import 'group_search_screen.dart';
 import '../widgets/memo/memo_detail_sheet.dart';
 import '../widgets/memo/memo_form_sheet.dart';
 
@@ -700,24 +701,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ),
       ),
-      title: _isSearching
-        ? TextField(
-            controller: _searchController,
-            autofocus: true,
-            onChanged: (v) => setState(() => _searchQuery = v.trim()),
-            decoration: InputDecoration(
-              // hintText: l.searchPlaceholder,
-              hintText: switch (_currentIndex) {
-                0 => l.searchPlaceholder,
-                1 => l.searchChatPlaceholder,
-                2 => l.searchMemoPlaceholder,
-                4 => l.searchGroupsHint,
-                _ => l.searchPlaceholder,
-              },
-              border: InputBorder.none,
-            ),
-          )
-        : Text(_getAppBarTitle(l, _currentIndex)),
+      title: _currentIndex == 4
+          ? _GroupSearchBarButton(
+              label: l.searchGroupsHint,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const GroupSearchScreen()),
+              ),
+            )
+          : _isSearching
+              ? TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  onChanged: (v) => setState(() => _searchQuery = v.trim()),
+                  decoration: InputDecoration(
+                    // hintText: l.searchPlaceholder,
+                    hintText: switch (_currentIndex) {
+                      0 => l.searchPlaceholder,
+                      1 => l.searchChatPlaceholder,
+                      2 => l.searchMemoPlaceholder,
+                      _ => l.searchPlaceholder,
+                    },
+                    border: InputBorder.none,
+                  ),
+                )
+              : Text(_getAppBarTitle(l, _currentIndex)),
       centerTitle: true,
       actions: [
         if (activeVoiceRoom != null)
@@ -913,6 +920,53 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (index == 2) return l.navMemo;
     if (index == 3) return l.navSchedule;
     return l.navGroups;
+  }
+}
+
+class _GroupSearchBarButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _GroupSearchBarButton({
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: cs.surfaceContainerHighest.withOpacity(0.72),
+      borderRadius: BorderRadius.circular(28),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(28),
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 140, maxWidth: 240),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.search, size: 20, color: cs.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: cs.onSurfaceVariant,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
