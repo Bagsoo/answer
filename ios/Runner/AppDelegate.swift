@@ -106,7 +106,7 @@ class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
     let adView = NativeAdView()
 
     adView.translatesAutoresizingMaskIntoConstraints = false
-    adView.heightAnchor.constraint(equalToConstant: 72).isActive = true
+    adView.heightAnchor.constraint(equalToConstant: 144).isActive = true
 
     let container = UIView()
     container.translatesAutoresizingMaskIntoConstraints = false
@@ -161,6 +161,22 @@ class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
       adChoicesView.heightAnchor.constraint(equalToConstant: 20)
     ])
     adView.adChoicesView = adChoicesView
+
+    adView.clipsToBounds = false
+    container.clipsToBounds = false
+
+    let mediaView = GADMediaView()
+    mediaView.translatesAutoresizingMaskIntoConstraints = false
+    mediaView.alpha = 0.0
+    container.addSubview(mediaView)
+    container.sendSubviewToBack(mediaView)
+    NSLayoutConstraint.activate([
+      mediaView.widthAnchor.constraint(equalToConstant: 120),
+      mediaView.heightAnchor.constraint(equalToConstant: 120),
+      mediaView.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 0),
+      mediaView.topAnchor.constraint(equalTo: container.topAnchor, constant: 0)
+    ])
+    adView.mediaView = mediaView
 
     let vStack = UIStackView()
     vStack.axis = .vertical

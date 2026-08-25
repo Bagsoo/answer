@@ -23,11 +23,13 @@ class ListTileNativeAdFactory(private val context: Context) : NativeAdFactory {
         val iconView = adView.findViewById<ImageView>(R.id.ad_app_icon)
         val callToActionView = adView.findViewById<Button>(R.id.ad_call_to_action)
         val badgeView = adView.findViewById<TextView>(R.id.ad_badge)
+        val mediaView = adView.findViewById<com.google.android.gms.ads.nativead.MediaView>(R.id.ad_media)
 
         adView.headlineView = headlineView
         adView.bodyView = bodyView
         adView.iconView = iconView
         adView.callToActionView = callToActionView
+        adView.mediaView = mediaView
 
         // Apply custom localized label if possible
         val adLabel = customOptions?.get("adLabel") as? String

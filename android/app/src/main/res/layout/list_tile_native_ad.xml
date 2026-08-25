@@ -2,12 +2,16 @@
 <com.google.android.gms.ads.nativead.NativeAdView
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="72dp"
+    android:layout_height="144dp"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     android:background="#00000000">
 
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:paddingHorizontal="16dp"
         android:paddingVertical="12dp">
 
@@ -84,6 +88,15 @@
             android:minHeight="0dp"
             android:minWidth="0dp"
             style="?android:attr/borderlessButtonStyle"/>
+
+        <com.google.android.gms.ads.nativead.MediaView
+            android:id="@+id/ad_media"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:layout_alignParentStart="true"
+            android:layout_alignParentTop="true"
+            android:visibility="visible"
+            android:alpha="0.0" />
 
     </RelativeLayout>
 </com.google.android.gms.ads.nativead.NativeAdView>

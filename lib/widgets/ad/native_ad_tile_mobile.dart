@@ -51,7 +51,7 @@ class _NativeAdTileState extends State<NativeAdTileMobile> {
   Widget build(BuildContext context) {
     return switch (_ctrl.state) {
       AdState.loaded => SizedBox(
-          height: 72,
+          height: 144,
           width: double.infinity,
           child: AdWidget(ad: _ctrl.nativeAd!),
         ),
@@ -68,7 +68,7 @@ class _AdPlaceholder extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return SizedBox(
-      height: 72,
+      height: 144,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
