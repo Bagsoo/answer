@@ -165,7 +165,7 @@ class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
     adView.clipsToBounds = false
     container.clipsToBounds = false
 
-    let mediaView = GADMediaView()
+    let mediaView = MediaView()
     mediaView.translatesAutoresizingMaskIntoConstraints = false
     mediaView.alpha = 0.0
     container.addSubview(mediaView)
