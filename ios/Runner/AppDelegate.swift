@@ -86,6 +86,13 @@ import google_mobile_ads
       factoryId: "listTile",
       nativeAdFactory: factory
     )
+
+    let groupFactory = GroupCardNativeAdFactory()
+    FLTGoogleMobileAdsPlugin.registerNativeAdFactory(
+      engineBridge.pluginRegistry,
+      factoryId: "groupTile",
+      nativeAdFactory: groupFactory
+    )
   }
 }
 
@@ -234,5 +241,166 @@ class ListTileNativeAdFactory: NSObject, FLTNativeAdFactory {
 
     adView.nativeAd = nativeAd
     return adView
+  }
+}
+
+class GroupCardNativeAdFactory: NSObject, FLTNativeAdFactory {
+  func createNativeAd(_ nativeAd: NativeAd, customOptions: [AnyHashable : Any]? = nil) -> NativeAdView? {
+    let adView = NativeAdView()
+    let isDark = (customOptions?["themeBrightness"] as? String) == "dark"
+    let bgColor = isDark
+      ? UIColor(red: 42/255.0, green: 32/255.0, blue: 30/255.0, alpha: 1.0)
+      : UIColor(red: 255/255.0, green: 252/255.0, blue: 250/255.0, alpha: 1.0)
+    let borderColor = isDark
+      ? UIColor(white: 1.0, alpha: 0.16)
+      : UIColor(white: 0.0, alpha: 0.07)
+    let iconBg = isDark
+      ? UIColor(red: 74/255.0, green: 55/255.0, blue: 51/255.0, alpha: 1.0)
+      : UIColor(red: 244/255.0, green: 225/255.0, blue: 220/255.0, alpha: 1.0)
+    let attributionBg = isDark
+      ? UIColor(red: 74/255.0, green: 55/255.0, blue: 51/255.0, alpha: 1.0)
+      : UIColor(red: 234/255.0, green: 221/255.0, blue: 212/255.0, alpha: 1.0)
+    let attributionText = isDark
+      ? UIColor(red: 250/255.0, green: 240/255.0, blue: 235/255.0, alpha: 1.0)
+      : UIColor(red: 107/255.0, green: 43/255.0, blue: 30/255.0, alpha: 1.0)
+    let headlineText = isDark
+      ? UIColor(red: 255/255.0, green: 246/255.0, blue: 241/255.0, alpha: 1.0)
+      : UIColor(red: 35/255.0, green: 24/255.0, blue: 21/255.0, alpha: 1.0)
+    let bodyText = isDark
+      ? UIColor(red: 244/255.0, green: 231/255.0, blue: 225/255.0, alpha: 0.82)
+      : UIColor(red: 35/255.0, green: 24/255.0, blue: 21/255.0, alpha: 0.6)
+    let ctaBg = isDark
+      ? UIColor(red: 99/255.0, green: 74/255.0, blue: 67/255.0, alpha: 1.0)
+      : UIColor(red: 230/255.0, green: 203/255.0, blue: 184/255.0, alpha: 1.0)
+    let ctaText = isDark
+      ? UIColor(red: 255/255.0, green: 249/255.0, blue: 246/255.0, alpha: 1.0)
+      : UIColor(red: 74/255.0, green: 24/255.0, blue: 14/255.0, alpha: 1.0)
+
+    adView.translatesAutoresizingMaskIntoConstraints = false
+    adView.heightAnchor.constraint(equalToConstant: 152).isActive = true
+
+    let container = UIView()
+    container.translatesAutoresizingMaskIntoConstraints = false
+    container.backgroundColor = bgColor
+    container.layer.cornerRadius = 22
+    container.layer.borderWidth = 1
+    container.layer.borderColor = borderColor.cgColor
+    adView.addSubview(container)
+    NSLayoutConstraint.activate([
+      container.topAnchor.constraint(equalTo: adView.topAnchor, constant: 0),
+      container.bottomAnchor.constraint(equalTo: adView.bottomAnchor, constant: 0),
+      container.leadingAnchor.constraint(equalTo: adView.leadingAnchor, constant: 0),
+      container.trailingAnchor.constraint(equalTo: adView.trailingAnchor, constant: 0)
+    ])
+
+    let iconView = UIImageView()
+    iconView.translatesAutoresizingMaskIntoConstraints = false
+    iconView.layer.cornerRadius = 22
+    iconView.clipsToBounds = true
+    iconView.backgroundColor = iconBg
+    iconView.contentMode = .scaleAspectFill
+    container.addSubview(iconView)
+    NSLayoutConstraint.activate([
+      iconView.widthAnchor.constraint(equalToConstant: 44),
+      iconView.heightAnchor.constraint(equalToConstant: 44),
+      iconView.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 14),
+      iconView.topAnchor.constraint(equalTo: container.topAnchor, constant: 14)
+    ])
+    adView.iconView = iconView
+
+    let adChoicesView = AdChoicesView()
+    adChoicesView.translatesAutoresizingMaskIntoConstraints = false
+    container.addSubview(adChoicesView)
+    NSLayoutConstraint.activate([
+      adChoicesView.topAnchor.constraint(equalTo: container.topAnchor, constant: 14),
+      adChoicesView.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -14),
+      adChoicesView.widthAnchor.constraint(equalToConstant: 16),
+      adChoicesView.heightAnchor.constraint(equalToConstant: 16)
+    ])
+    adView.adChoicesView = adChoicesView
+
+    let headline = UILabel()
+    headline.translatesAutoresizingMaskIntoConstraints = false
+    headline.font = UIFont.systemFont(ofSize: 16, weight: .bold)
+    headline.textColor = headlineText
+    headline.numberOfLines = 1
+    container.addSubview(headline)
+    NSLayoutConstraint.activate([
+      headline.topAnchor.constraint(equalTo: iconView.topAnchor),
+      headline.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 10),
+      headline.trailingAnchor.constraint(lessThanOrEqualTo: adChoicesView.leadingAnchor, constant: -8)
+    ])
+    adView.headlineView = headline
+
+    let attribution = PaddingLabel()
+    attribution.translatesAutoresizingMaskIntoConstraints = false
+    attribution.text = (customOptions?["adLabel"] as? String) ?? "Ad"
+    attribution.textColor = attributionText
+    attribution.backgroundColor = attributionBg
+    attribution.font = UIFont.systemFont(ofSize: 9, weight: .bold)
+    attribution.layer.cornerRadius = 6
+    attribution.layer.masksToBounds = true
+    container.addSubview(attribution)
+    NSLayoutConstraint.activate([
+      attribution.topAnchor.constraint(equalTo: headline.bottomAnchor, constant: 4),
+      attribution.leadingAnchor.constraint(equalTo: headline.leadingAnchor),
+      attribution.heightAnchor.constraint(equalToConstant: 16)
+    ])
+
+    let body = UILabel()
+    body.translatesAutoresizingMaskIntoConstraints = false
+    body.font = UIFont.systemFont(ofSize: 12, weight: .regular)
+    body.textColor = bodyText
+    body.numberOfLines = 2
+    container.addSubview(body)
+    NSLayoutConstraint.activate([
+      body.topAnchor.constraint(equalTo: attribution.bottomAnchor, constant: 3),
+      body.leadingAnchor.constraint(equalTo: headline.leadingAnchor),
+      body.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -14)
+    ])
+    adView.bodyView = body
+
+    let ctaButton = UIButton(type: .system)
+    ctaButton.translatesAutoresizingMaskIntoConstraints = false
+    ctaButton.backgroundColor = ctaBg
+    ctaButton.setTitleColor(ctaText, for: .normal)
+    ctaButton.titleLabel?.font = UIFont.systemFont(ofSize: 11, weight: .semibold)
+    ctaButton.contentEdgeInsets = UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
+    ctaButton.layer.cornerRadius = 15
+    ctaButton.layer.masksToBounds = true
+    ctaButton.isUserInteractionEnabled = false
+    container.addSubview(ctaButton)
+    NSLayoutConstraint.activate([
+      ctaButton.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -14),
+      ctaButton.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -14),
+      ctaButton.heightAnchor.constraint(equalToConstant: 30),
+      ctaButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 52)
+    ])
+    adView.callToActionView = ctaButton
+
+    let divider = UIView()
+    divider.translatesAutoresizingMaskIntoConstraints = false
+    divider.backgroundColor = isDark ? UIColor(white: 1.0, alpha: 0.08) : UIColor(white: 0.0, alpha: 0.06)
+    container.addSubview(divider)
+    NSLayoutConstraint.activate([
+      divider.leadingAnchor.constraint(equalTo: iconView.leadingAnchor),
+      divider.trailingAnchor.constraint(equalTo: ctaButton.leadingAnchor, constant: -10),
+      divider.bottomAnchor.constraint(equalTo: ctaButton.centerYAnchor),
+      divider.heightAnchor.constraint(equalToConstant: 1)
+    ])
+
+    adView.setNativeAd(nativeAd)
+    return adView
+  }
+}
+
+final class PaddingLabel: UILabel {
+  override func drawText(in rect: CGRect) {
+    super.drawText(in: rect.inset(by: UIEdgeInsets(top: 1, left: 6, bottom: 1, right: 6)))
+  }
+
+  override var intrinsicContentSize: CGSize {
+    let size = super.intrinsicContentSize
+    return CGSize(width: size.width + 12, height: size.height + 2)
   }
 }

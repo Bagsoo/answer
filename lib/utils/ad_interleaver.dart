@@ -9,12 +9,22 @@ const int _kMaxAdsPerList         = 2; // 전체 최대 광고 수
 
 /// [items] 리스트 사이사이에 [NativeAdTile]을 삽입해 반환.
 /// 여러 섹션에서 동일하게 호출할 경우 키 중복을 막기 위해 [keyPrefix]를 사용할 수 있습니다.
-List<Widget> interleaveAds(List<Widget> items, {String keyPrefix = 'native_ad'}) {
+List<Widget> interleaveAds(
+  List<Widget> items, {
+  String keyPrefix = 'native_ad',
+  int? minItemsBeforeFirstAd,
+  int? minItemsBetweenAds,
+  int? maxAdsPerList,
+}) {
   // 모바일 플랫폼(Android, iOS)이 아니면 광고 삽입 없이 원본 리스트 반환
   final isMobile = !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
   if (!isMobile) return items;
 
-  if (items.length < _kMinItemsBeforeFirstAd) return items;
+  final firstThreshold = minItemsBeforeFirstAd ?? _kMinItemsBeforeFirstAd;
+  final betweenThreshold = minItemsBetweenAds ?? _kMinItemsBetweenAds;
+  final maxAds = maxAdsPerList ?? _kMaxAdsPerList;
+
+  if (items.length < firstThreshold) return items;
 
   final result = <Widget>[];
   int adsInserted = 0;
@@ -25,10 +35,10 @@ List<Widget> interleaveAds(List<Widget> items, {String keyPrefix = 'native_ad'})
     itemsSinceLastAd++;
 
     final isAfterFirstThreshold =
-        i + 1 >= _kMinItemsBeforeFirstAd && adsInserted == 0;
+        i + 1 >= firstThreshold && adsInserted == 0;
     final isAfterInterval =
-        itemsSinceLastAd >= _kMinItemsBetweenAds && adsInserted > 0;
-    final canInsertMore = adsInserted < _kMaxAdsPerList;
+        itemsSinceLastAd >= betweenThreshold && adsInserted > 0;
+    final canInsertMore = adsInserted < maxAds;
     final isNotLast = i < items.length - 1;
 
     if (canInsertMore && isNotLast && (isAfterFirstThreshold || isAfterInterval)) {

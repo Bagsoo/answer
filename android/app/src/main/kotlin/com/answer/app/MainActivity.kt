@@ -112,11 +112,15 @@ class MainActivity : FlutterActivity() {
         GoogleMobileAdsPlugin.registerNativeAdFactory(
             flutterEngine, "listTile", ListTileNativeAdFactory(context)
         )
+        GoogleMobileAdsPlugin.registerNativeAdFactory(
+            flutterEngine, "groupTile", GroupCardNativeAdFactory(context)
+        )
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
         super.cleanUpFlutterEngine(flutterEngine)
         GoogleMobileAdsPlugin.unregisterNativeAdFactory(flutterEngine, "listTile")
+        GoogleMobileAdsPlugin.unregisterNativeAdFactory(flutterEngine, "groupTile")
     }
 
     private fun parseShareIntent(intent: Intent?): Map<String, Any?>? {

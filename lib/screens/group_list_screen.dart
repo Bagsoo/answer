@@ -6,10 +6,13 @@ import '../providers/user_provider.dart';
 import '../services/group_service.dart';
 import '../services/local_preferences_service.dart';
 import '../services/recommendation_service.dart';
+import '../widgets/ad/group_native_ad_tile.dart';
 import '../widgets/groups/group_tile.dart';
+import '../widgets/groups/recommendation_group_card.dart';
 import 'profile_screen.dart';
 import 'create_group_screen.dart';
 import 'group_detail_screen.dart';
+import 'group_recommendation_section_screen.dart';
 import 'group_preview_screen.dart';
 import '../utils/ad_interleaver.dart';
 import '../services/group_cache_service.dart';
@@ -43,7 +46,7 @@ class _GroupListScreenState extends State<GroupListScreen>
   List<Map<String, dynamic>> _joinedGroups = [];
   bool _joinedLoading = true;
 
-  List<Map<String, dynamic>> _recommendedGroups = [];
+  RecommendationSections? _recommendationSections;
   bool _recommendLoading = false;
   bool _recommendLoaded = false;
   String? _recommendErrorMsg;
@@ -119,10 +122,10 @@ class _GroupListScreenState extends State<GroupListScreen>
     try {
       final results = await context
           .read<RecommendationService>()
-          .getRecommendedGroups();
+          .getRecommendationSections(previewLimit: 8);
       if (mounted) {
         setState(() {
-          _recommendedGroups = results;
+          _recommendationSections = results;
           _recommendLoading = false;
         });
       }
@@ -293,15 +296,7 @@ class _GroupListScreenState extends State<GroupListScreen>
 
     final hasLocation = userProvider.hasLocation;
     final hasInterests = userProvider.interests.isNotEmpty;
-
-    final recommendWidgets = _recommendedGroups.map<Widget>((group) {
-      final isJoined = joinedIds.contains(group['id'] as String? ?? '');
-      return ExploreGroupTile(
-        group: group,
-        isAlreadyJoined: isJoined,
-        onTap: () => _handleGroupTap(group, isJoined),
-      );
-    }).toList();
+    final sections = _recommendationSections;
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -311,6 +306,7 @@ class _GroupListScreenState extends State<GroupListScreen>
       child: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
+          _buildRecommendHeader(l, cs),
           if (!hasLocation || !hasInterests)
             _RecommendSetupBanner(
               hasLocation: hasLocation,
@@ -318,32 +314,300 @@ class _GroupListScreenState extends State<GroupListScreen>
               l: l,
               cs: cs,
             ),
-
-          if (_recommendedGroups.isEmpty)
+          if (sections == null ||
+              (sections.activeGroups.isEmpty &&
+                  sections.personalizedGroups.isEmpty &&
+                  sections.nearbyNewGroups.isEmpty))
             Padding(
               padding: const EdgeInsets.only(top: 60),
               child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.recommend_outlined,
-                          size: 48, color: cs.onSurface.withOpacity(0.3)),
-                      const SizedBox(height: 16),
-                      Text(
-                        _recommendErrorMsg ?? l.noRecommendations,
-                        style: TextStyle(
-                            color: _recommendErrorMsg != null ? cs.error : cs.onSurface.withOpacity(0.5)),
-                        textAlign: TextAlign.center,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.recommend_outlined,
+                        size: 48, color: cs.onSurface.withOpacity(0.3)),
+                    const SizedBox(height: 16),
+                    Text(
+                      _recommendErrorMsg ?? l.noRecommendations,
+                      style: TextStyle(
+                        color: _recommendErrorMsg != null
+                            ? cs.error
+                            : cs.onSurface.withOpacity(0.5),
                       ),
-                    ],
-                  ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
+              ),
             )
           else
-            ...interleaveAds(recommendWidgets, keyPrefix: 'recommend_ad'),
+            ..._buildSectionBlocks(context, l, cs, sections, joinedIds),
         ],
       ),
     );
+  }
+
+  Widget _buildRecommendHeader(AppLocalizations l, ColorScheme cs) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              cs.primaryContainer.withOpacity(0.85),
+              cs.surfaceContainerHighest,
+            ],
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: cs.primary.withOpacity(0.15),
+              child: Icon(Icons.explore, color: cs.primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l.recommended,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: cs.onPrimaryContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${l.activeGroups}, ${l.personalizedGroups}, ${l.nearbyNewGroups}',
+                    style: TextStyle(
+                      color: cs.onPrimaryContainer.withOpacity(0.8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildSectionBlocks(
+    BuildContext context,
+    AppLocalizations l,
+    ColorScheme cs,
+    RecommendationSections sections,
+    Set<String> joinedIds,
+  ) {
+    return [
+      _buildSectionBlock(
+        context,
+        title: l.activeGroups,
+        description: l.activeGroupsDesc,
+        items: sections.activeGroups,
+        emptyLabel: l.noActiveGroups,
+        section: RecommendationSectionType.active,
+        l: l,
+        cs: cs,
+        joinedIds: joinedIds,
+      ),
+      _buildSectionBlock(
+        context,
+        title: l.personalizedGroups,
+        description: l.personalizedGroupsDesc,
+        items: sections.personalizedGroups,
+        emptyLabel: l.noPersonalizedGroups,
+        section: RecommendationSectionType.personalized,
+        l: l,
+        cs: cs,
+        joinedIds: joinedIds,
+      ),
+      _buildSectionBlock(
+        context,
+        title: l.nearbyNewGroups,
+        description: l.nearbyNewGroupsDesc,
+        items: sections.nearbyNewGroups,
+        emptyLabel: l.noNearbyNewGroups,
+        section: RecommendationSectionType.nearbyNew,
+        l: l,
+        cs: cs,
+        joinedIds: joinedIds,
+      ),
+    ];
+  }
+
+  Widget _buildSectionBlock(
+    BuildContext context, {
+    required String title,
+    required String description,
+    required List<Map<String, dynamic>> items,
+    required String emptyLabel,
+    required RecommendationSectionType section,
+    required AppLocalizations l,
+    required ColorScheme cs,
+    required Set<String> joinedIds,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => GroupRecommendationSectionScreen(
+                      section: section,
+                    ),
+                  ),
+                ),
+                child: Text(l.seeAll),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (items.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: cs.outlineVariant.withOpacity(0.3)),
+              ),
+              child: Text(
+                emptyLabel,
+                style: TextStyle(color: cs.onSurfaceVariant),
+              ),
+            )
+          else
+            ..._buildSectionItems(
+              context,
+              items: items,
+              section: section,
+              joinedIds: joinedIds,
+              l: l,
+              cs: cs,
+            ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildSectionItems(
+    BuildContext context, {
+    required List<Map<String, dynamic>> items,
+    required RecommendationSectionType section,
+    required Set<String> joinedIds,
+    required AppLocalizations l,
+    required ColorScheme cs,
+  }) {
+    final previewItems = items.take(8).toList();
+    final widgets = <Widget>[];
+    for (var i = 0; i < previewItems.length; i++) {
+      final group = previewItems[i];
+      final groupId = group['id'] as String? ?? '';
+      final isJoined = joinedIds.contains(groupId);
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: RecommendationGroupCard(
+            group: group,
+            isJoined: isJoined,
+            onTap: () => _handleGroupTap(group, isJoined),
+            chips: _sectionReasonChips(section, l, group),
+          ),
+        ),
+      );
+
+      final shouldInsertAd = i == 2 && previewItems.length >= 5;
+      if (shouldInsertAd) {
+        widgets.add(
+          const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: GroupNativeAdTile(),
+          ),
+        );
+      }
+    }
+
+    if (previewItems.length >= 5) {
+      widgets.add(
+        Align(
+          alignment: Alignment.center,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => GroupRecommendationSectionScreen(
+                    section: section,
+                  ),
+                ),
+              ),
+              child: Text(l.seeAll),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return widgets;
+  }
+
+  List<String> _sectionReasonChips(
+    RecommendationSectionType section,
+    AppLocalizations l,
+    Map<String, dynamic> group,
+  ) {
+    switch (section) {
+      case RecommendationSectionType.active:
+        return [
+          l.recentlyActive,
+          '${l.activityScore} ${(group['_score'] as num?)?.toDouble().toStringAsFixed(0) ?? '0'}',
+        ];
+      case RecommendationSectionType.personalized:
+        final matched = (group['matched_interest_count'] as num?)?.toInt() ?? 0;
+        return [
+          if (matched > 0) '${l.matchedInterests} $matched',
+        ];
+      case RecommendationSectionType.nearbyNew:
+        return [
+          l.newlyCreated,
+        ];
+    }
   }
 }
 
