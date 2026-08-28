@@ -389,7 +389,7 @@ class GroupCardNativeAdFactory: NSObject, FLTNativeAdFactory {
       divider.heightAnchor.constraint(equalToConstant: 1)
     ])
 
-    adView.setNativeAd(nativeAd)
+    adView.nativeAd = nativeAd
     return adView
   }
 }
