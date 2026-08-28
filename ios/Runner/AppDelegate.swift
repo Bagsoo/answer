@@ -278,6 +278,7 @@ class GroupCardNativeAdFactory: NSObject, FLTNativeAdFactory {
 
     adView.translatesAutoresizingMaskIntoConstraints = false
     adView.heightAnchor.constraint(equalToConstant: 152).isActive = true
+    adView.widthAnchor.constraint(equalToConstant: UIScreen.main.bounds.width - 32).isActive = true
 
     let container = UIView()
     container.translatesAutoresizingMaskIntoConstraints = false
@@ -285,6 +286,7 @@ class GroupCardNativeAdFactory: NSObject, FLTNativeAdFactory {
     container.layer.cornerRadius = 22
     container.layer.borderWidth = 1
     container.layer.borderColor = borderColor.cgColor
+    container.clipsToBounds = true
     adView.addSubview(container)
     NSLayoutConstraint.activate([
       container.topAnchor.constraint(equalTo: adView.topAnchor, constant: 0),
