@@ -295,6 +295,17 @@ class GroupCardNativeAdFactory: NSObject, FLTNativeAdFactory {
       container.trailingAnchor.constraint(equalTo: adView.trailingAnchor, constant: 0)
     ])
 
+    let adChoicesView = AdChoicesView()
+    adChoicesView.translatesAutoresizingMaskIntoConstraints = false
+    container.addSubview(adChoicesView)
+    NSLayoutConstraint.activate([
+      adChoicesView.topAnchor.constraint(equalTo: container.topAnchor, constant: 14),
+      adChoicesView.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -14),
+      adChoicesView.widthAnchor.constraint(equalToConstant: 16),
+      adChoicesView.heightAnchor.constraint(equalToConstant: 16)
+    ])
+    adView.adChoicesView = adChoicesView
+
     let iconView = UIImageView()
     iconView.translatesAutoresizingMaskIntoConstraints = false
     iconView.layer.cornerRadius = 22
@@ -310,29 +321,17 @@ class GroupCardNativeAdFactory: NSObject, FLTNativeAdFactory {
     ])
     adView.iconView = iconView
 
-    let adChoicesView = AdChoicesView()
-    adChoicesView.translatesAutoresizingMaskIntoConstraints = false
-    container.addSubview(adChoicesView)
+    let contentStack = UIStackView()
+    contentStack.axis = .vertical
+    contentStack.alignment = .leading
+    contentStack.spacing = 3
+    contentStack.translatesAutoresizingMaskIntoConstraints = false
+    container.addSubview(contentStack)
     NSLayoutConstraint.activate([
-      adChoicesView.topAnchor.constraint(equalTo: container.topAnchor, constant: 14),
-      adChoicesView.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -14),
-      adChoicesView.widthAnchor.constraint(equalToConstant: 16),
-      adChoicesView.heightAnchor.constraint(equalToConstant: 16)
+      contentStack.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 10),
+      contentStack.trailingAnchor.constraint(lessThanOrEqualTo: adChoicesView.leadingAnchor, constant: -8),
+      contentStack.topAnchor.constraint(equalTo: iconView.topAnchor)
     ])
-    adView.adChoicesView = adChoicesView
-
-    let headline = UILabel()
-    headline.translatesAutoresizingMaskIntoConstraints = false
-    headline.font = UIFont.systemFont(ofSize: 16, weight: .bold)
-    headline.textColor = headlineText
-    headline.numberOfLines = 1
-    container.addSubview(headline)
-    NSLayoutConstraint.activate([
-      headline.topAnchor.constraint(equalTo: iconView.topAnchor),
-      headline.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 10),
-      headline.trailingAnchor.constraint(lessThanOrEqualTo: adChoicesView.leadingAnchor, constant: -8)
-    ])
-    adView.headlineView = headline
 
     let attribution = PaddingLabel()
     attribution.translatesAutoresizingMaskIntoConstraints = false
@@ -342,24 +341,26 @@ class GroupCardNativeAdFactory: NSObject, FLTNativeAdFactory {
     attribution.font = UIFont.systemFont(ofSize: 9, weight: .bold)
     attribution.layer.cornerRadius = 6
     attribution.layer.masksToBounds = true
-    container.addSubview(attribution)
-    NSLayoutConstraint.activate([
-      attribution.topAnchor.constraint(equalTo: headline.bottomAnchor, constant: 4),
-      attribution.leadingAnchor.constraint(equalTo: headline.leadingAnchor),
-      attribution.heightAnchor.constraint(equalToConstant: 16)
-    ])
+    contentStack.addArrangedSubview(attribution)
+
+    let headline = UILabel()
+    headline.translatesAutoresizingMaskIntoConstraints = false
+    headline.font = UIFont.systemFont(ofSize: 16, weight: .bold)
+    headline.textColor = headlineText
+    headline.numberOfLines = 2
+    headline.lineBreakMode = .byTruncatingTail
+    headline.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    contentStack.addArrangedSubview(headline)
+    adView.headlineView = headline
 
     let body = UILabel()
     body.translatesAutoresizingMaskIntoConstraints = false
     body.font = UIFont.systemFont(ofSize: 12, weight: .regular)
     body.textColor = bodyText
     body.numberOfLines = 2
-    container.addSubview(body)
-    NSLayoutConstraint.activate([
-      body.topAnchor.constraint(equalTo: attribution.bottomAnchor, constant: 3),
-      body.leadingAnchor.constraint(equalTo: headline.leadingAnchor),
-      body.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -14)
-    ])
+    body.lineBreakMode = .byTruncatingTail
+    body.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    contentStack.addArrangedSubview(body)
     adView.bodyView = body
 
     let ctaButton = UIButton(type: .system)
@@ -379,17 +380,6 @@ class GroupCardNativeAdFactory: NSObject, FLTNativeAdFactory {
       ctaButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 52)
     ])
     adView.callToActionView = ctaButton
-
-    let divider = UIView()
-    divider.translatesAutoresizingMaskIntoConstraints = false
-    divider.backgroundColor = isDark ? UIColor(white: 1.0, alpha: 0.08) : UIColor(white: 0.0, alpha: 0.06)
-    container.addSubview(divider)
-    NSLayoutConstraint.activate([
-      divider.leadingAnchor.constraint(equalTo: iconView.leadingAnchor),
-      divider.trailingAnchor.constraint(equalTo: ctaButton.leadingAnchor, constant: -10),
-      divider.bottomAnchor.constraint(equalTo: ctaButton.centerYAnchor),
-      divider.heightAnchor.constraint(equalToConstant: 1)
-    ])
 
     adView.nativeAd = nativeAd
     return adView
