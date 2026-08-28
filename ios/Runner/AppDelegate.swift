@@ -381,6 +381,15 @@ class GroupCardNativeAdFactory: NSObject, FLTNativeAdFactory {
     ])
     adView.callToActionView = ctaButton
 
+    (adView.headlineView as? UILabel)?.text = nativeAd.headline
+    (adView.bodyView as? UILabel)?.text = nativeAd.body
+    (adView.callToActionView as? UIButton)?.setTitle(nativeAd.callToAction, for: .normal)
+    (adView.iconView as? UIImageView)?.image = nativeAd.icon?.image
+
+    adView.callToActionView?.isHidden = nativeAd.callToAction == nil
+    adView.iconView?.isHidden = nativeAd.icon == nil
+    adView.bodyView?.isHidden = nativeAd.body == nil
+
     adView.nativeAd = nativeAd
     return adView
   }
